@@ -1,0 +1,5 @@
+1:"$Sreact.fragment"
+2:I[97367,["/_next/static/chunks/0o~269zocnb95.js"],"ViewportBoundary"]
+3:I[97367,["/_next/static/chunks/0o~269zocnb95.js"],"MetadataBoundary"]
+4:"$Sreact.suspense"
+0:{"rsc":["$","$1","h",{"children":[null,["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"Leap - 起業家の成長を追える資本提携プラットフォーム"}],["$","meta","1",{"name":"description","content":"Leapは起業家の進捗とKPIを投資家が継続的に観察できるSNS型資本提携プラットフォームです。"}]]}]}]}],null]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"YVTQKNzioxZ_irLS_0zym"}
