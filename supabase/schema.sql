@@ -1,6 +1,10 @@
 create extension if not exists "pgcrypto";
 
-create type public.user_role as enum ('entrepreneur', 'investor', 'admin');
+do $$ begin
+  create type public.user_role as enum ('entrepreneur', 'investor', 'admin');
+exception
+  when duplicate_object then null;
+end $$;
 
 create table public.users (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -37,10 +41,21 @@ create table public.entrepreneur_profiles (
   verified_interview boolean not null default false,
   verified_revenue boolean not null default false,
   is_fast_growing boolean not null default false,
-  is_hidden boolean not null default false,
+  is_hidden boolean not null default true,
+  payment_status text not null default 'unpaid' check (payment_status in ('unpaid', 'pending_review', 'paid')),
+  payment_requested_at timestamptz,
+  paid_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.entrepreneur_profiles
+  add column if not exists payment_status text not null default 'unpaid',
+  add column if not exists payment_requested_at timestamptz,
+  add column if not exists paid_at timestamptz;
+
+alter table public.entrepreneur_profiles
+  alter column is_hidden set default true;
 
 create table public.investor_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -135,8 +150,20 @@ create table public.meeting_requests (
   message text,
   proposed_at timestamptz,
   status text not null default 'pending',
+  ticket_plan text,
+  ticket_count int not null default 1,
+  ticket_amount numeric not null default 11000,
+  ticket_payment_status text not null default 'unpaid',
+  confirmed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.meeting_requests
+  add column if not exists ticket_plan text,
+  add column if not exists ticket_count int not null default 1,
+  add column if not exists ticket_amount numeric not null default 11000,
+  add column if not exists ticket_payment_status text not null default 'unpaid',
+  add column if not exists confirmed_at timestamptz;
 
 create table public.pitch_materials (
   id uuid primary key default gen_random_uuid(),
