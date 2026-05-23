@@ -6,6 +6,7 @@ export type AppUser = {
   role: UserRole;
   profile_completed: boolean;
   is_suspended: boolean;
+  notification_email_enabled: boolean;
 };
 
 export type EntrepreneurProfile = {
@@ -36,6 +37,10 @@ export type EntrepreneurProfile = {
   is_hidden: boolean;
   payment_status: 'unpaid' | 'pending_review' | 'paid';
   payment_transfer_name: string | null;
+  payment_plan_id: string | null;
+  payment_plan_label: string | null;
+  payment_plan_months: number | null;
+  payment_plan_amount: number | null;
   payment_requested_at: string | null;
   paid_at: string | null;
 };

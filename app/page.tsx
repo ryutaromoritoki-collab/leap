@@ -38,6 +38,7 @@ import {
   Rocket,
   Search,
   Send,
+  Settings,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -56,6 +57,7 @@ type View =
   | 'kpi'
   | 'messages'
   | 'admin'
+  | 'settings'
   | 'legal'
   | 'launch';
 
@@ -74,7 +76,7 @@ const legalCopy: Record<LegalSlug, { title: string; body: string }> = {
   },
   commerce: {
     title: '特定商取引法に基づく表記',
-    body: '起業家プロフィールの公開費用は月額11,000円です。投資家との面談チケットは1枚11,000円、3枚29,700円、5枚44,000円です。支払方法は銀行振込のみです。振込先は近畿産業信用組合 本店営業部 普通 3170341 カ）エーアイインフルエンサーです。',
+    body: '起業家プロフィールの公開費用は1ヶ月11,000円、3ヶ月29,700円、6ヶ月55,000円、1年間99,000円です。投資家との面談チケットは1枚11,000円、3枚29,700円、5枚44,000円です。支払方法は銀行振込のみです。振込先は近畿産業信用組合 本店営業部 普通 3170341 カ）エーアイインフルエンサーです。',
   },
   disclaimer: {
     title: '免責事項',
@@ -118,13 +120,18 @@ const paymentLabels: Record<string, string> = {
   paid: '入金確認済み',
 };
 const bankAccount = {
-  fee: '月額 11,000円',
   bank: '近畿産業信用組合',
   branch: '本店営業部',
   type: '普通',
   number: '3170341',
   holder: 'カ）エーアイインフルエンサー',
 };
+const entrepreneurPaymentPlans = [
+  { id: 'one_month', label: '1ヶ月', months: 1, amount: 11000 },
+  { id: 'three_months', label: '3ヶ月', months: 3, amount: 29700 },
+  { id: 'six_months', label: '6ヶ月', months: 6, amount: 55000 },
+  { id: 'one_year', label: '1年間', months: 12, amount: 99000 },
+];
 const ticketPlans = [
   { id: 'one', label: '1枚', count: 1, amount: 11000 },
   { id: 'three', label: '3枚', count: 3, amount: 29700 },
@@ -254,16 +261,18 @@ export default function LeapApp() {
       const { data: ownProfile } = await supabase.from('entrepreneur_profiles').select('*').eq('user_id', user.id).maybeSingle();
       setProfile((ownProfile as EntrepreneurProfile | null) ?? null);
       if (ownProfile) {
-        const [{ data: postRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }] = await Promise.all([
+        const [{ data: postRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
+          supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
         ]);
         setPosts((postRows as ProgressPost[]) ?? []);
         setKpis((kpiRows as StartupKpi[]) ?? []);
         setFollows(followRows ?? []);
         setMeetings(meetingRows ?? []);
+        setMessages(messageRows ?? []);
       }
     }
 
@@ -388,6 +397,7 @@ export default function LeapApp() {
           </div>
           <div className="flex items-center gap-2">
             <span className="btn-secondary hidden h-11 px-3 text-xs sm:inline-flex"><Bell size={16} /> {notifications.length}</span>
+            <button className="btn-secondary h-11 px-3" onClick={() => setView('settings')} aria-label="設定"><Settings size={17} /></button>
             <button className="btn-secondary h-11 px-3" onClick={signOut}><LogOut size={17} /></button>
           </div>
         </header>
@@ -416,6 +426,7 @@ export default function LeapApp() {
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
         {view === 'messages' && <Messages currentUser={user} messages={messages} refresh={loadWorkspace} />}
         {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
+        {view === 'settings' && <SettingsPage currentUser={user} refresh={loadUser} />}
         {view === 'legal' && <LegalPage slug={legalSlug} currentUser={user} />}
         {view === 'launch' && <LaunchChecklist />}
       </main>
@@ -441,6 +452,7 @@ function titleFor(view: View, role: UserRole) {
     kpi: 'KPIダッシュボード',
     messages: 'メッセージ',
     admin: '管理者ページ',
+    settings: '設定',
     legal: '法務・問い合わせ',
     launch: 'ローンチ前チェック',
   };
@@ -909,6 +921,8 @@ function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurPr
   const [showApplication, setShowApplication] = useState(status !== 'unpaid');
   const [acceptedTerms, setAcceptedTerms] = useState(status !== 'unpaid');
   const [transferName, setTransferName] = useState(profile.payment_transfer_name ?? `${profile.company_name} `);
+  const [selectedPlanId, setSelectedPlanId] = useState(profile.payment_plan_id ?? entrepreneurPaymentPlans[0].id);
+  const selectedPlan = entrepreneurPaymentPlans.find((plan) => plan.id === selectedPlanId) ?? entrepreneurPaymentPlans[0];
   const canShowBank = acceptedTerms || status !== 'unpaid';
 
   async function requestReview() {
@@ -918,6 +932,10 @@ function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurPr
       .update({
         payment_status: 'pending_review',
         payment_transfer_name: transferName.trim() || profile.company_name,
+        payment_plan_id: selectedPlan.id,
+        payment_plan_label: selectedPlan.label,
+        payment_plan_months: selectedPlan.months,
+        payment_plan_amount: selectedPlan.amount,
         payment_requested_at: new Date().toISOString(),
         is_hidden: true,
       })
@@ -957,6 +975,22 @@ function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurPr
             お振込名義
             <input className="field" value={transferName} onChange={(e) => setTransferName(e.target.value)} placeholder="例：カ）リープ ヤマダタロウ" />
           </label>
+          <div className="mt-4">
+            <p className="text-sm font-bold text-cyan-100">公開プランを選択してください</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-4">
+              {entrepreneurPaymentPlans.map((plan) => (
+                <button
+                  key={plan.id}
+                  className={`rounded-2xl border p-4 text-left transition ${selectedPlanId === plan.id ? 'border-cyan-300 bg-cyan-300/15' : 'border-white/10 bg-black/25 hover:border-cyan-300/40'}`}
+                  onClick={() => setSelectedPlanId(plan.id)}
+                  type="button"
+                >
+                  <span className="text-sm font-bold text-white">{plan.label}</span>
+                  <b className="mt-2 block text-xl">{yen(plan.amount)}</b>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
             <p className="font-bold text-white">利用規約への同意</p>
             <p className="mt-2">
@@ -972,8 +1006,8 @@ function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurPr
       {canShowBank ? (
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-          <p className="text-xs font-bold text-slate-400">月額費用</p>
-          <p className="mt-1 text-2xl font-black">{bankAccount.fee}</p>
+          <p className="text-xs font-bold text-slate-400">選択プラン</p>
+          <p className="mt-1 text-2xl font-black">{selectedPlan.label} {yen(selectedPlan.amount)}</p>
           <p className="mt-3 text-xs leading-6 text-slate-400">入金後、下のボタンで運営へ確認依頼を送ってください。</p>
           <p className="mt-3 rounded-xl bg-emerald-300/10 p-3 text-xs leading-6 text-emerald-100">
             運営にメッセージでお振込明細書のお写真を送ると、早急に対応できる場合があります。
@@ -1273,15 +1307,25 @@ function PitchUpload({ profile, refresh }: { profile: EntrepreneurProfile; refre
     setMessage('ピッチ資料を保存しました。');
     await refresh();
   }
+  async function requestConsultation() {
+    if (!supabase) return;
+    await supabase.from('contact_inquiries').insert({
+      user_id: profile.user_id,
+      category: 'pitch_consultation',
+      body: `${profile.company_name} がピッチ資料の相談を希望しています。運営からメッセージで連絡してください。`,
+    });
+    setMessage('ピッチ資料の相談申請を運営へ送信しました。');
+  }
   return (
     <section className="glass rounded-[24px] p-5">
       <h3 className="text-xl font-black">ピッチ資料</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-400">投資家が面談前に確認できる資料を安全なファイル保管場所へ保存します。</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400">投資家が面談前に確認できる資料を安全なファイル保管場所へ保存します。見せ方や構成に迷う場合は、運営へ相談申請できます。</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <input className="field" placeholder="資料タイトル" value={title} onChange={(e) => setTitle(e.target.value)} />
         <input className="field" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         <button className="btn-primary" onClick={upload}><FileText size={17} /> 保存</button>
       </div>
+      <button className="btn-secondary mt-3 w-full" onClick={requestConsultation}><MessageCircle size={17} /> ピッチ資料の相談申請を希望する</button>
       {message && <p className="mt-3 text-sm text-slate-300">{message}</p>}
     </section>
   );
@@ -1333,7 +1377,7 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         </AdminRow>
       )} />
       <AdminTable title="起業家審査・バッジ付与" rows={adminData.entrepreneurs ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 支払い: ${paymentLabels[row.payment_status] ?? '未入金'} / 振込名義: ${row.payment_transfer_name ?? '未申請'}`}>
+        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 支払い: ${paymentLabels[row.payment_status] ?? '未入金'} / プラン: ${row.payment_plan_label ?? '未選択'} ${row.payment_plan_amount ? yen(row.payment_plan_amount) : ''} / 振込名義: ${row.payment_transfer_name ?? '未申請'}`}>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
@@ -1359,18 +1403,89 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
 }
 
 function Messages({ currentUser, messages, refresh }: { currentUser: AppUser; messages: any[]; refresh: () => Promise<void> }) {
+  const [supportBody, setSupportBody] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
   async function markRead(id: string) {
     await supabase!.from('messages').update({ read_at: new Date().toISOString() }).eq('id', id);
     await refresh();
   }
+  async function sendSupportMessage() {
+    if (!supabase || !supportBody.trim()) return;
+    await supabase.from('contact_inquiries').insert({
+      user_id: currentUser.id,
+      email: currentUser.email,
+      category: 'support_message',
+      body: supportBody,
+    });
+    setSupportBody('');
+    setSupportMessage('運営サポートへメッセージを送信しました。');
+  }
   return (
     <section className="grid gap-3">
+      <article className="glass rounded-2xl p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-emerald-300">運営サポート</p>
+            <h3 className="mt-1 text-xl font-black">運営に相談する</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-400">支払い確認、ピッチ資料、登録情報、使い方の相談をここから運営へ送れます。</p>
+          </div>
+          <span className="pill"><ShieldCheck size={14} /> 常に表示</span>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <textarea className="field min-h-24" value={supportBody} onChange={(e) => setSupportBody(e.target.value)} placeholder="運営へのメッセージを書く" />
+          <button className="btn-primary self-stretch" onClick={sendSupportMessage}><Send size={17} /> 送信</button>
+        </div>
+        {supportMessage && <p className="mt-3 text-sm text-slate-300">{supportMessage}</p>}
+      </article>
       {messages.length === 0 ? <EmptyState title="メッセージはまだありません" body="フォローや面談リクエスト後の1対1チャットがここに表示されます。" /> : messages.map((m) => (
         <article key={m.id} className="glass flex items-center justify-between gap-3 rounded-2xl p-4">
           <div><p className="font-bold">{m.body}</p><span className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString('ja-JP')}</span></div>
           {m.receiver_id === currentUser.id && !m.read_at && <button className="btn-secondary" onClick={() => markRead(m.id)}>既読</button>}
         </article>
       ))}
+    </section>
+  );
+}
+
+function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh: () => Promise<void> }) {
+  const [emailEnabled, setEmailEnabled] = useState(currentUser.notification_email_enabled !== false);
+  const [message, setMessage] = useState('');
+
+  async function saveNotificationSetting(nextValue: boolean) {
+    if (!supabase) return;
+    setEmailEnabled(nextValue);
+    const { error } = await supabase.from('users').update({ notification_email_enabled: nextValue }).eq('id', currentUser.id);
+    if (error) {
+      setMessage(toJapaneseError(error.message));
+      setEmailEnabled(!nextValue);
+      return;
+    }
+    setMessage(nextValue ? 'メール通知をオンにしました。' : 'メール通知をオフにしました。');
+    await refresh();
+  }
+
+  return (
+    <section className="glass rounded-[28px] p-6">
+      <p className="text-sm font-bold text-emerald-300">通知設定</p>
+      <h2 className="mt-2 text-3xl font-black">メール通知</h2>
+      <p className="mt-3 max-w-3xl leading-7 text-slate-300">
+        メッセージやコメントが届いたとき、登録メールアドレスへ通知します。通知が多い場合はいつでもオフにできます。
+      </p>
+      <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-bold">登録メールアドレス</p>
+            <p className="mt-1 text-sm text-slate-400">{currentUser.email ?? '未設定'}</p>
+          </div>
+          <button className={emailEnabled ? 'btn-primary' : 'btn-secondary'} onClick={() => saveNotificationSetting(!emailEnabled)}>
+            <Bell size={17} /> {emailEnabled ? '通知オン' : '通知オフ'}
+          </button>
+        </div>
+      </div>
+      <p className="mt-4 rounded-2xl bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-100">
+        メール送信はSupabaseの通知キューに保存されます。Resendなどの送信処理を接続すると、コメント・メッセージ通知が自動送信されます。
+      </p>
+      {message && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
     </section>
   );
 }

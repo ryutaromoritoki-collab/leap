@@ -12,9 +12,13 @@ create table public.users (
   role public.user_role not null,
   profile_completed boolean not null default false,
   is_suspended boolean not null default false,
+  notification_email_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.users
+  add column if not exists notification_email_enabled boolean not null default true;
 
 create table public.entrepreneur_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -44,6 +48,10 @@ create table public.entrepreneur_profiles (
   is_hidden boolean not null default true,
   payment_status text not null default 'unpaid' check (payment_status in ('unpaid', 'pending_review', 'paid')),
   payment_transfer_name text,
+  payment_plan_id text,
+  payment_plan_label text,
+  payment_plan_months int,
+  payment_plan_amount numeric,
   payment_requested_at timestamptz,
   paid_at timestamptz,
   created_at timestamptz not null default now(),
@@ -53,6 +61,10 @@ create table public.entrepreneur_profiles (
 alter table public.entrepreneur_profiles
   add column if not exists payment_status text not null default 'unpaid',
   add column if not exists payment_transfer_name text,
+  add column if not exists payment_plan_id text,
+  add column if not exists payment_plan_label text,
+  add column if not exists payment_plan_months int,
+  add column if not exists payment_plan_amount numeric,
   add column if not exists payment_requested_at timestamptz,
   add column if not exists paid_at timestamptz;
 
@@ -205,6 +217,18 @@ create table public.notifications (
   created_at timestamptz not null default now()
 );
 
+create table public.email_notification_queue (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  notification_id uuid references public.notifications(id) on delete cascade,
+  event_type text not null,
+  subject text not null,
+  body text not null,
+  status text not null default 'pending',
+  sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 insert into storage.buckets (id, name, public)
 values ('pitch-materials', 'pitch-materials', false)
 on conflict (id) do nothing;
@@ -240,6 +264,7 @@ alter table public.pitch_materials enable row level security;
 alter table public.reports enable row level security;
 alter table public.admin_actions enable row level security;
 alter table public.notifications enable row level security;
+alter table public.email_notification_queue enable row level security;
 alter table public.contact_inquiries enable row level security;
 
 create or replace function public.is_admin()
@@ -312,6 +337,8 @@ create policy "admin actions admin only" on public.admin_actions for all using (
 create policy "notifications own read" on public.notifications for select using (user_id = auth.uid() or public.is_admin());
 create policy "notifications logged insert" on public.notifications for insert with check (auth.uid() is not null);
 create policy "notifications own update" on public.notifications for update using (user_id = auth.uid() or public.is_admin());
+create policy "email queue own/admin read" on public.email_notification_queue for select using (user_id = auth.uid() or public.is_admin());
+create policy "email queue admin update" on public.email_notification_queue for update using (public.is_admin());
 create policy "contact insert" on public.contact_inquiries for insert with check (true);
 create policy "contact admin read" on public.contact_inquiries for select using (public.is_admin());
 create policy "contact admin update" on public.contact_inquiries for update using (public.is_admin());
@@ -334,3 +361,37 @@ grant usage, select on all sequences in schema public to authenticated;
 
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
 alter default privileges in schema public grant usage, select on sequences to authenticated;
+
+create or replace function public.queue_comment_message_email()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  email_enabled boolean;
+begin
+  if new.type not in ('comment', 'message') then
+    return new;
+  end if;
+
+  select coalesce(notification_email_enabled, true)
+  into email_enabled
+  from public.users
+  where id = new.user_id and is_suspended = false;
+
+  if email_enabled then
+    insert into public.email_notification_queue (user_id, notification_id, event_type, subject, body)
+    values (
+      new.user_id,
+      new.id,
+      new.type,
+      case when new.type = 'comment' then 'Leapでコメントが届きました' else 'Leapでメッセージが届きました' end,
+      new.body
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists queue_comment_message_email_trigger on public.notifications;
+create trigger queue_comment_message_email_trigger
+after insert on public.notifications
+for each row execute function public.queue_comment_message_email();
