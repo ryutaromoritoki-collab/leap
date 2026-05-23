@@ -43,6 +43,7 @@ create table public.entrepreneur_profiles (
   is_fast_growing boolean not null default false,
   is_hidden boolean not null default true,
   payment_status text not null default 'unpaid' check (payment_status in ('unpaid', 'pending_review', 'paid')),
+  payment_transfer_name text,
   payment_requested_at timestamptz,
   paid_at timestamptz,
   created_at timestamptz not null default now(),
@@ -51,6 +52,7 @@ create table public.entrepreneur_profiles (
 
 alter table public.entrepreneur_profiles
   add column if not exists payment_status text not null default 'unpaid',
+  add column if not exists payment_transfer_name text,
   add column if not exists payment_requested_at timestamptz,
   add column if not exists paid_at timestamptz;
 

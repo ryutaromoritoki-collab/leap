@@ -1,5 +1,6 @@
 alter table public.entrepreneur_profiles
   add column if not exists payment_status text not null default 'unpaid',
+  add column if not exists payment_transfer_name text,
   add column if not exists payment_requested_at timestamptz,
   add column if not exists paid_at timestamptz;
 

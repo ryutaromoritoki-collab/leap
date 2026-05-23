@@ -906,12 +906,21 @@ function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: 
 function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
   const status = profile.payment_status ?? 'unpaid';
   const isPublished = !profile.is_hidden && status === 'paid';
+  const [showApplication, setShowApplication] = useState(status !== 'unpaid');
+  const [acceptedTerms, setAcceptedTerms] = useState(status !== 'unpaid');
+  const [transferName, setTransferName] = useState(profile.payment_transfer_name ?? `${profile.company_name} `);
+  const canShowBank = acceptedTerms || status !== 'unpaid';
 
   async function requestReview() {
     if (!supabase) return;
     await supabase
       .from('entrepreneur_profiles')
-      .update({ payment_status: 'pending_review', payment_requested_at: new Date().toISOString(), is_hidden: true })
+      .update({
+        payment_status: 'pending_review',
+        payment_transfer_name: transferName.trim() || profile.company_name,
+        payment_requested_at: new Date().toISOString(),
+        is_hidden: true,
+      })
       .eq('id', profile.id);
     await supabase.from('notifications').insert({
       user_id: profile.user_id,
@@ -933,11 +942,42 @@ function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurPr
         </div>
         <span className="pill"><Landmark size={14} /> {paymentLabels[status] ?? status}</span>
       </div>
+      {!isPublished && !showApplication && (
+        <button className="btn-primary mt-5 w-full" onClick={() => setShowApplication(true)}>
+          月額費用の支払いを申請する
+        </button>
+      )}
+      {!isPublished && showApplication && (
+        <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
+          <p className="text-sm font-bold text-cyan-100">お振込名義を設定してください</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            お振込名義は、登録時の会社名がある場合は会社名、続けてお名前をカタカナで入力してください。
+          </p>
+          <label className="label mt-4">
+            お振込名義
+            <input className="field" value={transferName} onChange={(e) => setTransferName(e.target.value)} placeholder="例：カ）リープ ヤマダタロウ" />
+          </label>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
+            <p className="font-bold text-white">利用規約への同意</p>
+            <p className="mt-2">
+              Leapは投資判断を代行・推奨するサービスではありません。プロフィール公開後も、掲載情報をもとにした投資判断は各利用者の責任で行われます。月額費用は起業家プロフィールの公開・運営確認・プラットフォーム利用に関する費用です。
+            </p>
+            <label className="mt-4 flex items-center gap-3 text-white">
+              <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} />
+              利用規約に同意する
+            </label>
+          </div>
+        </div>
+      )}
+      {canShowBank ? (
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <p className="text-xs font-bold text-slate-400">月額費用</p>
           <p className="mt-1 text-2xl font-black">{bankAccount.fee}</p>
           <p className="mt-3 text-xs leading-6 text-slate-400">入金後、下のボタンで運営へ確認依頼を送ってください。</p>
+          <p className="mt-3 rounded-xl bg-emerald-300/10 p-3 text-xs leading-6 text-emerald-100">
+            運営にメッセージでお振込明細書のお写真を送ると、早急に対応できる場合があります。
+          </p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
           <p><b className="text-white">銀行名:</b> {bankAccount.bank}</p>
@@ -945,10 +985,14 @@ function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurPr
           <p><b className="text-white">種別:</b> {bankAccount.type}</p>
           <p><b className="text-white">口座番号:</b> {bankAccount.number}</p>
           <p><b className="text-white">口座名義:</b> {bankAccount.holder}</p>
+          <p><b className="text-white">お振込名義:</b> {transferName || '未入力'}</p>
         </div>
       </div>
+      ) : (
+        showApplication && <p className="mt-4 rounded-2xl bg-white/8 p-4 text-sm leading-6 text-slate-300">利用規約に同意すると、振込先口座情報が表示されます。</p>
+      )}
       {!isPublished && (
-        <button className="btn-primary mt-5 w-full" onClick={requestReview} disabled={status === 'pending_review'}>
+        <button className="btn-primary mt-5 w-full" onClick={requestReview} disabled={status === 'pending_review' || !canShowBank || !transferName.trim()}>
           {status === 'pending_review' ? '運営が入金確認中です' : '振込済みとして確認を依頼する'}
         </button>
       )}
@@ -1289,7 +1333,7 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         </AdminRow>
       )} />
       <AdminTable title="起業家審査・バッジ付与" rows={adminData.entrepreneurs ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 支払い: ${paymentLabels[row.payment_status] ?? '未入金'}`}>
+        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 支払い: ${paymentLabels[row.payment_status] ?? '未入金'} / 振込名義: ${row.payment_transfer_name ?? '未申請'}`}>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>

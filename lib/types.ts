@@ -35,6 +35,7 @@ export type EntrepreneurProfile = {
   is_fast_growing: boolean;
   is_hidden: boolean;
   payment_status: 'unpaid' | 'pending_review' | 'paid';
+  payment_transfer_name: string | null;
   payment_requested_at: string | null;
   paid_at: string | null;
 };
