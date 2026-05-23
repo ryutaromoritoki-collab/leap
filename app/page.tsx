@@ -26,12 +26,15 @@ import {
   Flag,
   Gauge,
   Heart,
+  Landmark,
   Home,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Mail,
   MessageCircle,
   Plus,
+  RefreshCcw,
   Rocket,
   Search,
   Send,
@@ -71,7 +74,7 @@ const legalCopy: Record<LegalSlug, { title: string; body: string }> = {
   },
   commerce: {
     title: '特定商取引法に基づく表記',
-    body: '有料機能を提供する場合、販売事業者名、所在地、連絡先、販売価格、支払方法、キャンセル条件を本ページに明記します。初期版では無料利用を前提としています。',
+    body: '起業家プロフィールの公開費用は月額11,000円です。投資家との面談チケットは1枚11,000円、3枚29,700円、5枚44,000円です。支払方法は銀行振込のみです。振込先は近畿産業信用組合 本店営業部 普通 3170341 カ）エーアイインフルエンサーです。',
   },
   disclaimer: {
     title: '免責事項',
@@ -96,6 +99,8 @@ const nav = [
 ];
 
 const phaseOptions = ['アイデア', '初期検証', 'プレシード', 'シード', 'プレシリーズA', 'シリーズA', 'シリーズB以降'];
+const industryOptions = ['AI・機械学習', 'SaaS', 'FinTech', 'HealthTech', 'ClimateTech', 'RetailTech', 'EdTech', 'HRTech', 'FoodTech', '製造・IoT', '不動産・建設', '物流', 'エンタメ', '地方創生', 'その他'];
+const locationOptions = ['北海道', '東北', '関東', '東京都', '神奈川県', '千葉県', '埼玉県', '中部', '関西', '大阪府', '京都府', '兵庫県', '中国・四国', '九州・沖縄', '海外'];
 const visibilityOptions = ['public', 'followers', 'verified_investors'];
 const visibilityLabels: Record<string, string> = {
   public: '全体公開',
@@ -107,6 +112,24 @@ const roleLabels: Record<UserRole, string> = {
   investor: '投資家',
   admin: '管理者',
 };
+const paymentLabels: Record<string, string> = {
+  unpaid: '未入金',
+  pending_review: '振込確認待ち',
+  paid: '入金確認済み',
+};
+const bankAccount = {
+  fee: '月額 11,000円',
+  bank: '近畿産業信用組合',
+  branch: '本店営業部',
+  type: '普通',
+  number: '3170341',
+  holder: 'カ）エーアイインフルエンサー',
+};
+const ticketPlans = [
+  { id: 'one', label: '1枚', count: 1, amount: 11000 },
+  { id: 'three', label: '3枚', count: 3, amount: 29700 },
+  { id: 'five', label: '5枚', count: 5, amount: 44000 },
+];
 
 function yen(value?: number | null) {
   if (value === null || value === undefined) return '未入力';
@@ -123,6 +146,9 @@ function toJapaneseError(message: string) {
   if (lower.includes('invalid login credentials')) return 'メールアドレスまたはパスワードが正しくありません。';
   if (lower.includes('email not confirmed')) return 'メール認証が完了していません。確認メールを開いて認証してください。';
   if (lower.includes('user already registered') || lower.includes('already registered')) return 'このメールアドレスはすでに登録されています。';
+  if (lower.includes('error sending confirmation email')) {
+    return '確認メールを送信できませんでした。Supabaseのメール送信設定、送信元メールアドレス、SMTPのユーザー名とパスワードを確認してください。';
+  }
   if (lower.includes('password should be at least')) return 'パスワードは6文字以上で入力してください。';
   if (lower.includes('signup is disabled')) return '現在、新規登録は停止されています。';
   if (lower.includes('permission denied')) return '操作権限がありません。ログイン状態または権限設定を確認してください。';
@@ -137,6 +163,7 @@ export default function LeapApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recoveringPassword, setRecoveringPassword] = useState(false);
   const [view, setView] = useState<View>('home');
   const [legalSlug, setLegalSlug] = useState<LegalSlug>('terms');
   const [profile, setProfile] = useState<EntrepreneurProfile | null>(null);
@@ -153,6 +180,7 @@ export default function LeapApp() {
   const [adminData, setAdminData] = useState<Record<string, any[]>>({});
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
+  const [authNotice, setAuthNotice] = useState('');
 
   useEffect(() => {
     if (!supabase) {
@@ -160,12 +188,19 @@ export default function LeapApp() {
       return;
     }
 
+    const authText = decodeURIComponent(`${window.location.hash} ${window.location.search}`).toLowerCase();
+    if (authText.includes('already') || authText.includes('registered') || authText.includes('confirmed')) {
+      setAuthNotice('すでに登録しています。ログインするか、パスワードを忘れた場合は再設定してください。');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
     });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') setRecoveringPassword(true);
       setSession(nextSession);
     });
 
@@ -310,11 +345,15 @@ export default function LeapApp() {
   }
 
   if (!session || !user) {
-    return <AuthScreen onReady={loadUser} setLegal={(slug) => { setLegalSlug(slug); setView('legal'); }} />;
+    return <AuthScreen initialMessage={authNotice} onReady={loadUser} setLegal={(slug) => { setLegalSlug(slug); setView('legal'); }} />;
   }
 
   if (user.is_suspended) {
     return <FullScreenMessage title="アカウントは停止されています" body="管理者による確認が必要です。お問い合わせからご連絡ください。" />;
+  }
+
+  if (recoveringPassword) {
+    return <UpdatePasswordScreen onDone={async () => { setRecoveringPassword(false); await loadUser(); }} />;
   }
 
   if (!user.profile_completed) {
@@ -435,7 +474,7 @@ function SetupRequired() {
   );
 }
 
-function AuthScreen({ onReady, setLegal }: { onReady: () => Promise<void>; setLegal: (slug: LegalSlug) => void }) {
+function AuthScreen({ onReady, setLegal, initialMessage }: { onReady: () => Promise<void>; setLegal: (slug: LegalSlug) => void; initialMessage?: string }) {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -443,6 +482,13 @@ function AuthScreen({ onReady, setLegal }: { onReady: () => Promise<void>; setLe
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (initialMessage) {
+      setMode('login');
+      setMessage(initialMessage);
+    }
+  }, [initialMessage]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -457,10 +503,7 @@ function AuthScreen({ onReady, setLegal }: { onReady: () => Promise<void>; setLe
     setMessage('');
     try {
       if (mode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
-        if (error) throw error;
-        setMessage('パスワード再設定メールを送信しました。');
-        setCooldown(60);
+        await sendResetEmail();
       } else if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -470,11 +513,17 @@ function AuthScreen({ onReady, setLegal }: { onReady: () => Promise<void>; setLe
             data: { role },
           },
         });
-        if (error) throw error;
+        if (error) {
+          if (error.message.toLowerCase().includes('already registered')) {
+            await resendConfirmation();
+            return;
+          }
+          throw error;
+        }
         if (data.session && data.user) {
           await supabase.from('users').upsert({ id: data.user.id, email, role, profile_completed: false });
         }
-        setMessage('確認メールを送信しました。メール認証後にログインしてください。');
+        setMessage('確認メールを送信しました。届かない場合は、少し待ってから「確認メールを再送」を押してください。すでに登録済みの場合は、パスワード再設定へ進めます。');
         setCooldown(60);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -487,6 +536,34 @@ function AuthScreen({ onReady, setLegal }: { onReady: () => Promise<void>; setLe
     } finally {
       setBusy(false);
     }
+  }
+
+  async function resendConfirmation() {
+    if (!supabase) return;
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: location.origin },
+    });
+    if (error) {
+      const lower = error.message.toLowerCase();
+      if (lower.includes('already') || lower.includes('confirmed') || lower.includes('registered')) {
+        setMessage('このメールアドレスはすでに登録しています。ログインするか、パスワードを忘れた場合は再設定してください。');
+        setMode('login');
+        return;
+      }
+      throw error;
+    }
+    setMessage('確認メールを再送しました。メール内の確認URLを開いてください。');
+    setCooldown(60);
+  }
+
+  async function sendResetEmail() {
+    if (!supabase) return;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+    if (error) throw error;
+    setMessage('パスワード再設定メールを送信しました。メール内のリンクから新しいパスワードを設定してください。');
+    setCooldown(60);
   }
 
   return (
@@ -530,11 +607,67 @@ function AuthScreen({ onReady, setLegal }: { onReady: () => Promise<void>; setLe
           <button className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" disabled={busy || (cooldown > 0 && mode !== 'login')} onClick={submit}>
             {busy ? '処理中...' : cooldown > 0 && mode !== 'login' ? `再送信まで ${cooldown}秒` : mode === 'login' ? 'ログイン' : mode === 'signup' ? '登録する' : '再設定メールを送る'}
           </button>
+          {mode === 'signup' && (
+            <button className="btn-secondary w-full disabled:cursor-not-allowed disabled:opacity-60" disabled={busy || cooldown > 0 || !email} onClick={async () => {
+              setBusy(true);
+              setMessage('');
+              try {
+                await resendConfirmation();
+              } catch (error: any) {
+                setMessage(toJapaneseError(error.message));
+                setCooldown(60);
+              } finally {
+                setBusy(false);
+              }
+            }}>
+              <RefreshCcw size={17} /> 確認メールを再送
+            </button>
+          )}
+          {mode !== 'reset' && (
+            <button className="btn-secondary w-full" onClick={() => { setMode('reset'); setMessage('登録済みの場合は、ここからパスワードを再設定できます。'); }}>
+              <KeyRound size={17} /> パスワードを忘れていますか？
+            </button>
+          )}
           {message && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
         </div>
         <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-400">
           {Object.keys(legalCopy).map((slug) => <button key={slug} onClick={() => setLegal(slug as LegalSlug)}>{legalCopy[slug as LegalSlug].title}</button>)}
         </div>
+      </section>
+    </main>
+  );
+}
+
+function UpdatePasswordScreen({ onDone }: { onDone: () => Promise<void> }) {
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function updatePassword() {
+    if (!supabase) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      setMessage('パスワードを変更しました。');
+      await onDone();
+    } catch (error: any) {
+      setMessage(toJapaneseError(error.message));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="grid min-h-screen place-items-center p-4">
+      <section className="glass w-full max-w-lg rounded-[28px] p-6">
+        <div className="neon-text text-3xl font-black">Leap</div>
+        <h1 className="mt-6 text-3xl font-black">新しいパスワードを設定</h1>
+        <p className="mt-3 leading-7 text-slate-300">登録済みアカウントのパスワードを変更します。6文字以上で入力してください。</p>
+        <label className="label mt-5">新しいパスワード<input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <button className="btn-primary mt-5 w-full" disabled={busy || password.length < 6} onClick={updatePassword}>{busy ? '変更中...' : 'パスワードを変更する'}</button>
+        {message && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
       </section>
     </main>
   );
@@ -580,6 +713,8 @@ function Onboarding({ user, onDone }: { user: AppUser; onDone: () => Promise<voi
             fundraising_amount: numberOrNull(form.fundraising_amount),
             fund_usage: form.fund_usage,
             investor_support: form.investor_support,
+            is_hidden: true,
+            payment_status: 'unpaid',
           })
           .select()
           .single();
@@ -656,7 +791,13 @@ function Onboarding({ user, onDone }: { user: AppUser; onDone: () => Promise<voi
 }
 
 function EntrepreneurStep({ step, form, set }: { step: number; form: Record<string, any>; set: (name: string, value: any) => void }) {
-  if (step === 0) return <FieldGrid fields={['company_name:会社名', 'founder_name:代表者名', 'location:所在地', 'industry:業界', 'founded_month:設立年月', 'employee_count:従業員数']} form={form} set={set} />;
+  if (step === 0) return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <FieldGrid fields={['company_name:会社名', 'founder_name:代表者名', 'founded_month:設立年月', 'employee_count:従業員数']} form={form} set={set} />
+      <OptionSelect label="所在地" value={form.location ?? ''} options={locationOptions} onChange={(value) => set('location', value)} />
+      <OptionSelect label="業界" value={form.industry ?? ''} options={industryOptions} onChange={(value) => set('industry', value)} />
+    </div>
+  );
   if (step === 1) return <FieldGrid textarea fields={['tagline:一言説明', 'overview:事業概要', 'problem:解決している課題', 'solution:提供サービス', 'target_customer:ターゲット顧客', 'business_model:ビジネスモデル', 'advantage:競合優位性']} form={form} set={set} />;
   if (step === 2) return (
     <>
@@ -675,8 +816,18 @@ function EntrepreneurStep({ step, form, set }: { step: number; form: Record<stri
 }
 
 function InvestorStep({ step, form, set }: { step: number; form: Record<string, any>; set: (name: string, value: any) => void }) {
-  if (step === 0) return <FieldGrid fields={['full_name:氏名', 'company_name:会社名', 'position:役職', 'location:所在地']} form={form} set={set} />;
-  if (step === 1) return <FieldGrid textarea fields={['investment_fields:投資領域', 'investable_amount:投資可能額（円）', 'interested_phases:興味のあるフェーズ', 'past_investments:過去の投資実績', 'support_areas:支援できる内容']} form={form} set={set} />;
+  if (step === 0) return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <FieldGrid fields={['full_name:氏名', 'company_name:会社名', 'position:役職']} form={form} set={set} />
+      <OptionSelect label="所在地" value={form.location ?? ''} options={locationOptions} onChange={(value) => set('location', value)} />
+    </div>
+  );
+  if (step === 1) return (
+    <div className="grid gap-4">
+      <OptionSelect label="投資領域" value={form.investment_fields ?? ''} options={industryOptions} onChange={(value) => set('investment_fields', value)} />
+      <FieldGrid textarea fields={['investable_amount:投資可能額（円）', 'interested_phases:興味のあるフェーズ', 'past_investments:過去の投資実績', 'support_areas:支援できる内容']} form={form} set={set} />
+    </div>
+  );
   return (
     <div className="grid gap-3">
       {['投資先を探したい', '事業提携先を探したい', 'M&A候補を探したい', '起業家を支援したい'].map((item) => (
@@ -690,6 +841,18 @@ function InvestorStep({ step, form, set }: { step: number; form: Record<string, 
         </label>
       ))}
     </div>
+  );
+}
+
+function OptionSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="label">
+      {label}
+      <select className="field" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">選択してください</option>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -725,6 +888,7 @@ function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: 
           <Metric label="進捗投稿" value={`${posts.length}`} icon={FileText} />
         </div>
       </section>
+      <PublicationPaymentPanel profile={profile} refresh={refresh} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
         <PostComposer profile={profile} refresh={refresh} />
         <KpiComposer profile={profile} refresh={refresh} />
@@ -736,6 +900,59 @@ function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: 
       </section>
       <KpiDashboard profile={profile} kpis={kpis} compact />
     </div>
+  );
+}
+
+function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
+  const status = profile.payment_status ?? 'unpaid';
+  const isPublished = !profile.is_hidden && status === 'paid';
+
+  async function requestReview() {
+    if (!supabase) return;
+    await supabase
+      .from('entrepreneur_profiles')
+      .update({ payment_status: 'pending_review', payment_requested_at: new Date().toISOString(), is_hidden: true })
+      .eq('id', profile.id);
+    await supabase.from('notifications').insert({
+      user_id: profile.user_id,
+      type: 'payment_review_requested',
+      body: '銀行振込の確認依頼を受け付けました。運営確認後にプロフィールが公開されます。',
+    });
+    await refresh();
+  }
+
+  return (
+    <section className={`glass rounded-[24px] p-5 ${isPublished ? 'border-emerald-300/40' : 'border-cyan-300/30'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-emerald-300">公開設定</p>
+          <h3 className="mt-2 text-2xl font-black">{isPublished ? 'プロフィールは公開中です' : '入金確認後にプロフィールが公開されます'}</h3>
+          <p className="mt-2 max-w-3xl leading-7 text-slate-300">
+            起業家プロフィールは月額費用のお支払い確認後に、投資家の検索結果とフィードへ表示されます。支払い方法は銀行振込のみです。
+          </p>
+        </div>
+        <span className="pill"><Landmark size={14} /> {paymentLabels[status] ?? status}</span>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+          <p className="text-xs font-bold text-slate-400">月額費用</p>
+          <p className="mt-1 text-2xl font-black">{bankAccount.fee}</p>
+          <p className="mt-3 text-xs leading-6 text-slate-400">入金後、下のボタンで運営へ確認依頼を送ってください。</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
+          <p><b className="text-white">銀行名:</b> {bankAccount.bank}</p>
+          <p><b className="text-white">支店:</b> {bankAccount.branch}</p>
+          <p><b className="text-white">種別:</b> {bankAccount.type}</p>
+          <p><b className="text-white">口座番号:</b> {bankAccount.number}</p>
+          <p><b className="text-white">口座名義:</b> {bankAccount.holder}</p>
+        </div>
+      </div>
+      {!isPublished && (
+        <button className="btn-primary mt-5 w-full" onClick={requestReview} disabled={status === 'pending_review'}>
+          {status === 'pending_review' ? '運営が入金確認中です' : '振込済みとして確認を依頼する'}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -753,6 +970,7 @@ function InvestorHome({ currentUser, profiles, posts, follows, meetings, message
           <Metric label="未返信メッセージ" value={`${messages.filter((m) => !m.read_at).length}`} icon={Mail} />
         </div>
       </section>
+      <MeetingTicketPanel meetings={meetings} />
       {follows.length === 0 && <EmptyState title="まだフォロー中の起業家はいません。興味のある起業家を探しましょう。" cta="起業家を探す" onClick={() => setView('search')} />}
       <section className="grid gap-3">
         <h3 className="text-xl font-black">興味領域に合う起業家</h3>
@@ -765,6 +983,29 @@ function InvestorHome({ currentUser, profiles, posts, follows, meetings, message
         {posts.length === 0 ? <EmptyState title="新着進捗ログはまだありません" body="フォローした起業家の進捗がここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} />)}
       </section>
     </div>
+  );
+}
+
+function MeetingTicketPanel({ meetings }: { meetings: any[] }) {
+  const payableMeetings = meetings.filter((meeting) => meeting.status === 'confirmed' && meeting.ticket_payment_status !== 'paid');
+  return (
+    <section className="glass rounded-[24px] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-emerald-300">面談チケット</p>
+          <h3 className="mt-2 text-2xl font-black">面談確定後はチケット費用を銀行振込でお支払いください</h3>
+          <p className="mt-2 leading-7 text-slate-300">1枚11,000円、3枚29,700円、5枚44,000円。管理者の入金確認後、面談支払い済みとして扱われます。</p>
+        </div>
+        <span className="pill"><CalendarClock size={14} /> 未入金 {payableMeetings.length}件</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {ticketPlans.map((plan) => <Metric key={plan.id} label={plan.label} value={yen(plan.amount)} icon={CircleDollarSign} />)}
+      </div>
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
+        <p><b className="text-white">振込先:</b> {bankAccount.bank} {bankAccount.branch} {bankAccount.type} {bankAccount.number}</p>
+        <p><b className="text-white">口座名義:</b> {bankAccount.holder}</p>
+      </div>
+    </section>
   );
 }
 
@@ -789,8 +1030,8 @@ function SearchPage({ query, setQuery, profiles, openProfile, refresh }: { query
           <input className="field border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="キーワード、業界、地域で検索" />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <input className="field" placeholder="業界" value={filters.industry} onChange={(e) => setFilters({ ...filters, industry: e.target.value })} />
-          <input className="field" placeholder="地域" value={filters.location} onChange={(e) => setFilters({ ...filters, location: e.target.value })} />
+          <select className="field" value={filters.industry} onChange={(e) => setFilters({ ...filters, industry: e.target.value })}><option value="">業界すべて</option>{industryOptions.map((p) => <option key={p}>{p}</option>)}</select>
+          <select className="field" value={filters.location} onChange={(e) => setFilters({ ...filters, location: e.target.value })}><option value="">地域すべて</option>{locationOptions.map((p) => <option key={p}>{p}</option>)}</select>
           <select className="field" value={filters.phase} onChange={(e) => setFilters({ ...filters, phase: e.target.value })}><option value="">フェーズすべて</option>{phaseOptions.map((p) => <option key={p}>{p}</option>)}</select>
           <label className="pill"><input type="checkbox" onChange={(e) => setFilters({ ...filters, verified: e.target.checked })} /> 認証済み</label>
           <label className="pill"><input type="checkbox" onChange={(e) => setFilters({ ...filters, interviewed: e.target.checked })} /> 運営面談済み</label>
@@ -806,6 +1047,7 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
   const [meetingMessage, setMeetingMessage] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
   const [comment, setComment] = useState('');
+  const [ticketPlanId, setTicketPlanId] = useState(ticketPlans[0].id);
 
   async function follow() {
     if (!supabase) return;
@@ -822,7 +1064,17 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
 
   async function requestMeeting() {
     if (!supabase) return;
-    await supabase.from('meeting_requests').insert({ entrepreneur_id: profile.id, investor_id: currentUser.id, message: meetingMessage, proposed_at: meetingDate || null });
+    const plan = ticketPlans.find((item) => item.id === ticketPlanId) ?? ticketPlans[0];
+    await supabase.from('meeting_requests').insert({
+      entrepreneur_id: profile.id,
+      investor_id: currentUser.id,
+      message: meetingMessage,
+      proposed_at: meetingDate || null,
+      ticket_plan: plan.label,
+      ticket_count: plan.count,
+      ticket_amount: plan.amount,
+      ticket_payment_status: 'unpaid',
+    });
     await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'meeting_request', body: '面談リクエストが届きました。' });
     setMeetingMessage('');
     setMeetingDate('');
@@ -854,6 +1106,11 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
           )}
         </div>
         <BadgeRow profile={profile} />
+        {profile.is_hidden && (
+          <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
+            このプロフィールは現在非公開です。月額費用の入金確認後、投資家に公開されます。
+          </div>
+        )}
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <Metric label="現在フェーズ" value={profile.current_phase ?? '未入力'} icon={Rocket} />
           <Metric label="調達希望額" value={yen(profile.fundraising_amount)} icon={CircleDollarSign} />
@@ -877,6 +1134,12 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
             <label className="label mt-4">投資メモ<textarea className="field min-h-24" value={note} onChange={(e) => setNote(e.target.value)} /></label>
             <label className="label mt-4">面談メッセージ<textarea className="field min-h-24" value={meetingMessage} onChange={(e) => setMeetingMessage(e.target.value)} /></label>
             <label className="label mt-4">面談希望日時<input className="field" type="datetime-local" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} /></label>
+            <label className="label mt-4">面談チケット
+              <select className="field" value={ticketPlanId} onChange={(e) => setTicketPlanId(e.target.value)}>
+                {ticketPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.label} / {yen(plan.amount)}</option>)}
+              </select>
+              <span className="text-xs leading-5 text-slate-500">面談日程が確定した場合、選択したチケット費用を銀行振込でお支払いください。</span>
+            </label>
             <button className="btn-primary mt-4 w-full" onClick={requestMeeting}><CalendarClock size={17} /> 面談リクエスト</button>
             <label className="label mt-4">メッセージ<textarea className="field min-h-24" value={comment} onChange={(e) => setComment(e.target.value)} /></label>
             <button className="btn-secondary mt-4 w-full" onClick={sendMessage}><Send size={17} /> メッセージ送信</button>
@@ -1026,16 +1289,25 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         </AdminRow>
       )} />
       <AdminTable title="起業家審査・バッジ付与" rows={adminData.entrepreneurs ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.company_name} meta={row.industry ?? '業界未入力'}>
+        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 支払い: ${paymentLabels[row.payment_status] ?? '未入金'}`}>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_revenue: !row.verified_revenue }, '売上確認済みバッジ付与')}>売上確認</button>
+          <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { payment_status: 'paid', paid_at: new Date().toISOString(), is_hidden: false }, '入金確認・プロフィール公開')}>入金確認して公開</button>
+          <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
         </AdminRow>
       )} />
       <AdminTable title="投稿非表示" rows={adminData.posts ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.did_today} meta={new Date(row.created_at).toLocaleString('ja-JP')}>
           <button className="btn-secondary" onClick={() => update('progress_posts', row.id, { is_hidden: !row.is_hidden }, '投稿非表示')}>{row.is_hidden ? '再表示' : '非表示'}</button>
+        </AdminRow>
+      )} />
+      <AdminTable title="面談リクエスト・チケット確認" rows={adminData.meetings ?? []} render={(row) => (
+        <AdminRow key={row.id} title={row.message || '面談リクエスト'} meta={`状態: ${row.status} / チケット: ${row.ticket_plan ?? '1枚'} ${yen(row.ticket_amount)} / 入金: ${row.ticket_payment_status === 'paid' ? '確認済み' : '未確認'}`}>
+          <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { status: 'confirmed', confirmed_at: new Date().toISOString() }, '面談日程確定')}>日程確定</button>
+          <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { ticket_payment_status: 'paid' }, '面談チケット入金確認')}>チケット入金確認</button>
+          <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { status: 'cancelled' }, '面談キャンセル')}>キャンセル</button>
         </AdminRow>
       )} />
     </div>
