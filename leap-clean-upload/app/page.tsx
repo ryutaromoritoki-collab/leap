@@ -281,20 +281,24 @@ export default function LeapApp() {
         return;
       }
       if (ownProfile) {
-        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
+        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
-          supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(100),
-          supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(100),
+          supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(500),
+          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(1000),
+          supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
+          supabase.from('post_likes').select('post_id').limit(5000),
+          supabase.from('post_comments').select('post_id').limit(5000),
         ]);
-        setPosts((postRows as ProgressPost[]) ?? []);
+        const decoratedOwnPosts = attachPostProfiles(withPostReactionCounts((postRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
+        const decoratedAllPosts = attachPostProfiles(withPostReactionCounts((allPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
+        setPosts(decoratedOwnPosts);
         setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
         setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
-        setAllPosts(attachPostProfiles((allPostRows as ProgressPost[]) ?? [], (allProfiles as EntrepreneurProfile[]) ?? []));
+        setAllPosts(decoratedAllPosts);
         setKpis((kpiRows as StartupKpi[]) ?? []);
         setFollows(followRows ?? []);
         setMeetings(meetingRows ?? []);
@@ -303,25 +307,27 @@ export default function LeapApp() {
     }
 
     if (user.role === 'investor') {
-      const [{ data: investorProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }] =
+      const [{ data: investorProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] =
         await Promise.all([
           supabase.from('investor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(100),
-          supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(100),
+          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(1000),
+          supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase
             .from('progress_posts')
             .select('*')
             .or('is_hidden.is.null,is_hidden.eq.false')
             .order('created_at', { ascending: false })
-            .limit(50),
+            .limit(500),
           supabase.from('follows').select('*').eq('investor_id', user.id),
           supabase.from('meeting_requests').select('*').eq('investor_id', user.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
+          supabase.from('post_likes').select('post_id').limit(5000),
+          supabase.from('post_comments').select('post_id').limit(5000),
         ]);
       setInvestor((investorProfile as InvestorProfile | null) ?? null);
       setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
       setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
-      const postsWithProfiles = attachPostProfiles((allPosts as ProgressPost[]) ?? [], (allProfiles as EntrepreneurProfile[]) ?? []);
+      const postsWithProfiles = attachPostProfiles(withPostReactionCounts((allPosts as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
       setPosts(postsWithProfiles);
       setAllPosts(postsWithProfiles);
       setFollows(followRows ?? []);
@@ -495,7 +501,7 @@ export default function LeapApp() {
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
         {view === 'messages' && <Messages currentUser={user} messages={messages} meetings={meetings} refresh={loadWorkspace} />}
         {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
-        {view === 'settings' && <SettingsPage currentUser={user} refresh={loadUser} />}
+        {view === 'settings' && <SettingsPage currentUser={user} refresh={async () => { await loadUser(); await loadWorkspace(); }} />}
         {view === 'legal' && <LegalPage slug={legalSlug} currentUser={user} />}
         {view === 'launch' && <LaunchChecklist />}
       </main>
@@ -1555,16 +1561,17 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
   }
 
   async function openTimelineProfile(post: ProgressPost) {
-    if (post.entrepreneur_profiles) {
-      openProfile(post.entrepreneur_profiles);
-      return;
-    }
     if (!supabase) {
+      if (post.entrepreneur_profiles) openProfile(post.entrepreneur_profiles);
       setNotice('プロフィール情報を取得できませんでした。');
       return;
     }
     const { data, error } = await supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').eq('id', post.entrepreneur_id).maybeSingle();
     if (error || !data) {
+      if (post.entrepreneur_profiles) {
+        openProfile(post.entrepreneur_profiles);
+        return;
+      }
       setNotice('プロフィール情報を取得できませんでした。時間をおいて再度お試しください。');
       return;
     }
@@ -1671,6 +1678,8 @@ function FeedPost({
   reactToPost: (post: ProgressPost, action: 'like' | 'save' | 'report') => Promise<void>;
 }) {
   const [viewCount, setViewCount] = useState(post.view_count ?? 0);
+  const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
+  const [commentCount] = useState(post.comment_count ?? 0);
   const profile = post.entrepreneur_profiles;
   const isPrivatePost = post.post_type === 'private';
   const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
@@ -1735,10 +1744,12 @@ function FeedPost({
           ) : null}
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-400">
             <span className="pill"><Gauge size={13} /> 閲覧 {viewCount.toLocaleString()}回</span>
+            <span className="pill"><Heart size={13} /> いいね {likeCount.toLocaleString()}</span>
+            <span className="pill"><MessageCircle size={13} /> コメント {commentCount.toLocaleString()}</span>
             <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? '通常投稿' : '進捗投稿'}</span>
             {currentUser.role === 'investor' && profile && (
               <>
-                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => reactToPost(post, 'like')}><Heart size={15} /> いいね</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={async () => { await reactToPost(post, 'like'); setLikeCount((current) => current + 1); }}><Heart size={15} /> いいね</button>
                 <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => reactToPost(post, 'save')}><Bookmark size={15} /> 保存</button>
                 <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => reactToPost(post, 'report')}><Flag size={15} /> 通報</button>
                 <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => quickFollow(profile)}><Heart size={15} /> フォロー</button>
@@ -2142,6 +2153,8 @@ function BadgeRow({ profile }: { profile: EntrepreneurProfile }) {
 function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost; currentUser?: AppUser; investor?: InvestorProfile | null; refresh?: () => Promise<void> }) {
   const [comment, setComment] = useState('');
   const [viewCount, setViewCount] = useState(post.view_count ?? 0);
+  const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
+  const [commentCount, setCommentCount] = useState(post.comment_count ?? 0);
   const [notice, setNotice] = useState('');
   const canComment = currentUser?.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const isPrivatePost = post.post_type === 'private';
@@ -2160,6 +2173,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
   async function like() {
     if (!supabase || !currentUser) return;
     const { error } = await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUser.id });
+    if (!error) setLikeCount((current) => current + 1);
     setNotice(error ? toJapaneseError(error.message) : 'いいねしました。');
   }
   async function save() {
@@ -2208,6 +2222,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
     }
     await supabase.from('notifications').insert({ user_id: post.user_id, type: 'comment', body: '進捗投稿にコメントがつきました。' });
     setComment('');
+    setCommentCount((current) => current + 1);
     setNotice('コメントしました。');
   }
   return (
@@ -2216,6 +2231,8 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
         <div><p className="text-sm text-slate-400">{new Date(post.created_at).toLocaleString('ja-JP')} / {visibilityLabels[post.visibility] ?? post.visibility}</p>{!isPrivatePost && <h3 className="mt-2 text-xl font-black">{post.did_today}</h3>}</div>
         <div className="flex flex-wrap justify-end gap-2">
           <span className="pill"><Gauge size={13} /> 閲覧 {viewCount.toLocaleString()}回</span>
+          <span className="pill"><Heart size={13} /> いいね {likeCount.toLocaleString()}</span>
+          <span className="pill"><MessageCircle size={13} /> コメント {commentCount.toLocaleString()}</span>
           <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? 'ひとこと' : '進捗'}</span>
         </div>
       </div>
@@ -2300,8 +2317,27 @@ function attachPostProfiles(posts: ProgressPost[], profiles: EntrepreneurProfile
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   return posts.map((post) => ({
     ...post,
-    entrepreneur_profiles: post.entrepreneur_profiles ?? profileById.get(post.entrepreneur_id),
+    entrepreneur_profiles: profileById.get(post.entrepreneur_id) ?? post.entrepreneur_profiles,
   }));
+}
+
+function withPostReactionCounts(posts: ProgressPost[], likes: any[], comments: any[]) {
+  const likeCounts = countRowsByPostId(likes);
+  const commentCounts = countRowsByPostId(comments);
+  return posts.map((post) => ({
+    ...post,
+    like_count: likeCounts.get(post.id) ?? 0,
+    comment_count: commentCounts.get(post.id) ?? 0,
+  }));
+}
+
+function countRowsByPostId(rows: any[]) {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.post_id) continue;
+    counts.set(row.post_id, (counts.get(row.post_id) ?? 0) + 1);
+  }
+  return counts;
 }
 
 function containsContactInfo(value: string) {
