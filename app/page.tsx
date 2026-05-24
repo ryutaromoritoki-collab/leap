@@ -175,6 +175,7 @@ export default function LeapApp() {
   const [kpis, setKpis] = useState<StartupKpi[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<EntrepreneurProfile | null>(null);
   const [profiles, setProfiles] = useState<EntrepreneurProfile[]>([]);
+  const [investorProfiles, setInvestorProfiles] = useState<InvestorProfile[]>([]);
   const [comments, setComments] = useState<any[]>([]);
   const [follows, setFollows] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
@@ -278,16 +279,20 @@ export default function LeapApp() {
         return;
       }
       if (ownProfile) {
-        const [{ data: postRows }, { data: allPostRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
+        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
-          supabase.from('progress_posts').select('*, entrepreneur_profiles(*, users(last_login_at))').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
+          supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
+          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
+          supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
         ]);
         setPosts((postRows as ProgressPost[]) ?? []);
-        setAllPosts((allPostRows as ProgressPost[]) ?? []);
+        setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
+        setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
+        setAllPosts(attachPostProfiles((allPostRows as ProgressPost[]) ?? [], (allProfiles as EntrepreneurProfile[]) ?? []));
         setKpis((kpiRows as StartupKpi[]) ?? []);
         setFollows(followRows ?? []);
         setMeetings(meetingRows ?? []);
@@ -296,13 +301,14 @@ export default function LeapApp() {
     }
 
     if (user.role === 'investor') {
-      const [{ data: investorProfile }, { data: allProfiles }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }] =
+      const [{ data: investorProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }] =
         await Promise.all([
           supabase.from('investor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').eq('is_hidden', false).order('created_at', { ascending: false }).limit(50),
+          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(50),
+          supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(100),
           supabase
             .from('progress_posts')
-            .select('*, entrepreneur_profiles(*, users(last_login_at))')
+            .select('*')
             .or('is_hidden.is.null,is_hidden.eq.false')
             .order('created_at', { ascending: false })
             .limit(50),
@@ -312,8 +318,10 @@ export default function LeapApp() {
         ]);
       setInvestor((investorProfile as InvestorProfile | null) ?? null);
       setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
-      setPosts((allPosts as ProgressPost[]) ?? []);
-      setAllPosts((allPosts as ProgressPost[]) ?? []);
+      setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
+      const postsWithProfiles = attachPostProfiles((allPosts as ProgressPost[]) ?? [], (allProfiles as EntrepreneurProfile[]) ?? []);
+      setPosts(postsWithProfiles);
+      setAllPosts(postsWithProfiles);
       setFollows(followRows ?? []);
       setMeetings(meetingRows ?? []);
       setMessages(messageRows ?? []);
@@ -474,6 +482,7 @@ export default function LeapApp() {
             query={query}
             setQuery={setQuery}
             profiles={profiles}
+            investors={investorProfiles}
             refresh={loadWorkspace}
             openProfile={openStartupProfile}
           />
@@ -1143,12 +1152,12 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
   );
 }
 
-function SearchPage({ query, setQuery, profiles, openProfile, refresh }: { query: string; setQuery: (q: string) => void; profiles: EntrepreneurProfile[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
+function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh }: { query: string; setQuery: (q: string) => void; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   const [filters, setFilters] = useState({ industry: '', location: '', phase: '', verified: false, interviewed: false });
   const [applied, setApplied] = useState({ query: '', industry: '', location: '', phase: '', verified: false, interviewed: false });
-  const filtered = useMemo(() => {
+  const filteredEntrepreneurs = useMemo(() => {
     return profiles.filter((p) => {
-      const text = `${p.company_name} ${p.industry ?? ''} ${p.location ?? ''} ${p.tagline ?? ''}`.toLowerCase();
+      const text = `${p.account_name ?? ''} ${p.company_name} ${p.founder_name ?? ''} ${p.industry ?? ''} ${p.location ?? ''} ${p.tagline ?? ''}`.toLowerCase();
       return (!applied.query || text.includes(applied.query.toLowerCase()))
         && (!applied.industry || p.industry?.includes(applied.industry))
         && (!applied.location || p.location?.includes(applied.location))
@@ -1157,13 +1166,24 @@ function SearchPage({ query, setQuery, profiles, openProfile, refresh }: { query
         && (!applied.interviewed || p.verified_interview);
     });
   }, [profiles, applied]);
+  const filteredInvestors = useMemo(() => {
+    return investors.filter((p) => {
+      const text = `${p.account_name ?? ''} ${p.full_name ?? ''} ${p.company_name ?? ''} ${p.location ?? ''}`.toLowerCase();
+      return (!applied.query || text.includes(applied.query.toLowerCase()))
+        && (!applied.location || p.location?.includes(applied.location))
+        && !applied.industry
+        && !applied.phase
+        && (!applied.verified || Boolean(p.corporate_number || p.license_file_path))
+        && !applied.interviewed;
+    });
+  }, [investors, applied]);
   const newEntrants = profiles.filter((p: any) => Date.now() - new Date(p.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000);
   return (
     <div className="grid gap-5">
       <section className="glass rounded-[24px] p-5">
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-4">
           <Search size={18} />
-          <input className="field border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="キーワード、業界、地域で検索" />
+          <input className="field border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="アカウント名、会社名、名前、業界、地域で検索" />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <select className="field" value={filters.industry} onChange={(e) => setFilters({ ...filters, industry: e.target.value })}><option value="">業界すべて</option>{industryOptions.map((p) => <option key={p}>{p}</option>)}</select>
@@ -1180,7 +1200,24 @@ function SearchPage({ query, setQuery, profiles, openProfile, refresh }: { query
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{newEntrants.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
         </section>
       )}
-      {filtered.length === 0 ? <EmptyState title="条件に一致する起業家はいません" body="検索条件を広げるか、起業家の登録を待ってください。" /> : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filtered.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>}
+      {filteredEntrepreneurs.length === 0 && filteredInvestors.length === 0 ? (
+        <EmptyState title="条件に一致するアカウントはありません" body="検索条件を広げるか、アカウント名・会社名・名前で検索してください。" />
+      ) : (
+        <section className="grid gap-4">
+          {filteredEntrepreneurs.length > 0 && (
+            <div className="grid gap-3">
+              <h3 className="text-xl font-black">起業家アカウント</h3>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filteredEntrepreneurs.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
+            </div>
+          )}
+          {filteredInvestors.length > 0 && (
+            <div className="grid gap-3">
+              <h3 className="text-xl font-black">投資家アカウント</h3>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filteredInvestors.map((p) => <InvestorAccountCard key={p.id} profile={p} />)}</div>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -1910,10 +1947,30 @@ function StartupCard({ profile, onClick }: { profile: EntrepreneurProfile; onCli
     <button className="glass rounded-[24px] p-5 text-left transition hover:border-cyan-300/50" onClick={onClick}>
       <div className="flex items-center justify-between gap-3"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 via-violet-400 to-emerald-300 font-black text-slate-950">{profile.company_name.slice(0, 1)}</div><ChevronRight /></div>
       <h3 className="mt-4 text-xl font-black">{profile.company_name}</h3>
+      {profile.account_name && <p className="mt-1 text-sm font-bold text-cyan-300">@{profile.account_name}</p>}
       <p className="mt-2 line-clamp-3 min-h-16 leading-7 text-slate-300">{profile.tagline || profile.overview || '事業説明は未入力です。'}</p>
       <BadgeRow profile={profile} />
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-400"><span>業界 <b className="block text-white">{profile.industry ?? '未入力'}</b></span><span>累計投資金額 <b className="block text-white">{yen(profile.total_investment_amount)}</b></span></div>
     </button>
+  );
+}
+
+function InvestorAccountCard({ profile }: { profile: InvestorProfile }) {
+  const title = profile.company_name || profile.full_name || '投資家';
+  return (
+    <article className="glass rounded-[24px] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-emerald-300 via-cyan-300 to-violet-400 font-black text-slate-950">{title.slice(0, 1)}</div>
+        <span className="pill"><CircleDollarSign size={13} /> 投資家</span>
+      </div>
+      <h3 className="mt-4 text-xl font-black">{title}</h3>
+      {profile.account_name && <p className="mt-1 text-sm font-bold text-cyan-300">@{profile.account_name}</p>}
+      <p className="mt-2 text-sm leading-6 text-slate-400">{profile.full_name}{profile.location ? ` / ${profile.location}` : ''}</p>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-400">
+        <span>確認状態 <b className="block text-white">{profile.corporate_number || profile.license_file_path ? '提出済み' : '未提出'}</b></span>
+        <span>累計投資金額 <b className="block text-white">{yen(profile.total_investment_amount)}</b></span>
+      </div>
+    </article>
   );
 }
 
@@ -2046,6 +2103,14 @@ function numberOrNull(value: any) {
 function splitTags(value?: string) {
   if (!value) return [];
   return value.split(',').map((tag) => tag.trim()).filter(Boolean);
+}
+
+function attachPostProfiles(posts: ProgressPost[], profiles: EntrepreneurProfile[]) {
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  return posts.map((post) => ({
+    ...post,
+    entrepreneur_profiles: post.entrepreneur_profiles ?? profileById.get(post.entrepreneur_id),
+  }));
 }
 
 function containsContactInfo(value: string) {
