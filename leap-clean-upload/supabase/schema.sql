@@ -172,6 +172,7 @@ create table public.progress_posts (
   related_kpi text,
   tags text[],
   visibility text not null default 'public',
+  view_count int not null default 0,
   is_hidden boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -180,7 +181,15 @@ create table public.progress_posts (
 alter table public.progress_posts
   add column if not exists post_type text not null default 'progress',
   add column if not exists title text,
-  add column if not exists body text;
+  add column if not exists body text,
+  add column if not exists view_count int not null default 0;
+
+create table public.post_views (
+  post_id uuid not null references public.progress_posts(id) on delete cascade,
+  viewer_id uuid not null references public.users(id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (post_id, viewer_id)
+);
 
 create table public.post_comments (
   id uuid primary key default gen_random_uuid(),
@@ -348,6 +357,7 @@ alter table public.startup_kpis enable row level security;
 alter table public.progress_posts enable row level security;
 alter table public.post_comments enable row level security;
 alter table public.post_likes enable row level security;
+alter table public.post_views enable row level security;
 alter table public.follows enable row level security;
 alter table public.watchlists enable row level security;
 alter table public.messages enable row level security;
@@ -393,6 +403,9 @@ create policy "comments owner/admin update" on public.post_comments for update u
 create policy "likes readable" on public.post_likes for select using (true);
 create policy "likes owner insert" on public.post_likes for insert with check (user_id = auth.uid());
 create policy "likes owner delete" on public.post_likes for delete using (user_id = auth.uid());
+
+create policy "views owner/admin read" on public.post_views for select using (viewer_id = auth.uid() or public.is_admin());
+create policy "views logged insert" on public.post_views for insert with check (viewer_id = auth.uid());
 
 create policy "follows readable" on public.follows for select using (true);
 create policy "follows investor insert" on public.follows for insert with check (investor_id = auth.uid());
@@ -468,6 +481,55 @@ grant select, insert, update, delete on public.automated_reminders to authentica
 
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
 alter default privileges in schema public grant usage, select on sequences to authenticated;
+
+create or replace function public.increment_post_view(post_id_input uuid)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  next_count int;
+begin
+  if auth.uid() is null then
+    select coalesce(view_count, 0) into next_count
+    from public.progress_posts
+    where id = post_id_input;
+    return coalesce(next_count, 0);
+  end if;
+
+  insert into public.post_views (post_id, viewer_id)
+  values (post_id_input, auth.uid())
+  on conflict do nothing;
+
+  select count(*)::int
+  into next_count
+  from public.post_views
+  where post_id = post_id_input;
+
+  update public.progress_posts
+  set view_count = next_count
+  where id = post_id_input;
+
+  return coalesce(next_count, 0);
+end;
+$$;
+
+create or replace function public.notify_admin_contact_inquiry()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.notifications (user_id, type, body)
+  select
+    id,
+    'admin_contact_inquiry',
+    '運営相談が届きました: ' || coalesce(new.category, '問い合わせ')
+  from public.users
+  where role = 'admin' and is_suspended = false;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists contact_inquiry_admin_notification on public.contact_inquiries;
+create trigger contact_inquiry_admin_notification
+after insert on public.contact_inquiries
+for each row execute function public.notify_admin_contact_inquiry();
 
 create or replace function public.queue_comment_message_email()
 returns trigger language plpgsql security definer set search_path = public as $$

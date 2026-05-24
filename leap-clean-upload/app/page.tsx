@@ -94,6 +94,7 @@ const legalCopy: Record<LegalSlug, { title: string; body: string }> = {
 
 const nav = [
   { view: 'home' as View, label: 'ホーム', icon: Home },
+  { view: 'post' as View, label: '投稿', icon: FileText },
   { view: 'search' as View, label: '検索', icon: Search },
   { view: 'kpi' as View, label: 'KPI', icon: LayoutDashboard },
   { view: 'messages' as View, label: 'メッセージ', icon: Mail },
@@ -169,6 +170,7 @@ export default function LeapApp() {
   const [profile, setProfile] = useState<EntrepreneurProfile | null>(null);
   const [investor, setInvestor] = useState<InvestorProfile | null>(null);
   const [posts, setPosts] = useState<ProgressPost[]>([]);
+  const [allPosts, setAllPosts] = useState<ProgressPost[]>([]);
   const [kpis, setKpis] = useState<StartupKpi[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<EntrepreneurProfile | null>(null);
   const [profiles, setProfiles] = useState<EntrepreneurProfile[]>([]);
@@ -259,14 +261,16 @@ export default function LeapApp() {
       const { data: ownProfile } = await supabase.from('entrepreneur_profiles').select('*').eq('user_id', user.id).maybeSingle();
       setProfile((ownProfile as EntrepreneurProfile | null) ?? null);
       if (ownProfile) {
-        const [{ data: postRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
+        const [{ data: postRows }, { data: allPostRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
+          supabase.from('progress_posts').select('*, entrepreneur_profiles(company_name, industry, total_investment_amount)').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
         ]);
         setPosts((postRows as ProgressPost[]) ?? []);
+        setAllPosts((allPostRows as ProgressPost[]) ?? []);
         setKpis((kpiRows as StartupKpi[]) ?? []);
         setFollows(followRows ?? []);
         setMeetings(meetingRows ?? []);
@@ -292,6 +296,7 @@ export default function LeapApp() {
       setInvestor((investorProfile as InvestorProfile | null) ?? null);
       setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
       setPosts((allPosts as ProgressPost[]) ?? []);
+      setAllPosts((allPosts as ProgressPost[]) ?? []);
       setFollows(followRows ?? []);
       setMeetings(meetingRows ?? []);
       setMessages(messageRows ?? []);
@@ -329,6 +334,7 @@ export default function LeapApp() {
         contactSuspicions: contactSuspicions.data ?? [],
         allMessages: allMessages.data ?? [],
       });
+      setAllPosts((progressPosts.data as ProgressPost[]) ?? []);
     }
 
     const { data: notificationRows } = await supabase.from('notifications').select('*').eq('user_id', user.id).is('read_at', null).limit(20);
@@ -432,12 +438,13 @@ export default function LeapApp() {
         {toast && <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{toast}</div>}
 
         {view === 'home' && user.role === 'entrepreneur' && (
-          <EntrepreneurHome profile={profile} posts={posts} kpis={kpis} follows={follows} meetings={meetings} refresh={loadWorkspace} />
+          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} kpis={kpis} follows={follows} meetings={meetings} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'investor' && (
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} posts={posts} follows={follows} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
+        {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} />}
         {view === 'search' && (
           <SearchPage
             query={query}
@@ -458,7 +465,7 @@ export default function LeapApp() {
         {view === 'launch' && <LaunchChecklist />}
       </main>
 
-      <nav className="glass fixed bottom-3 left-3 right-3 z-30 grid grid-cols-5 gap-1 rounded-3xl p-2 lg:hidden">
+      <nav className="glass fixed bottom-3 left-3 right-3 z-30 grid grid-cols-6 gap-1 rounded-3xl p-2 lg:hidden">
         {nav.filter((item) => item.view !== 'admin' || user.role === 'admin').map((item) => (
           <button key={item.view} onClick={() => setView(item.view)} className={`grid min-h-12 place-items-center rounded-2xl ${view === item.view ? 'bg-white/12 text-white' : 'text-slate-400'}`} aria-label={item.label}>
             <item.icon size={21} />
@@ -475,7 +482,7 @@ function titleFor(view: View, role: UserRole) {
     home: 'ホーム',
     search: '起業家検索',
     profile: '起業家プロフィール',
-    post: '進捗投稿',
+    post: '投稿一覧',
     kpi: 'KPIダッシュボード',
     messages: 'メッセージ',
     admin: '管理者ページ',
@@ -846,7 +853,7 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
   );
 }
 
-function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: { profile: EntrepreneurProfile | null; posts: ProgressPost[]; kpis: StartupKpi[]; follows: any[]; meetings: any[]; refresh: () => Promise<void> }) {
+function EntrepreneurHome({ currentUser, profile, posts, kpis, follows, meetings, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; kpis: StartupKpi[]; follows: any[]; meetings: any[]; refresh: () => Promise<void> }) {
   if (!profile) return <EmptyState title="プロフィールが未作成です" body="起業家プロフィールを作成すると、投資家が事業進捗を継続的に確認できます。" cta="オンボーディングを確認" />;
   const completeness = calcCompleteness(profile);
   return (
@@ -871,7 +878,7 @@ function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: 
       <PitchUpload profile={profile} refresh={refresh} />
       <section className="grid gap-3">
         <h3 className="text-xl font-black">進捗ログ</h3>
-        {posts.length === 0 ? <EmptyState title="まだ進捗投稿がありません。まずは今日やったことを投稿しましょう。" cta="進捗を投稿する" /> : posts.map((post) => <PostCard key={post.id} post={post} />)}
+        {posts.length === 0 ? <EmptyState title="まだ投稿がありません。まずは短い近況から投稿しましょう。" cta="投稿する" /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} />)}
       </section>
       <KpiDashboard profile={profile} kpis={kpis} compact />
     </div>
@@ -1275,16 +1282,20 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
 }
 
 function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
-  const [form, setForm] = useState<Record<string, string>>({ visibility: 'public', post_type: 'progress' });
+  const [form, setForm] = useState<Record<string, string>>({ visibility: 'public', post_type: 'private' });
   const isPrivatePost = form.post_type === 'private';
+  const quickPostIdeas = ['今日の小さな進捗', 'いま困っていること', '投資家に聞きたいこと', '嬉しかった反応'];
   async function submit() {
+    const body = form.body?.trim() ?? '';
+    const title = (form.title?.trim() || body.slice(0, 40) || '近況投稿').trim();
+    const didToday = (form.did_today?.trim() || title || '今日の進捗').trim();
     const { error } = await supabase!.from('progress_posts').insert({
       entrepreneur_id: profile.id,
       user_id: profile.user_id,
       post_type: form.post_type,
-      title: isPrivatePost ? form.title : null,
-      body: isPrivatePost ? form.body : null,
-      did_today: isPrivatePost ? form.title : form.did_today,
+      title: isPrivatePost ? title : null,
+      body: isPrivatePost ? body : null,
+      did_today: isPrivatePost ? title : didToday,
       metric_change: isPrivatePost ? null : form.metric_change,
       issue: isPrivatePost ? null : form.issue,
       next_action: isPrivatePost ? null : form.next_action,
@@ -1293,22 +1304,34 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
       visibility: form.visibility,
     });
     if (!error) {
-      setForm({ visibility: 'public' });
+      setForm({ visibility: 'public', post_type: 'private' });
       await refresh();
     }
   }
   return (
     <section className="glass rounded-[24px] p-5">
-      <h3 className="text-xl font-black">投稿</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-400">進捗投稿と、自由に書ける通常投稿を使い分けできます。</p>
-      <label className="label mt-4">投稿タイプ<select className="field" value={form.post_type} onChange={(e) => setForm({ ...form, post_type: e.target.value })}><option value="progress">進捗投稿</option><option value="private">通常投稿</option></select></label>
+      <h3 className="text-xl font-black">気軽に投稿</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-400">短い近況だけでも大丈夫です。小さな実行や悩みも、投資家が成長を追う材料になります。</p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button type="button" className={isPrivatePost ? 'btn-primary' : 'btn-secondary'} onClick={() => setForm({ ...form, post_type: 'private' })}>ひとこと投稿</button>
+        <button type="button" className={!isPrivatePost ? 'btn-primary' : 'btn-secondary'} onClick={() => setForm({ ...form, post_type: 'progress' })}>進捗テンプレ</button>
+      </div>
       {isPrivatePost ? (
-        <FieldGrid textarea fields={['title:タイトル', 'body:本文', 'tags:タグ（カンマ区切り）']} form={form} set={(n, v) => setForm({ ...form, [n]: v })} />
+        <div className="mt-4 grid gap-4">
+          <div className="flex flex-wrap gap-2">
+            {quickPostIdeas.map((idea) => (
+              <button key={idea} type="button" className="pill" onClick={() => setForm({ ...form, title: idea, body: form.body || `${idea}について共有します。` })}>{idea}</button>
+            ))}
+          </div>
+          <label className="label">本文<textarea className="field min-h-32" value={form.body ?? ''} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="例：今日は商談で良い反応がありました。次は導入条件を整理します。" /></label>
+          <label className="label">タイトル（任意）<input className="field" value={form.title ?? ''} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="未入力なら本文から自動作成します" /></label>
+          <label className="label">タグ（任意）<input className="field" value={form.tags ?? ''} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="例：営業, プロダクト" /></label>
+        </div>
       ) : (
         <FieldGrid textarea fields={['did_today:今日やったこと', 'metric_change:数値の変化', 'issue:課題', 'next_action:次にやること', 'related_kpi:関連KPI', 'tags:タグ（カンマ区切り）']} form={form} set={(n, v) => setForm({ ...form, [n]: v })} />
       )}
       <label className="label mt-4">公開範囲<select className="field" value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })}>{visibilityOptions.map((v) => <option key={v} value={v}>{visibilityLabels[v]}</option>)}</select></label>
-      <button className="btn-primary mt-4 w-full" onClick={submit}><Plus size={17} /> 投稿する</button>
+      <button className="btn-primary mt-4 w-full" onClick={submit} disabled={isPrivatePost ? !form.body?.trim() : !form.did_today?.trim()}><Plus size={17} /> 投稿する</button>
     </section>
   );
 }
@@ -1364,11 +1387,15 @@ function PitchUpload({ profile, refresh }: { profile: EntrepreneurProfile; refre
   }
   async function requestConsultation() {
     if (!supabase) return;
-    await supabase.from('contact_inquiries').insert({
+    const { error } = await supabase.from('contact_inquiries').insert({
       user_id: profile.user_id,
       category: 'pitch_consultation',
       body: `${profile.company_name} がピッチ資料の相談を希望しています。運営からメッセージで連絡してください。`,
     });
+    if (error) {
+      setMessage(toJapaneseError(error.message));
+      return;
+    }
     setMessage('ピッチ資料の相談申請を運営へ送信しました。');
   }
   return (
@@ -1410,6 +1437,32 @@ function KpiDashboard({ profile, kpis, compact }: { profile: EntrepreneurProfile
   );
 }
 
+function AllPostsPage({ posts, currentUser, investor }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null }) {
+  return (
+    <section className="grid gap-4">
+      <div className="glass rounded-[28px] p-6">
+        <p className="text-sm font-bold text-emerald-300">投稿一覧</p>
+        <h2 className="mt-2 text-3xl font-black">公開されている投稿を一覧で確認できます</h2>
+        <p className="mt-3 max-w-3xl leading-7 text-slate-300">
+          起業家の進捗投稿と通常投稿を、登録ユーザー全員が時系列で確認できます。非表示にされた投稿は表示されません。
+        </p>
+      </div>
+      {posts.length === 0 ? (
+        <EmptyState title="表示できる投稿はまだありません" body="起業家が投稿すると、この一覧に表示されます。" />
+      ) : (
+        posts.map((post) => (
+          <div key={post.id} className="grid gap-2">
+            {(post as any).entrepreneur_profiles?.company_name && (
+              <p className="px-1 text-sm font-bold text-cyan-200">{(post as any).entrepreneur_profiles.company_name}</p>
+            )}
+            <PostCard post={post} currentUser={currentUser} investor={investor} />
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
 function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; refresh: () => Promise<void> }) {
   async function update(table: string, id: string, patch: Record<string, any>, action: string) {
     await supabase!.from(table).update(patch).eq('id', id);
@@ -1427,9 +1480,14 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         <Metric label="ユーザー一覧" value={`${adminData.users?.length ?? 0}`} icon={UsersRound} />
         <Metric label="起業家一覧" value={`${adminData.entrepreneurs?.length ?? 0}`} icon={Building2} />
         <Metric label="投稿一覧" value={`${adminData.posts?.length ?? 0}`} icon={FileText} />
-        <Metric label="通報一覧" value={`${reports.length}`} icon={Flag} />
+        <Metric label="運営相談" value={`${adminData.inquiries?.length ?? 0}`} icon={MessageCircle} />
       </div>
       {reports.length === 0 && <EmptyState title="現在確認が必要な通報はありません。" />}
+      <AdminTable title="運営相談・お問い合わせ" rows={adminData.inquiries ?? []} render={(row) => (
+        <AdminRow key={row.id} title={row.category ?? '問い合わせ'} meta={`${row.email ?? 'メール未登録'} / ${new Date(row.created_at).toLocaleString('ja-JP')} / ${row.body ?? ''}`}>
+          <span className="pill"><MessageCircle size={13} /> 未対応</span>
+        </AdminRow>
+      )} />
       <AdminTable title="メンバー一覧" rows={adminData.users ?? []} render={(row) => {
         const hasEntrepreneur = entrepreneurs.some((p) => p.user_id === row.id);
         const hasInvestor = investors.some((p) => p.user_id === row.id);
@@ -1495,12 +1553,16 @@ function Messages({ currentUser, messages, meetings, refresh }: { currentUser: A
   }
   async function sendSupportMessage() {
     if (!supabase || !supportBody.trim()) return;
-    await supabase.from('contact_inquiries').insert({
+    const { error } = await supabase.from('contact_inquiries').insert({
       user_id: currentUser.id,
       email: currentUser.email,
       category: 'support_message',
       body: supportBody,
     });
+    if (error) {
+      setSupportMessage(toJapaneseError(error.message));
+      return;
+    }
     setSupportBody('');
     setSupportMessage('運営サポートへメッセージを送信しました。');
   }
@@ -1676,8 +1738,21 @@ function BadgeRow({ profile }: { profile: EntrepreneurProfile }) {
 
 function PostCard({ post, currentUser, investor }: { post: ProgressPost; currentUser?: AppUser; investor?: InvestorProfile | null }) {
   const [comment, setComment] = useState('');
+  const [viewCount, setViewCount] = useState(post.view_count ?? 0);
   const canComment = currentUser?.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const isPrivatePost = post.post_type === 'private';
+
+  useEffect(() => {
+    if (!supabase || !currentUser || currentUser.id === post.user_id) return;
+    let cancelled = false;
+    supabase.rpc('increment_post_view', { post_id_input: post.id }).then(({ data }) => {
+      if (!cancelled && typeof data === 'number') setViewCount(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, post.id, post.user_id]);
+
   async function like() {
     if (!supabase || !currentUser) return;
     await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUser.id });
@@ -1706,7 +1781,10 @@ function PostCard({ post, currentUser, investor }: { post: ProgressPost; current
     <article className="glass rounded-[24px] p-5">
       <div className="flex items-start justify-between gap-3">
         <div><p className="text-sm text-slate-400">{new Date(post.created_at).toLocaleString('ja-JP')} / {visibilityLabels[post.visibility] ?? post.visibility}</p><h3 className="mt-2 text-xl font-black">{isPrivatePost ? post.title : post.did_today}</h3></div>
-        <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? '通常投稿' : '進捗'}</span>
+        <div className="flex flex-wrap justify-end gap-2">
+          <span className="pill"><Gauge size={13} /> 閲覧 {viewCount.toLocaleString()}回</span>
+          <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? 'ひとこと' : '進捗'}</span>
+        </div>
       </div>
       {isPrivatePost ? <p className="mt-4 whitespace-pre-line leading-7 text-slate-300">{post.body || '本文はありません。'}</p> : <div className="mt-4 grid gap-3 md:grid-cols-3">
         <Detail title="数値の変化" body={post.metric_change} />
