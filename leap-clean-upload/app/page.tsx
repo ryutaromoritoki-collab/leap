@@ -164,6 +164,7 @@ export default function LeapApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [recoveringPassword, setRecoveringPassword] = useState(false);
   const [view, setView] = useState<View>('home');
   const [legalSlug, setLegalSlug] = useState<LegalSlug>('terms');
@@ -219,7 +220,10 @@ export default function LeapApp() {
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      setWorkspaceReady(false);
+      return;
+    }
     loadWorkspace();
   }, [user?.id, view]);
 
@@ -257,13 +261,26 @@ export default function LeapApp() {
 
   async function loadWorkspace() {
     if (!supabase || !user) return;
+    setWorkspaceReady(false);
+    try {
     if (user.role === 'entrepreneur') {
       const { data: ownProfile } = await supabase.from('entrepreneur_profiles').select('*').eq('user_id', user.id).maybeSingle();
       setProfile((ownProfile as EntrepreneurProfile | null) ?? null);
+      if (!ownProfile) {
+        await supabase.from('users').update({ profile_completed: false }).eq('id', user.id);
+        setUser({ ...user, profile_completed: false });
+        setPosts([]);
+        setAllPosts([]);
+        setKpis([]);
+        setFollows([]);
+        setMeetings([]);
+        setMessages([]);
+        return;
+      }
       if (ownProfile) {
         const [{ data: postRows }, { data: allPostRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
-          supabase.from('progress_posts').select('*, entrepreneur_profiles(company_name, industry, total_investment_amount)').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
+          supabase.from('progress_posts').select('*, entrepreneur_profiles(*, users(last_login_at))').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
@@ -339,6 +356,9 @@ export default function LeapApp() {
 
     const { data: notificationRows } = await supabase.from('notifications').select('*').eq('user_id', user.id).is('read_at', null).limit(20);
     setNotifications(notificationRows ?? []);
+    } finally {
+      setWorkspaceReady(true);
+    }
   }
 
   async function signOut() {
@@ -397,6 +417,10 @@ export default function LeapApp() {
     return <Onboarding user={user} onDone={loadUser} />;
   }
 
+  if (!workspaceReady) {
+    return <FullScreenMessage title="Leapを起動しています" body="最新のプロフィールと投稿を確認しています。" />;
+  }
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="glass fixed inset-y-0 left-0 z-20 hidden w-[260px] border-y-0 border-l-0 p-5 lg:block">
@@ -444,7 +468,7 @@ export default function LeapApp() {
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} posts={posts} follows={follows} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
-        {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} />}
+        {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} openProfile={openStartupProfile} refresh={loadWorkspace} />}
         {view === 'search' && (
           <SearchPage
             query={query}
@@ -1222,6 +1246,14 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
     setComment('');
   }
 
+  async function quickMessage() {
+    if (!supabase || !investorGate.canContact) return;
+    const body = 'プロフィールを拝見しました。詳しくお話を伺いたいです。';
+    await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    await refresh();
+  }
+
   return (
     <div className="grid gap-5">
       <section className="glass overflow-hidden rounded-[28px] p-6">
@@ -1233,8 +1265,9 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
             <p className="mt-3 max-w-2xl leading-7 text-slate-300">{profile.tagline || '一言説明は未入力です。'}</p>
           </div>
           {currentUser.role === 'investor' && (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               <button className="btn-primary" onClick={follow}><Heart size={17} /> フォロー</button>
+              <button className="btn-secondary" disabled={!investorGate.canContact} onClick={quickMessage}><Send size={17} /> メッセージ</button>
               <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>
             </div>
           )}
@@ -1283,9 +1316,12 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
 
 function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
   const [form, setForm] = useState<Record<string, string>>({ visibility: 'public', post_type: 'private' });
+  const [toast, setToast] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const isPrivatePost = form.post_type === 'private';
   const quickPostIdeas = ['今日の小さな進捗', 'いま困っていること', '投資家に聞きたいこと', '嬉しかった反応'];
   async function submit() {
+    setErrorMessage('');
     const body = form.body?.trim() ?? '';
     const title = (form.title?.trim() || body.slice(0, 40) || '近況投稿').trim();
     const didToday = (form.did_today?.trim() || title || '今日の進捗').trim();
@@ -1303,13 +1339,22 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
       tags: splitTags(form.tags),
       visibility: form.visibility,
     });
-    if (!error) {
-      setForm({ visibility: 'public', post_type: 'private' });
-      await refresh();
+    if (error) {
+      setErrorMessage(toJapaneseError(error.message));
+      return;
     }
+    setForm({ visibility: 'public', post_type: 'private' });
+    setToast('投稿しました');
+    setTimeout(() => setToast(''), 2200);
+    await refresh();
   }
   return (
     <section className="glass rounded-[24px] p-5">
+      {toast && (
+        <div className="fixed left-1/2 top-4 z-50 w-[calc(100vw-32px)] max-w-sm -translate-x-1/2 rounded-2xl border border-emerald-300/40 bg-slate-950/95 px-5 py-4 text-center text-base font-black text-emerald-100 shadow-2xl shadow-cyan-500/20">
+          {toast}
+        </div>
+      )}
       <h3 className="text-xl font-black">気軽に投稿</h3>
       <p className="mt-2 text-sm leading-6 text-slate-400">短い近況だけでも大丈夫です。小さな実行や悩みも、投資家が成長を追う材料になります。</p>
       <div className="mt-4 grid grid-cols-2 gap-2">
@@ -1332,6 +1377,7 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
       )}
       <label className="label mt-4">公開範囲<select className="field" value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })}>{visibilityOptions.map((v) => <option key={v} value={v}>{visibilityLabels[v]}</option>)}</select></label>
       <button className="btn-primary mt-4 w-full" onClick={submit} disabled={isPrivatePost ? !form.body?.trim() : !form.did_today?.trim()}><Plus size={17} /> 投稿する</button>
+      {errorMessage && <p className="mt-3 rounded-2xl bg-rose-400/10 p-3 text-sm text-rose-100">{errorMessage}</p>}
     </section>
   );
 }
@@ -1437,29 +1483,174 @@ function KpiDashboard({ profile, kpis, compact }: { profile: EntrepreneurProfile
   );
 }
 
-function AllPostsPage({ posts, currentUser, investor }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null }) {
+function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
+  const [messageByPost, setMessageByPost] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState('');
+  const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
+
+  async function quickFollow(profile?: EntrepreneurProfile) {
+    if (!supabase || !profile) return;
+    await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
+    setNotice(`${profile.company_name}をフォローしました。`);
+    await refresh();
+  }
+
+  async function quickMessage(post: ProgressPost) {
+    if (!supabase) return;
+    const profile = post.entrepreneur_profiles;
+    const body = messageByPost[post.id]?.trim();
+    if (!profile || !body) return;
+    if (!canMessage) {
+      setNotice('法人番号または運転免許証の提出後にメッセージを送信できます。');
+      return;
+    }
+    if (containsContactInfo(body)) {
+      await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
+      setNotice('連絡先交換につながる可能性がある内容は送信できません。');
+      return;
+    }
+    await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    setMessageByPost({ ...messageByPost, [post.id]: '' });
+    setNotice('メッセージを送信しました。');
+  }
+
   return (
-    <section className="grid gap-4">
-      <div className="glass rounded-[28px] p-6">
-        <p className="text-sm font-bold text-emerald-300">投稿一覧</p>
-        <h2 className="mt-2 text-3xl font-black">公開されている投稿を一覧で確認できます</h2>
-        <p className="mt-3 max-w-3xl leading-7 text-slate-300">
-          起業家の進捗投稿と通常投稿を、登録ユーザー全員が時系列で確認できます。非表示にされた投稿は表示されません。
-        </p>
+    <section className="mx-auto grid w-full max-w-2xl gap-4">
+      <div className="px-1">
+        <p className="text-sm font-bold text-emerald-300">投稿</p>
+        <h2 className="mt-1 text-3xl font-black">タイムライン</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-400">起業家の近況や進捗を時系列で確認できます。気になる投稿からすぐにプロフィール確認、フォロー、メッセージができます。</p>
       </div>
+      {notice && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
       {posts.length === 0 ? (
         <EmptyState title="表示できる投稿はまだありません" body="起業家が投稿すると、この一覧に表示されます。" />
       ) : (
-        posts.map((post) => (
-          <div key={post.id} className="grid gap-2">
-            {(post as any).entrepreneur_profiles?.company_name && (
-              <p className="px-1 text-sm font-bold text-cyan-200">{(post as any).entrepreneur_profiles.company_name}</p>
-            )}
-            <PostCard post={post} currentUser={currentUser} investor={investor} />
-          </div>
-        ))
+        <div className="overflow-hidden rounded-[24px] border border-white/10 bg-black/25">
+          {posts.map((post) => (
+            <FeedPost
+              key={post.id}
+              post={post}
+              currentUser={currentUser}
+              investor={investor}
+              messageValue={messageByPost[post.id]}
+              setMessage={(value) => setMessageByPost({ ...messageByPost, [post.id]: value })}
+              openProfile={openProfile}
+              quickFollow={quickFollow}
+              quickMessage={quickMessage}
+            />
+          ))}
+        </div>
       )}
     </section>
+  );
+}
+
+function FeedPost({
+  post,
+  currentUser,
+  investor,
+  messageValue,
+  setMessage,
+  openProfile,
+  quickFollow,
+  quickMessage,
+}: {
+  post: ProgressPost;
+  currentUser: AppUser;
+  investor: InvestorProfile | null;
+  messageValue?: string;
+  setMessage: (value: string) => void;
+  openProfile: (profile: EntrepreneurProfile) => void;
+  quickFollow: (profile?: EntrepreneurProfile) => Promise<void>;
+  quickMessage: (post: ProgressPost) => Promise<void>;
+}) {
+  const [viewCount, setViewCount] = useState(post.view_count ?? 0);
+  const profile = post.entrepreneur_profiles;
+  const isPrivatePost = post.post_type === 'private';
+  const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
+  const companyName = profile?.company_name || '起業家';
+  const displayName = profile?.account_name || profile?.founder_name || companyName;
+
+  useEffect(() => {
+    if (!supabase || !currentUser || currentUser.id === post.user_id) return;
+    let cancelled = false;
+    supabase.rpc('increment_post_view', { post_id_input: post.id }).then(({ data }) => {
+      if (!cancelled && typeof data === 'number') setViewCount(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, post.id, post.user_id]);
+
+  return (
+    <article className="border-b border-white/10 p-4 last:border-b-0 sm:p-5">
+      <div className="grid grid-cols-[44px_1fr] gap-3">
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-gradient-to-br from-cyan-400/25 via-violet-400/20 to-emerald-300/20 text-base font-black text-cyan-100"
+          onClick={() => profile && openProfile(profile)}
+          aria-label={`${companyName}のプロフィールを見る`}
+        >
+          {companyName.slice(0, 1)}
+        </button>
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <button type="button" className="truncate text-left font-black text-slate-50 hover:text-cyan-200" onClick={() => profile && openProfile(profile)}>
+              {companyName}
+            </button>
+            <span className="truncate text-sm text-slate-500">@{displayName}</span>
+            <span className="text-sm text-slate-500">・</span>
+            <span className="text-sm text-slate-500">{new Date(post.created_at).toLocaleDateString('ja-JP')}</span>
+          </div>
+          <button type="button" className="mt-1 text-left text-xs font-bold text-cyan-300 hover:text-cyan-100" onClick={() => profile && openProfile(profile)}>
+            プロフィールを見る
+          </button>
+          <h3 className="mt-3 break-words text-lg font-black leading-7 text-slate-50">{isPrivatePost ? post.title : post.did_today}</h3>
+          {isPrivatePost ? (
+            <p className="mt-2 whitespace-pre-line break-words leading-7 text-slate-300">{post.body || '本文はありません。'}</p>
+          ) : (
+            <div className="mt-3 grid gap-3">
+              <TimelineDetail title="数値の変化" body={post.metric_change} />
+              <TimelineDetail title="課題" body={post.issue} />
+              <TimelineDetail title="次にやること" body={post.next_action} />
+            </div>
+          )}
+          {post.tags?.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {post.tags.map((tag) => <span className="text-sm font-bold text-cyan-300" key={tag}>#{tag}</span>)}
+            </div>
+          ) : null}
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-400">
+            <span className="pill"><Gauge size={13} /> 閲覧 {viewCount.toLocaleString()}回</span>
+            <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? '通常投稿' : '進捗投稿'}</span>
+            {currentUser.role === 'investor' && profile && (
+              <>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => quickFollow(profile)}><Heart size={15} /> フォロー</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => setMessage(messageValue ?? '投稿を拝見しました。詳しくお話を伺いたいです。')}><Send size={15} /> メッセージ</button>
+              </>
+            )}
+          </div>
+          {messageValue !== undefined && (
+            <div className="mt-3 grid gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 sm:grid-cols-[1fr_auto]">
+              {!canMessage && <p className="sm:col-span-2 rounded-2xl bg-amber-300/10 p-3 text-sm text-amber-100">法人番号または運転免許証の提出後にメッセージを送信できます。</p>}
+              <input className="field" value={messageValue} onChange={(e) => setMessage(e.target.value)} placeholder="短いメッセージを書く" />
+              <button className="btn-primary" onClick={() => quickMessage(post)} disabled={!canMessage}><Send size={16} /> 送信</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function TimelineDetail({ title, body }: { title: string; body?: string | null }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+      <span className="text-xs font-bold text-cyan-300">{title}</span>
+      <p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-slate-300">{body || '未入力'}</p>
+    </div>
   );
 }
 
