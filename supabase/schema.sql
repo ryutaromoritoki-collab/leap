@@ -10,15 +10,21 @@ create table public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
   role public.user_role not null,
+  available_roles public.user_role[] not null default '{}',
+  phone text,
   profile_completed boolean not null default false,
   is_suspended boolean not null default false,
   notification_email_enabled boolean not null default true,
+  last_login_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.users
-  add column if not exists notification_email_enabled boolean not null default true;
+  add column if not exists available_roles public.user_role[] not null default '{}',
+  add column if not exists phone text,
+  add column if not exists notification_email_enabled boolean not null default true,
+  add column if not exists last_login_at timestamptz;
 
 create table public.entrepreneur_profiles (
   id uuid primary key default gen_random_uuid(),
@@ -54,6 +60,13 @@ create table public.entrepreneur_profiles (
   payment_plan_amount numeric,
   payment_requested_at timestamptz,
   paid_at timestamptz,
+  subscription_ends_at timestamptz,
+  meeting_ticket_balance int not null default 0,
+  meeting_ticket_plan text,
+  meeting_ticket_requested_count int not null default 0,
+  meeting_ticket_requested_amount numeric,
+  meeting_ticket_payment_status text not null default 'unpaid',
+  meeting_ticket_transfer_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -66,7 +79,14 @@ alter table public.entrepreneur_profiles
   add column if not exists payment_plan_months int,
   add column if not exists payment_plan_amount numeric,
   add column if not exists payment_requested_at timestamptz,
-  add column if not exists paid_at timestamptz;
+  add column if not exists paid_at timestamptz,
+  add column if not exists subscription_ends_at timestamptz,
+  add column if not exists meeting_ticket_balance int not null default 0,
+  add column if not exists meeting_ticket_plan text,
+  add column if not exists meeting_ticket_requested_count int not null default 0,
+  add column if not exists meeting_ticket_requested_amount numeric,
+  add column if not exists meeting_ticket_payment_status text not null default 'unpaid',
+  add column if not exists meeting_ticket_transfer_name text;
 
 alter table public.entrepreneur_profiles
   alter column is_hidden set default true;
@@ -84,9 +104,19 @@ create table public.investor_profiles (
   past_investments text,
   support_areas text,
   purpose text[],
+  document_type text,
+  document_file_path text,
+  document_status text not null default 'unsubmitted',
+  document_submitted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.investor_profiles
+  add column if not exists document_type text,
+  add column if not exists document_file_path text,
+  add column if not exists document_status text not null default 'unsubmitted',
+  add column if not exists document_submitted_at timestamptz;
 
 create table public.startup_kpis (
   id uuid primary key default gen_random_uuid(),
@@ -169,6 +199,8 @@ create table public.meeting_requests (
   ticket_amount numeric not null default 11000,
   ticket_payment_status text not null default 'unpaid',
   confirmed_at timestamptz,
+  final_meeting_at timestamptz,
+  meeting_admin_report text,
   created_at timestamptz not null default now()
 );
 
@@ -177,7 +209,9 @@ alter table public.meeting_requests
   add column if not exists ticket_count int not null default 1,
   add column if not exists ticket_amount numeric not null default 11000,
   add column if not exists ticket_payment_status text not null default 'unpaid',
-  add column if not exists confirmed_at timestamptz;
+  add column if not exists confirmed_at timestamptz,
+  add column if not exists final_meeting_at timestamptz,
+  add column if not exists meeting_admin_report text;
 
 create table public.pitch_materials (
   id uuid primary key default gen_random_uuid(),
@@ -233,6 +267,10 @@ insert into storage.buckets (id, name, public)
 values ('pitch-materials', 'pitch-materials', false)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('compliance-documents', 'compliance-documents', false)
+on conflict (id) do nothing;
+
 create table public.contact_inquiries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete set null,
@@ -241,6 +279,25 @@ create table public.contact_inquiries (
   body text not null,
   status text not null default 'open',
   created_at timestamptz not null default now()
+);
+
+create table public.contact_suspicions (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid references public.users(id) on delete set null,
+  receiver_id uuid references public.users(id) on delete set null,
+  body text not null,
+  reason text not null,
+  status text not null default 'open',
+  created_at timestamptz not null default now()
+);
+
+create table public.automated_reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  reminder_type text not null,
+  day_offset int not null,
+  sent_at timestamptz not null default now(),
+  unique(user_id, reminder_type, day_offset)
 );
 
 create index entrepreneur_profiles_search_idx on public.entrepreneur_profiles using gin (
@@ -266,6 +323,8 @@ alter table public.admin_actions enable row level security;
 alter table public.notifications enable row level security;
 alter table public.email_notification_queue enable row level security;
 alter table public.contact_inquiries enable row level security;
+alter table public.contact_suspicions enable row level security;
+alter table public.automated_reminders enable row level security;
 
 create or replace function public.is_admin()
 returns boolean language sql security definer set search_path = public as $$
@@ -342,6 +401,10 @@ create policy "email queue admin update" on public.email_notification_queue for 
 create policy "contact insert" on public.contact_inquiries for insert with check (true);
 create policy "contact admin read" on public.contact_inquiries for select using (public.is_admin());
 create policy "contact admin update" on public.contact_inquiries for update using (public.is_admin());
+create policy "contact suspicions logged insert" on public.contact_suspicions for insert with check (auth.uid() is not null);
+create policy "contact suspicions admin read" on public.contact_suspicions for select using (public.is_admin());
+create policy "contact suspicions admin update" on public.contact_suspicions for update using (public.is_admin());
+create policy "automated reminders admin read" on public.automated_reminders for select using (public.is_admin());
 
 create policy "pitch materials owner upload" on storage.objects for insert with check (
   bucket_id = 'pitch-materials' and auth.uid()::text = (storage.foldername(name))[1]
@@ -353,11 +416,20 @@ create policy "pitch materials owner update" on storage.objects for update using
   bucket_id = 'pitch-materials' and (auth.uid()::text = (storage.foldername(name))[1] or public.is_admin())
 );
 
+create policy "compliance documents owner upload" on storage.objects for insert with check (
+  bucket_id = 'compliance-documents' and auth.uid()::text = (storage.foldername(name))[1]
+);
+create policy "compliance documents owner read" on storage.objects for select using (
+  bucket_id = 'compliance-documents' and (auth.uid()::text = (storage.foldername(name))[1] or public.is_admin())
+);
+
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant select on public.entrepreneur_profiles to anon;
 grant insert on public.contact_inquiries to anon;
 grant usage, select on all sequences in schema public to authenticated;
+grant select, insert, update, delete on public.contact_suspicions to authenticated;
+grant select, insert, update, delete on public.automated_reminders to authenticated;
 
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
 alter default privileges in schema public grant usage, select on sequences to authenticated;
@@ -395,3 +467,50 @@ drop trigger if exists queue_comment_message_email_trigger on public.notificatio
 create trigger queue_comment_message_email_trigger
 after insert on public.notifications
 for each row execute function public.queue_comment_message_email();
+
+create or replace function public.run_automated_reminders()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  day_value int;
+  user_row record;
+begin
+  foreach day_value in array array[3, 7, 14, 30, 90] loop
+    for user_row in
+      select u.id
+      from public.users u
+      join public.investor_profiles ip on ip.user_id = u.id
+      where ip.document_file_path is null
+        and u.created_at <= now() - make_interval(days => day_value)
+        and not exists (
+          select 1 from public.automated_reminders ar
+          where ar.user_id = u.id and ar.reminder_type = 'investor_document' and ar.day_offset = day_value
+        )
+    loop
+      insert into public.contact_inquiries (user_id, category, body)
+      values (user_row.id, 'system_message', '投資家確認書類の提出をお願いします。法人は直近3ヶ月以内の登記簿謄本、個人事業主は開業届または直近の確定申告書をご提出ください。');
+      insert into public.automated_reminders (user_id, reminder_type, day_offset)
+      values (user_row.id, 'investor_document', day_value)
+      on conflict do nothing;
+    end loop;
+
+    for user_row in
+      select u.id
+      from public.users u
+      join public.entrepreneur_profiles ep on ep.user_id = u.id
+      where ep.is_hidden = true
+        and ep.payment_status <> 'paid'
+        and ep.created_at <= now() - make_interval(days => day_value)
+        and not exists (
+          select 1 from public.automated_reminders ar
+          where ar.user_id = u.id and ar.reminder_type = 'entrepreneur_payment' and ar.day_offset = day_value
+        )
+    loop
+      insert into public.contact_inquiries (user_id, category, body)
+      values (user_row.id, 'system_message', '現在プロフィールは非公開です。月額費用のお支払い確認後、投資家の検索結果とフィードへ公開されます。');
+      insert into public.automated_reminders (user_id, reminder_type, day_offset)
+      values (user_row.id, 'entrepreneur_payment', day_value)
+      on conflict do nothing;
+    end loop;
+  end loop;
+end;
+$$;
