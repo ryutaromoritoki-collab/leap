@@ -164,6 +164,7 @@ export default function LeapApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [recoveringPassword, setRecoveringPassword] = useState(false);
   const [view, setView] = useState<View>('home');
   const [legalSlug, setLegalSlug] = useState<LegalSlug>('terms');
@@ -219,7 +220,10 @@ export default function LeapApp() {
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!supabase || !user) return;
+    if (!supabase || !user) {
+      setWorkspaceReady(false);
+      return;
+    }
     loadWorkspace();
   }, [user?.id, view]);
 
@@ -257,13 +261,26 @@ export default function LeapApp() {
 
   async function loadWorkspace() {
     if (!supabase || !user) return;
+    setWorkspaceReady(false);
+    try {
     if (user.role === 'entrepreneur') {
       const { data: ownProfile } = await supabase.from('entrepreneur_profiles').select('*').eq('user_id', user.id).maybeSingle();
       setProfile((ownProfile as EntrepreneurProfile | null) ?? null);
+      if (!ownProfile) {
+        await supabase.from('users').update({ profile_completed: false }).eq('id', user.id);
+        setUser({ ...user, profile_completed: false });
+        setPosts([]);
+        setAllPosts([]);
+        setKpis([]);
+        setFollows([]);
+        setMeetings([]);
+        setMessages([]);
+        return;
+      }
       if (ownProfile) {
         const [{ data: postRows }, { data: allPostRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
-          supabase.from('progress_posts').select('*, entrepreneur_profiles(company_name, industry, total_investment_amount)').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
+          supabase.from('progress_posts').select('*, entrepreneur_profiles(*, users(last_login_at))').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
@@ -339,6 +356,9 @@ export default function LeapApp() {
 
     const { data: notificationRows } = await supabase.from('notifications').select('*').eq('user_id', user.id).is('read_at', null).limit(20);
     setNotifications(notificationRows ?? []);
+    } finally {
+      setWorkspaceReady(true);
+    }
   }
 
   async function signOut() {
@@ -397,6 +417,10 @@ export default function LeapApp() {
     return <Onboarding user={user} onDone={loadUser} />;
   }
 
+  if (!workspaceReady) {
+    return <FullScreenMessage title="Leapを起動しています" body="最新のプロフィールと投稿を確認しています。" />;
+  }
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="glass fixed inset-y-0 left-0 z-20 hidden w-[260px] border-y-0 border-l-0 p-5 lg:block">
@@ -444,7 +468,7 @@ export default function LeapApp() {
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} posts={posts} follows={follows} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
-        {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} />}
+        {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} openProfile={openStartupProfile} refresh={loadWorkspace} />}
         {view === 'search' && (
           <SearchPage
             query={query}
@@ -1222,6 +1246,14 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
     setComment('');
   }
 
+  async function quickMessage() {
+    if (!supabase || !investorGate.canContact) return;
+    const body = 'プロフィールを拝見しました。詳しくお話を伺いたいです。';
+    await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    await refresh();
+  }
+
   return (
     <div className="grid gap-5">
       <section className="glass overflow-hidden rounded-[28px] p-6">
@@ -1233,8 +1265,9 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
             <p className="mt-3 max-w-2xl leading-7 text-slate-300">{profile.tagline || '一言説明は未入力です。'}</p>
           </div>
           {currentUser.role === 'investor' && (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               <button className="btn-primary" onClick={follow}><Heart size={17} /> フォロー</button>
+              <button className="btn-secondary" disabled={!investorGate.canContact} onClick={quickMessage}><Send size={17} /> メッセージ</button>
               <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>
             </div>
           )}
@@ -1437,7 +1470,39 @@ function KpiDashboard({ profile, kpis, compact }: { profile: EntrepreneurProfile
   );
 }
 
-function AllPostsPage({ posts, currentUser, investor }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null }) {
+function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
+  const [messageByPost, setMessageByPost] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState('');
+  const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
+
+  async function quickFollow(profile?: EntrepreneurProfile) {
+    if (!supabase || !profile) return;
+    await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
+    setNotice(`${profile.company_name}をフォローしました。`);
+    await refresh();
+  }
+
+  async function quickMessage(post: ProgressPost) {
+    if (!supabase) return;
+    const profile = post.entrepreneur_profiles;
+    const body = messageByPost[post.id]?.trim();
+    if (!profile || !body) return;
+    if (!canMessage) {
+      setNotice('法人番号または運転免許証の提出後にメッセージを送信できます。');
+      return;
+    }
+    if (containsContactInfo(body)) {
+      await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
+      setNotice('連絡先交換につながる可能性がある内容は送信できません。');
+      return;
+    }
+    await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    setMessageByPost({ ...messageByPost, [post.id]: '' });
+    setNotice('メッセージを送信しました。');
+  }
+
   return (
     <section className="grid gap-4">
       <div className="glass rounded-[28px] p-6">
@@ -1447,13 +1512,30 @@ function AllPostsPage({ posts, currentUser, investor }: { posts: ProgressPost[];
           起業家の進捗投稿と通常投稿を、登録ユーザー全員が時系列で確認できます。非表示にされた投稿は表示されません。
         </p>
       </div>
+      {notice && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
       {posts.length === 0 ? (
         <EmptyState title="表示できる投稿はまだありません" body="起業家が投稿すると、この一覧に表示されます。" />
       ) : (
         posts.map((post) => (
           <div key={post.id} className="grid gap-2">
-            {(post as any).entrepreneur_profiles?.company_name && (
-              <p className="px-1 text-sm font-bold text-cyan-200">{(post as any).entrepreneur_profiles.company_name}</p>
+            {post.entrepreneur_profiles?.company_name && (
+              <div className="glass flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3">
+                <button className="text-left text-sm font-bold text-cyan-200 hover:text-white" onClick={() => openProfile(post.entrepreneur_profiles!)}>
+                  {post.entrepreneur_profiles.company_name}のプロフィールを見る
+                </button>
+                {currentUser.role === 'investor' && (
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn-secondary h-10 px-3 text-xs" onClick={() => quickFollow(post.entrepreneur_profiles)}><Heart size={14} /> フォロー</button>
+                    <button className="btn-secondary h-10 px-3 text-xs" onClick={() => setMessageByPost({ ...messageByPost, [post.id]: messageByPost[post.id] ?? '投稿を拝見しました。詳しくお話を伺いたいです。' })}><Send size={14} /> メッセージ</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {messageByPost[post.id] !== undefined && (
+              <div className="glass grid gap-2 rounded-2xl p-3 sm:grid-cols-[1fr_auto]">
+                <input className="field" value={messageByPost[post.id]} onChange={(e) => setMessageByPost({ ...messageByPost, [post.id]: e.target.value })} placeholder="短いメッセージを書く" />
+                <button className="btn-primary" onClick={() => quickMessage(post)}><Send size={16} /> 送信</button>
+              </div>
             )}
             <PostCard post={post} currentUser={currentUser} investor={investor} />
           </div>
