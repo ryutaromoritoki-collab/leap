@@ -380,7 +380,7 @@ create policy "own user or admin read" on public.users for select using (id = au
 create policy "own user insert" on public.users for insert with check (id = auth.uid());
 create policy "own user update" on public.users for update using (id = auth.uid() or public.is_admin());
 
-create policy "entrepreneur public read" on public.entrepreneur_profiles for select using (is_hidden = false or user_id = auth.uid() or public.is_admin());
+create policy "entrepreneur public read" on public.entrepreneur_profiles for select using (coalesce(is_hidden, false) = false or user_id = auth.uid() or public.is_admin());
 create policy "entrepreneur own insert" on public.entrepreneur_profiles for insert with check (user_id = auth.uid());
 create policy "entrepreneur own update" on public.entrepreneur_profiles for update using (user_id = auth.uid() or public.is_admin());
 
@@ -392,11 +392,11 @@ create policy "kpi readable" on public.startup_kpis for select using (true);
 create policy "kpi owner insert" on public.startup_kpis for insert with check (user_id = auth.uid());
 create policy "kpi owner update" on public.startup_kpis for update using (user_id = auth.uid() or public.is_admin());
 
-create policy "posts readable" on public.progress_posts for select using (is_hidden = false or user_id = auth.uid() or public.is_admin());
+create policy "posts readable" on public.progress_posts for select using (coalesce(is_hidden, false) = false or user_id = auth.uid() or public.is_admin());
 create policy "posts owner insert" on public.progress_posts for insert with check (user_id = auth.uid());
 create policy "posts owner/admin update" on public.progress_posts for update using (user_id = auth.uid() or public.is_admin());
 
-create policy "comments readable" on public.post_comments for select using (is_hidden = false or user_id = auth.uid() or public.is_admin());
+create policy "comments readable" on public.post_comments for select using (coalesce(is_hidden, false) = false or user_id = auth.uid() or public.is_admin());
 create policy "comments logged insert" on public.post_comments for insert with check (user_id = auth.uid());
 create policy "comments owner/admin update" on public.post_comments for update using (user_id = auth.uid() or public.is_admin());
 
