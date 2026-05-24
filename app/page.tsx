@@ -94,6 +94,7 @@ const legalCopy: Record<LegalSlug, { title: string; body: string }> = {
 
 const nav = [
   { view: 'home' as View, label: 'ホーム', icon: Home },
+  { view: 'post' as View, label: '投稿', icon: FileText },
   { view: 'search' as View, label: '検索', icon: Search },
   { view: 'kpi' as View, label: 'KPI', icon: LayoutDashboard },
   { view: 'messages' as View, label: 'メッセージ', icon: Mail },
@@ -169,6 +170,7 @@ export default function LeapApp() {
   const [profile, setProfile] = useState<EntrepreneurProfile | null>(null);
   const [investor, setInvestor] = useState<InvestorProfile | null>(null);
   const [posts, setPosts] = useState<ProgressPost[]>([]);
+  const [allPosts, setAllPosts] = useState<ProgressPost[]>([]);
   const [kpis, setKpis] = useState<StartupKpi[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<EntrepreneurProfile | null>(null);
   const [profiles, setProfiles] = useState<EntrepreneurProfile[]>([]);
@@ -259,14 +261,16 @@ export default function LeapApp() {
       const { data: ownProfile } = await supabase.from('entrepreneur_profiles').select('*').eq('user_id', user.id).maybeSingle();
       setProfile((ownProfile as EntrepreneurProfile | null) ?? null);
       if (ownProfile) {
-        const [{ data: postRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
+        const [{ data: postRows }, { data: allPostRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
+          supabase.from('progress_posts').select('*, entrepreneur_profiles(company_name, industry, total_investment_amount)').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
         ]);
         setPosts((postRows as ProgressPost[]) ?? []);
+        setAllPosts((allPostRows as ProgressPost[]) ?? []);
         setKpis((kpiRows as StartupKpi[]) ?? []);
         setFollows(followRows ?? []);
         setMeetings(meetingRows ?? []);
@@ -292,6 +296,7 @@ export default function LeapApp() {
       setInvestor((investorProfile as InvestorProfile | null) ?? null);
       setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
       setPosts((allPosts as ProgressPost[]) ?? []);
+      setAllPosts((allPosts as ProgressPost[]) ?? []);
       setFollows(followRows ?? []);
       setMeetings(meetingRows ?? []);
       setMessages(messageRows ?? []);
@@ -329,6 +334,7 @@ export default function LeapApp() {
         contactSuspicions: contactSuspicions.data ?? [],
         allMessages: allMessages.data ?? [],
       });
+      setAllPosts((progressPosts.data as ProgressPost[]) ?? []);
     }
 
     const { data: notificationRows } = await supabase.from('notifications').select('*').eq('user_id', user.id).is('read_at', null).limit(20);
@@ -438,6 +444,7 @@ export default function LeapApp() {
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} posts={posts} follows={follows} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
+        {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} />}
         {view === 'search' && (
           <SearchPage
             query={query}
@@ -458,7 +465,7 @@ export default function LeapApp() {
         {view === 'launch' && <LaunchChecklist />}
       </main>
 
-      <nav className="glass fixed bottom-3 left-3 right-3 z-30 grid grid-cols-5 gap-1 rounded-3xl p-2 lg:hidden">
+      <nav className="glass fixed bottom-3 left-3 right-3 z-30 grid grid-cols-6 gap-1 rounded-3xl p-2 lg:hidden">
         {nav.filter((item) => item.view !== 'admin' || user.role === 'admin').map((item) => (
           <button key={item.view} onClick={() => setView(item.view)} className={`grid min-h-12 place-items-center rounded-2xl ${view === item.view ? 'bg-white/12 text-white' : 'text-slate-400'}`} aria-label={item.label}>
             <item.icon size={21} />
@@ -475,7 +482,7 @@ function titleFor(view: View, role: UserRole) {
     home: 'ホーム',
     search: '起業家検索',
     profile: '起業家プロフィール',
-    post: '進捗投稿',
+    post: '投稿一覧',
     kpi: 'KPIダッシュボード',
     messages: 'メッセージ',
     admin: '管理者ページ',
@@ -1364,11 +1371,15 @@ function PitchUpload({ profile, refresh }: { profile: EntrepreneurProfile; refre
   }
   async function requestConsultation() {
     if (!supabase) return;
-    await supabase.from('contact_inquiries').insert({
+    const { error } = await supabase.from('contact_inquiries').insert({
       user_id: profile.user_id,
       category: 'pitch_consultation',
       body: `${profile.company_name} がピッチ資料の相談を希望しています。運営からメッセージで連絡してください。`,
     });
+    if (error) {
+      setMessage(toJapaneseError(error.message));
+      return;
+    }
     setMessage('ピッチ資料の相談申請を運営へ送信しました。');
   }
   return (
@@ -1410,6 +1421,32 @@ function KpiDashboard({ profile, kpis, compact }: { profile: EntrepreneurProfile
   );
 }
 
+function AllPostsPage({ posts, currentUser, investor }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null }) {
+  return (
+    <section className="grid gap-4">
+      <div className="glass rounded-[28px] p-6">
+        <p className="text-sm font-bold text-emerald-300">投稿一覧</p>
+        <h2 className="mt-2 text-3xl font-black">公開されている投稿を一覧で確認できます</h2>
+        <p className="mt-3 max-w-3xl leading-7 text-slate-300">
+          起業家の進捗投稿と通常投稿を、登録ユーザー全員が時系列で確認できます。非表示にされた投稿は表示されません。
+        </p>
+      </div>
+      {posts.length === 0 ? (
+        <EmptyState title="表示できる投稿はまだありません" body="起業家が投稿すると、この一覧に表示されます。" />
+      ) : (
+        posts.map((post) => (
+          <div key={post.id} className="grid gap-2">
+            {(post as any).entrepreneur_profiles?.company_name && (
+              <p className="px-1 text-sm font-bold text-cyan-200">{(post as any).entrepreneur_profiles.company_name}</p>
+            )}
+            <PostCard post={post} currentUser={currentUser} investor={investor} />
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
 function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; refresh: () => Promise<void> }) {
   async function update(table: string, id: string, patch: Record<string, any>, action: string) {
     await supabase!.from(table).update(patch).eq('id', id);
@@ -1427,9 +1464,14 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         <Metric label="ユーザー一覧" value={`${adminData.users?.length ?? 0}`} icon={UsersRound} />
         <Metric label="起業家一覧" value={`${adminData.entrepreneurs?.length ?? 0}`} icon={Building2} />
         <Metric label="投稿一覧" value={`${adminData.posts?.length ?? 0}`} icon={FileText} />
-        <Metric label="通報一覧" value={`${reports.length}`} icon={Flag} />
+        <Metric label="運営相談" value={`${adminData.inquiries?.length ?? 0}`} icon={MessageCircle} />
       </div>
       {reports.length === 0 && <EmptyState title="現在確認が必要な通報はありません。" />}
+      <AdminTable title="運営相談・お問い合わせ" rows={adminData.inquiries ?? []} render={(row) => (
+        <AdminRow key={row.id} title={row.category ?? '問い合わせ'} meta={`${row.email ?? 'メール未登録'} / ${new Date(row.created_at).toLocaleString('ja-JP')} / ${row.body ?? ''}`}>
+          <span className="pill"><MessageCircle size={13} /> 未対応</span>
+        </AdminRow>
+      )} />
       <AdminTable title="メンバー一覧" rows={adminData.users ?? []} render={(row) => {
         const hasEntrepreneur = entrepreneurs.some((p) => p.user_id === row.id);
         const hasInvestor = investors.some((p) => p.user_id === row.id);
@@ -1495,12 +1537,16 @@ function Messages({ currentUser, messages, meetings, refresh }: { currentUser: A
   }
   async function sendSupportMessage() {
     if (!supabase || !supportBody.trim()) return;
-    await supabase.from('contact_inquiries').insert({
+    const { error } = await supabase.from('contact_inquiries').insert({
       user_id: currentUser.id,
       email: currentUser.email,
       category: 'support_message',
       body: supportBody,
     });
+    if (error) {
+      setSupportMessage(toJapaneseError(error.message));
+      return;
+    }
     setSupportBody('');
     setSupportMessage('運営サポートへメッセージを送信しました。');
   }

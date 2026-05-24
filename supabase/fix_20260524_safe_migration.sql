@@ -96,6 +96,26 @@ exception
   when duplicate_object then null;
 end $$;
 
+create or replace function public.notify_admin_contact_inquiry()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.notifications (user_id, type, body)
+  select
+    id,
+    'admin_contact_inquiry',
+    '運営相談が届きました: ' || coalesce(new.category, '問い合わせ')
+  from public.users
+  where role = 'admin' and is_suspended = false;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists contact_inquiry_admin_notification on public.contact_inquiries;
+create trigger contact_inquiry_admin_notification
+after insert on public.contact_inquiries
+for each row execute function public.notify_admin_contact_inquiry();
+
 create table if not exists public.automated_reminders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
