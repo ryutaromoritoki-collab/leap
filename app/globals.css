@@ -13,6 +13,7 @@ html {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  touch-action: manipulation;
 }
 
 body {
@@ -22,6 +23,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  touch-action: manipulation;
   background:
     radial-gradient(circle at 18% 0%, rgba(22, 217, 255, 0.18), transparent 34rem),
     radial-gradient(circle at 90% 10%, rgba(147, 91, 255, 0.18), transparent 34rem),

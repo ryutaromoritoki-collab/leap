@@ -280,7 +280,7 @@ export default function LeapApp() {
       if (ownProfile) {
         const [{ data: postRows }, { data: allPostRows }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
-          supabase.from('progress_posts').select('*, entrepreneur_profiles(*, users(last_login_at))').eq('is_hidden', false).order('created_at', { ascending: false }).limit(100),
+          supabase.from('progress_posts').select('*, entrepreneur_profiles(*, users(last_login_at))').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
@@ -303,7 +303,7 @@ export default function LeapApp() {
           supabase
             .from('progress_posts')
             .select('*, entrepreneur_profiles(*, users(last_login_at))')
-            .eq('is_hidden', false)
+            .or('is_hidden.is.null,is_hidden.eq.false')
             .order('created_at', { ascending: false })
             .limit(50),
           supabase.from('follows').select('*').eq('investor_id', user.id),
@@ -1338,6 +1338,7 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
       related_kpi: form.related_kpi,
       tags: splitTags(form.tags),
       visibility: form.visibility,
+      is_hidden: false,
     });
     if (error) {
       setErrorMessage(toJapaneseError(error.message));
