@@ -4,8 +4,12 @@ export type AppUser = {
   id: string;
   email: string | null;
   role: UserRole;
+  available_roles: UserRole[] | null;
   profile_completed: boolean;
   is_suspended: boolean;
+  notification_email_enabled: boolean;
+  phone: string | null;
+  last_login_at: string | null;
 };
 
 export type EntrepreneurProfile = {
@@ -36,8 +40,19 @@ export type EntrepreneurProfile = {
   is_hidden: boolean;
   payment_status: 'unpaid' | 'pending_review' | 'paid';
   payment_transfer_name: string | null;
+  payment_plan_id: string | null;
+  payment_plan_label: string | null;
+  payment_plan_months: number | null;
+  payment_plan_amount: number | null;
   payment_requested_at: string | null;
   paid_at: string | null;
+  subscription_ends_at: string | null;
+  meeting_ticket_balance: number | null;
+  meeting_ticket_plan: string | null;
+  meeting_ticket_requested_count: number | null;
+  meeting_ticket_requested_amount: number | null;
+  meeting_ticket_payment_status: string | null;
+  meeting_ticket_transfer_name: string | null;
 };
 
 export type InvestorProfile = {
@@ -53,6 +68,10 @@ export type InvestorProfile = {
   past_investments: string | null;
   support_areas: string | null;
   purpose: string[] | null;
+  document_type: string | null;
+  document_file_path: string | null;
+  document_status: string | null;
+  document_submitted_at: string | null;
 };
 
 export type StartupKpi = {
