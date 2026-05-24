@@ -111,6 +111,7 @@ export type ProgressPost = {
   related_kpi: string | null;
   tags: string[] | null;
   visibility: string;
+  view_count: number | null;
   is_hidden: boolean;
   created_at: string;
   entrepreneur_profiles?: EntrepreneurProfile;

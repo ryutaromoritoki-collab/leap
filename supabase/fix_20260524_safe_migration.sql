@@ -58,6 +58,61 @@ alter table public.meeting_requests add column if not exists meeting_admin_repor
 alter table public.progress_posts add column if not exists post_type text not null default 'progress';
 alter table public.progress_posts add column if not exists title text;
 alter table public.progress_posts add column if not exists body text;
+alter table public.progress_posts add column if not exists view_count int not null default 0;
+
+create table if not exists public.post_views (
+  post_id uuid not null references public.progress_posts(id) on delete cascade,
+  viewer_id uuid not null references public.users(id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (post_id, viewer_id)
+);
+
+alter table public.post_views enable row level security;
+
+do $$ begin
+  create policy "views owner/admin read" on public.post_views
+    for select using (viewer_id = auth.uid() or public.is_admin());
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create policy "views logged insert" on public.post_views
+    for insert with check (viewer_id = auth.uid());
+exception
+  when duplicate_object then null;
+end $$;
+
+grant select, insert, update, delete on public.post_views to authenticated;
+
+create or replace function public.increment_post_view(post_id_input uuid)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  next_count int;
+begin
+  if auth.uid() is null then
+    select coalesce(view_count, 0) into next_count
+    from public.progress_posts
+    where id = post_id_input;
+    return coalesce(next_count, 0);
+  end if;
+
+  insert into public.post_views (post_id, viewer_id)
+  values (post_id_input, auth.uid())
+  on conflict do nothing;
+
+  select count(*)::int
+  into next_count
+  from public.post_views
+  where post_id = post_id_input;
+
+  update public.progress_posts
+  set view_count = next_count
+  where id = post_id_input;
+
+  return coalesce(next_count, 0);
+end;
+$$;
 
 insert into storage.buckets (id, name, public)
 values ('compliance-documents', 'compliance-documents', false)
