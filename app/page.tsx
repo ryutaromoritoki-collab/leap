@@ -282,7 +282,7 @@ export default function LeapApp() {
         const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(100),
+          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(100),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(100),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
@@ -304,7 +304,7 @@ export default function LeapApp() {
       const [{ data: investorProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }] =
         await Promise.all([
           supabase.from('investor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(50),
+          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(100),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(100),
           supabase
             .from('progress_posts')
@@ -1554,6 +1554,23 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
     setNotice('メッセージを送信しました。');
   }
 
+  async function openTimelineProfile(post: ProgressPost) {
+    if (post.entrepreneur_profiles) {
+      openProfile(post.entrepreneur_profiles);
+      return;
+    }
+    if (!supabase) {
+      setNotice('プロフィール情報を取得できませんでした。');
+      return;
+    }
+    const { data, error } = await supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').eq('id', post.entrepreneur_id).maybeSingle();
+    if (error || !data) {
+      setNotice('プロフィール情報を取得できませんでした。時間をおいて再度お試しください。');
+      return;
+    }
+    openProfile(data as EntrepreneurProfile);
+  }
+
   return (
     <section className="mx-auto grid w-full max-w-2xl gap-4">
       <div className="px-1">
@@ -1574,7 +1591,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
               investor={investor}
               messageValue={messageByPost[post.id]}
               setMessage={(value) => setMessageByPost({ ...messageByPost, [post.id]: value })}
-              openProfile={openProfile}
+              openTimelineProfile={openTimelineProfile}
               quickFollow={quickFollow}
               quickMessage={quickMessage}
             />
@@ -1591,7 +1608,7 @@ function FeedPost({
   investor,
   messageValue,
   setMessage,
-  openProfile,
+  openTimelineProfile,
   quickFollow,
   quickMessage,
 }: {
@@ -1600,7 +1617,7 @@ function FeedPost({
   investor: InvestorProfile | null;
   messageValue?: string;
   setMessage: (value: string) => void;
-  openProfile: (profile: EntrepreneurProfile) => void;
+  openTimelineProfile: (post: ProgressPost) => Promise<void>;
   quickFollow: (profile?: EntrepreneurProfile) => Promise<void>;
   quickMessage: (post: ProgressPost) => Promise<void>;
 }) {
@@ -1609,7 +1626,14 @@ function FeedPost({
   const isPrivatePost = post.post_type === 'private';
   const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const companyName = profile?.company_name || '起業家';
-  const displayName = profile?.account_name || profile?.founder_name || companyName;
+  const accountName = profile?.account_name || profile?.founder_name || companyName;
+  const postedAt = new Date(post.created_at).toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   useEffect(() => {
     if (!supabase || !currentUser || currentUser.id === post.user_id) return;
@@ -1628,21 +1652,21 @@ function FeedPost({
         <button
           type="button"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-gradient-to-br from-cyan-400/25 via-violet-400/20 to-emerald-300/20 text-base font-black text-cyan-100"
-          onClick={() => profile && openProfile(profile)}
+          onClick={() => openTimelineProfile(post)}
           aria-label={`${companyName}のプロフィールを見る`}
         >
           {companyName.slice(0, 1)}
         </button>
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <button type="button" className="truncate text-left font-black text-slate-50 hover:text-cyan-200" onClick={() => profile && openProfile(profile)}>
+            <button type="button" className="truncate text-left font-black text-slate-50 hover:text-cyan-200" onClick={() => openTimelineProfile(post)}>
               {companyName}
             </button>
-            <span className="truncate text-sm text-slate-500">@{displayName}</span>
+            <span className="truncate text-sm font-bold text-cyan-300">@{accountName}</span>
             <span className="text-sm text-slate-500">・</span>
-            <span className="text-sm text-slate-500">{new Date(post.created_at).toLocaleDateString('ja-JP')}</span>
+            <span className="text-sm text-slate-500">{postedAt}</span>
           </div>
-          <button type="button" className="mt-1 text-left text-xs font-bold text-cyan-300 hover:text-cyan-100" onClick={() => profile && openProfile(profile)}>
+          <button type="button" className="mt-1 text-left text-xs font-bold text-cyan-300 hover:text-cyan-100" onClick={() => openTimelineProfile(post)}>
             プロフィールを見る
           </button>
           <h3 className="mt-3 break-words text-lg font-black leading-7 text-slate-50">{isPrivatePost ? post.title : post.did_today}</h3>
