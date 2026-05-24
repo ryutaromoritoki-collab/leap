@@ -1235,7 +1235,9 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
   const [meetingMessage, setMeetingMessage] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
   const [comment, setComment] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
   const [investorGate, setInvestorGate] = useState<{ canContact: boolean; message: string }>({ canContact: currentUser.role !== 'investor', message: '' });
+  const isOwnProfile = currentUser.id === profile.user_id;
 
   useEffect(() => {
     async function loadGate() {
@@ -1252,8 +1254,13 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
 
   async function follow() {
     if (!supabase) return;
+    if (isOwnProfile) {
+      setActionMessage('自分のプロフィールはフォローできません。');
+      return;
+    }
     await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
+    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
+    setActionMessage(`${profile.company_name}をフォローしました。`);
     await refresh();
   }
 
@@ -1280,6 +1287,10 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
 
   async function sendMessage() {
     if (!supabase) return;
+    if (isOwnProfile) {
+      setActionMessage('自分のプロフィールにはメッセージを送信できません。');
+      return;
+    }
     if (!investorGate.canContact) return;
     if (containsContactInfo(comment)) {
       await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body: comment, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
@@ -1289,13 +1300,19 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
     await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body: comment });
     await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setComment('');
+    setActionMessage('メッセージを送信しました。');
   }
 
   async function quickMessage() {
     if (!supabase || !investorGate.canContact) return;
+    if (isOwnProfile) {
+      setActionMessage('自分のプロフィールにはメッセージを送信できません。');
+      return;
+    }
     const body = 'プロフィールを拝見しました。詳しくお話を伺いたいです。';
     await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
     await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    setActionMessage('メッセージを送信しました。');
     await refresh();
   }
 
@@ -1309,14 +1326,16 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
             <h2 className="mt-2 text-4xl font-black">{profile.company_name}</h2>
             <p className="mt-3 max-w-2xl leading-7 text-slate-300">{profile.tagline || '一言説明は未入力です。'}</p>
           </div>
-          {currentUser.role === 'investor' && (
-            <div className="grid gap-2 sm:grid-cols-3">
+          {!isOwnProfile && (
+            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
               <button className="btn-primary" onClick={follow}><Heart size={17} /> フォロー</button>
               <button className="btn-secondary" disabled={!investorGate.canContact} onClick={quickMessage}><Send size={17} /> メッセージ</button>
-              <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>
+              {currentUser.role === 'investor' && <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>}
             </div>
           )}
         </div>
+        {actionMessage && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{actionMessage}</p>}
+        {!isOwnProfile && !investorGate.canContact && <p className="mt-4 rounded-2xl bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">{investorGate.message}</p>}
         <BadgeRow profile={profile} />
         {profile.is_hidden && (
           <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
@@ -1342,7 +1361,7 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
           <Detail title="ビジネスモデル" body={profile.business_model} />
           <Detail title="資金用途" body={profile.fund_usage} />
         </section>
-        {currentUser.role === 'investor' && (
+        {currentUser.role === 'investor' && !isOwnProfile && (
           <section className="glass rounded-[24px] p-5">
             <h3 className="text-xl font-black">投資家アクション</h3>
             {!investorGate.canContact && <p className="mt-3 rounded-2xl bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">{investorGate.message}</p>}
