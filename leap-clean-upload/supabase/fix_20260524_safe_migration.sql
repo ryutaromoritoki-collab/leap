@@ -7,7 +7,11 @@ update public.users
 set available_roles = array[role]
 where available_roles = '{}';
 
-alter table public.entrepreneur_profiles add column if not exists payment_status text not null default 'unpaid';
+alter table public.entrepreneur_profiles add column if not exists payment_status text not null default 'paid';
+alter table public.entrepreneur_profiles add column if not exists account_name text;
+alter table public.entrepreneur_profiles add column if not exists employee_size text;
+alter table public.entrepreneur_profiles add column if not exists annual_revenue_scale text;
+alter table public.entrepreneur_profiles add column if not exists total_investment_amount numeric not null default 0;
 alter table public.entrepreneur_profiles add column if not exists payment_transfer_name text;
 alter table public.entrepreneur_profiles add column if not exists payment_plan_id text;
 alter table public.entrepreneur_profiles add column if not exists payment_plan_label text;
@@ -22,12 +26,22 @@ alter table public.entrepreneur_profiles add column if not exists meeting_ticket
 alter table public.entrepreneur_profiles add column if not exists meeting_ticket_requested_amount numeric;
 alter table public.entrepreneur_profiles add column if not exists meeting_ticket_payment_status text not null default 'unpaid';
 alter table public.entrepreneur_profiles add column if not exists meeting_ticket_transfer_name text;
-alter table public.entrepreneur_profiles alter column is_hidden set default true;
+alter table public.entrepreneur_profiles alter column is_hidden set default false;
+alter table public.entrepreneur_profiles alter column payment_status set default 'paid';
 
 update public.entrepreneur_profiles
-set is_hidden = true
-where payment_status <> 'paid';
+set is_hidden = false,
+    payment_status = 'paid'
+where true;
 
+alter table public.investor_profiles add column if not exists account_name text;
+alter table public.investor_profiles add column if not exists founded_month text;
+alter table public.investor_profiles add column if not exists employee_size text;
+alter table public.investor_profiles add column if not exists annual_revenue_scale text;
+alter table public.investor_profiles add column if not exists investor_type text;
+alter table public.investor_profiles add column if not exists corporate_number text;
+alter table public.investor_profiles add column if not exists license_file_path text;
+alter table public.investor_profiles add column if not exists total_investment_amount numeric not null default 0;
 alter table public.investor_profiles add column if not exists document_type text;
 alter table public.investor_profiles add column if not exists document_file_path text;
 alter table public.investor_profiles add column if not exists document_status text not null default 'unsubmitted';
@@ -40,6 +54,10 @@ alter table public.meeting_requests add column if not exists ticket_payment_stat
 alter table public.meeting_requests add column if not exists confirmed_at timestamptz;
 alter table public.meeting_requests add column if not exists final_meeting_at timestamptz;
 alter table public.meeting_requests add column if not exists meeting_admin_report text;
+
+alter table public.progress_posts add column if not exists post_type text not null default 'progress';
+alter table public.progress_posts add column if not exists title text;
+alter table public.progress_posts add column if not exists body text;
 
 insert into storage.buckets (id, name, public)
 values ('compliance-documents', 'compliance-documents', false)
@@ -117,7 +135,8 @@ begin
       select u.id
       from public.users u
       join public.investor_profiles ip on ip.user_id = u.id
-      where ip.document_file_path is null
+      where ip.corporate_number is null
+        and ip.license_file_path is null
         and u.created_at <= now() - make_interval(days => day_value)
         and not exists (
           select 1 from public.automated_reminders ar
@@ -125,28 +144,9 @@ begin
         )
     loop
       insert into public.contact_inquiries (user_id, category, body)
-      values (user_row.id, 'system_message', '投資家確認書類の提出をお願いします。法人は直近3ヶ月以内の登記簿謄本、個人事業主は開業届または直近の確定申告書をご提出ください。');
+      values (user_row.id, 'system_message', '投資家確認情報の提出をお願いします。法人は法人番号、個人事業主は運転免許証の写真をご提出ください。');
       insert into public.automated_reminders (user_id, reminder_type, day_offset)
       values (user_row.id, 'investor_document', day_value)
-      on conflict do nothing;
-    end loop;
-
-    for user_row in
-      select u.id
-      from public.users u
-      join public.entrepreneur_profiles ep on ep.user_id = u.id
-      where ep.is_hidden = true
-        and ep.payment_status <> 'paid'
-        and ep.created_at <= now() - make_interval(days => day_value)
-        and not exists (
-          select 1 from public.automated_reminders ar
-          where ar.user_id = u.id and ar.reminder_type = 'entrepreneur_payment' and ar.day_offset = day_value
-        )
-    loop
-      insert into public.contact_inquiries (user_id, category, body)
-      values (user_row.id, 'system_message', '現在プロフィールは非公開です。月額費用のお支払い確認後、投資家の検索結果とフィードへ公開されます。');
-      insert into public.automated_reminders (user_id, reminder_type, day_offset)
-      values (user_row.id, 'entrepreneur_payment', day_value)
       on conflict do nothing;
     end loop;
   end loop;

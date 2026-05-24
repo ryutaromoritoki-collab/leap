@@ -76,7 +76,7 @@ const legalCopy: Record<LegalSlug, { title: string; body: string }> = {
   },
   commerce: {
     title: '特定商取引法に基づく表記',
-    body: '起業家プロフィールの公開費用は1ヶ月11,000円、3ヶ月29,700円、6ヶ月55,000円、1年間99,000円です。投資家との面談チケットは1枚11,000円、3枚29,700円、5枚44,000円です。支払方法は銀行振込のみです。振込先は近畿産業信用組合 本店営業部 普通 3170341 カ）エーアイインフルエンサーです。',
+    body: '起業家プロフィールの登録・公開に月額費用はかかりません。投資家との面談チケットは1枚11,000円、3枚29,700円、5枚44,000円です。支払方法は銀行振込のみです。振込先は近畿産業信用組合 本店営業部 普通 3170341 カ）エーアイインフルエンサーです。',
   },
   disclaimer: {
     title: '免責事項',
@@ -109,15 +109,13 @@ const visibilityLabels: Record<string, string> = {
   followers: 'フォロワー限定',
   verified_investors: '認証済み投資家のみ',
 };
+const employeeSizeOptions = ['1人', '5人未満', '20人未満', '50人未満', '100人未満', '100-500人', '501-1000人', '1001-5000人', '5001人以上'];
+const revenueScaleOptions = ['1,000万円未満', '1,000万円-5,000万円未満', '5,000万円-1億円未満', '1億円-5億円未満', '5億円-10億円未満', '10億円-50億円未満', '50億円以上', '未回答'];
+const investorTypeOptions = ['法人', '個人事業主'];
 const roleLabels: Record<UserRole, string> = {
   entrepreneur: '起業家',
   investor: '投資家',
   admin: '管理者',
-};
-const paymentLabels: Record<string, string> = {
-  unpaid: '未入金',
-  pending_review: '振込確認待ち',
-  paid: '入金確認済み',
 };
 const bankAccount = {
   bank: '近畿産業信用組合',
@@ -126,12 +124,6 @@ const bankAccount = {
   number: '3170341',
   holder: 'カ）エーアイインフルエンサー',
 };
-const entrepreneurPaymentPlans = [
-  { id: 'one_month', label: '1ヶ月', months: 1, amount: 11000 },
-  { id: 'three_months', label: '3ヶ月', months: 3, amount: 29700 },
-  { id: 'six_months', label: '6ヶ月', months: 6, amount: 55000 },
-  { id: 'one_year', label: '1年間', months: 12, amount: 99000 },
-];
 const ticketPlans = [
   { id: 'one', label: '1枚', count: 1, amount: 11000 },
   { id: 'three', label: '3枚', count: 3, amount: 29700 },
@@ -727,8 +719,8 @@ function Onboarding({ user, onDone }: { user: AppUser; onDone: () => Promise<voi
   const [form, setForm] = useState<Record<string, any>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const entrepreneurSteps = ['基本情報', '事業情報', '資金調達情報', 'KPI情報', '初回進捗投稿'];
-  const investorSteps = ['基本情報', '投資情報', '利用目的'];
+  const entrepreneurSteps = ['アカウント情報'];
+  const investorSteps = ['アカウント情報'];
   const steps = user.role === 'entrepreneur' ? entrepreneurSteps : user.role === 'investor' ? investorSteps : ['運営アカウント設定'];
 
   function set(name: string, value: any) {
@@ -745,63 +737,28 @@ function Onboarding({ user, onDone }: { user: AppUser; onDone: () => Promise<voi
           .from('entrepreneur_profiles')
           .upsert({
             user_id: user.id,
+            account_name: form.account_name,
             company_name: form.company_name,
-            founder_name: form.founder_name,
-            location: form.location,
-            industry: form.industry,
+            founder_name: form.full_name,
             founded_month: form.founded_month,
-            employee_count: numberOrNull(form.employee_count),
-            tagline: form.tagline,
-            overview: form.overview,
-            problem: form.problem,
-            solution: form.solution,
-            target_customer: form.target_customer,
-            business_model: form.business_model,
-            advantage: form.advantage,
-            current_phase: form.current_phase,
-            fundraising_amount: numberOrNull(form.fundraising_amount),
-            fund_usage: form.fund_usage,
-            investor_support: form.investor_support,
-            is_hidden: true,
-            payment_status: 'unpaid',
+            employee_size: form.employee_size,
+            annual_revenue_scale: form.annual_revenue_scale,
+            tagline: form.company_name ? `${form.company_name}の事業成長をLeapで公開中` : null,
+            is_hidden: false,
+            payment_status: 'paid',
           })
           .select()
           .single();
         if (error) throw error;
-        await supabase.from('startup_kpis').insert({
-          entrepreneur_id: profile.id,
-          user_id: user.id,
-          kpi_month: new Date().toISOString().slice(0, 10),
-          monthly_revenue: numberOrNull(form.monthly_revenue),
-          customer_count: numberOrNull(form.customer_count),
-          mau: numberOrNull(form.mau),
-          retention_rate: numberOrNull(form.retention_rate),
-          gross_margin: numberOrNull(form.gross_margin),
-        });
-        await supabase.from('progress_posts').insert({
-          entrepreneur_id: profile.id,
-          user_id: user.id,
-          did_today: form.did_today,
-          metric_change: form.metric_change,
-          issue: form.issue,
-          next_action: form.next_action,
-          related_kpi: form.related_kpi,
-          tags: splitTags(form.tags),
-          visibility: form.visibility ?? 'public',
-        });
       } else if (user.role === 'investor') {
         const { error } = await supabase.from('investor_profiles').upsert({
           user_id: user.id,
+          account_name: form.account_name,
           full_name: form.full_name,
           company_name: form.company_name,
-          position: form.position,
-          location: form.location,
-          investment_fields: form.investment_fields,
-          investable_amount: numberOrNull(form.investable_amount),
-          interested_phases: form.interested_phases,
-          past_investments: form.past_investments,
-          support_areas: form.support_areas,
-          purpose: form.purpose ?? [],
+          founded_month: form.founded_month,
+          employee_size: form.employee_size,
+          annual_revenue_scale: form.annual_revenue_scale,
         });
         if (error) throw error;
       }
@@ -840,55 +797,23 @@ function Onboarding({ user, onDone }: { user: AppUser; onDone: () => Promise<voi
 }
 
 function EntrepreneurStep({ step, form, set }: { step: number; form: Record<string, any>; set: (name: string, value: any) => void }) {
-  if (step === 0) return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <FieldGrid fields={['company_name:会社名', 'founder_name:代表者名', 'founded_month:設立年月', 'employee_count:従業員数']} form={form} set={set} />
-      <OptionSelect label="所在地" value={form.location ?? ''} options={locationOptions} onChange={(value) => set('location', value)} />
-      <OptionSelect label="業界" value={form.industry ?? ''} options={industryOptions} onChange={(value) => set('industry', value)} />
-    </div>
-  );
-  if (step === 1) return <FieldGrid textarea fields={['tagline:一言説明', 'overview:事業概要', 'problem:解決している課題', 'solution:提供サービス', 'target_customer:ターゲット顧客', 'business_model:ビジネスモデル', 'advantage:競合優位性']} form={form} set={set} />;
-  if (step === 2) return (
-    <>
-      <label className="label">現在のフェーズ<select className="field" value={form.current_phase ?? ''} onChange={(e) => set('current_phase', e.target.value)}><option value="">選択</option>{phaseOptions.map((p) => <option key={p}>{p}</option>)}</select></label>
-      <FieldGrid textarea fields={['fundraising_amount:調達希望額（円）', 'fund_usage:資金用途', 'investor_support:投資家に求める支援']} form={form} set={set} />
-    </>
-  );
-  if (step === 3) return <FieldGrid fields={['monthly_revenue:月間売上（円）', 'customer_count:導入社数', 'mau:月間利用者数', 'retention_rate:継続率（%）', 'gross_margin:粗利率（%）']} form={form} set={set} />;
   return (
-    <>
-      <p className="rounded-2xl bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100">投資家は、派手な発表よりも「何を実行し、どの数字が動き、何が課題で、次にどう検証するか」を見ています。</p>
-      <FieldGrid textarea fields={['did_today:今日やったこと', 'metric_change:数値の変化', 'issue:課題', 'next_action:次にやること', 'related_kpi:関連KPI', 'tags:タグ（カンマ区切り）']} form={form} set={set} />
-      <label className="label">公開範囲<select className="field" value={form.visibility ?? 'public'} onChange={(e) => set('visibility', e.target.value)}>{visibilityOptions.map((v) => <option key={v} value={v}>{visibilityLabels[v]}</option>)}</select></label>
-    </>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <FieldGrid fields={['account_name:アカウント名', 'full_name:名前', 'company_name:会社名']} form={form} set={set} />
+      <label className="label">設立年月<input className="field" type="month" value={form.founded_month ?? ''} onChange={(e) => set('founded_month', e.target.value)} /></label>
+      <OptionSelect label="従業員数" value={form.employee_size ?? ''} options={employeeSizeOptions} onChange={(value) => set('employee_size', value)} />
+      <OptionSelect label="年商規模" value={form.annual_revenue_scale ?? ''} options={revenueScaleOptions} onChange={(value) => set('annual_revenue_scale', value)} />
+    </div>
   );
 }
 
 function InvestorStep({ step, form, set }: { step: number; form: Record<string, any>; set: (name: string, value: any) => void }) {
-  if (step === 0) return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <FieldGrid fields={['full_name:氏名', 'company_name:会社名', 'position:役職']} form={form} set={set} />
-      <OptionSelect label="所在地" value={form.location ?? ''} options={locationOptions} onChange={(value) => set('location', value)} />
-    </div>
-  );
-  if (step === 1) return (
-    <div className="grid gap-4">
-      <OptionSelect label="投資領域" value={form.investment_fields ?? ''} options={industryOptions} onChange={(value) => set('investment_fields', value)} />
-      <FieldGrid textarea fields={['investable_amount:投資可能額（円）', 'interested_phases:興味のあるフェーズ', 'past_investments:過去の投資実績', 'support_areas:支援できる内容']} form={form} set={set} />
-    </div>
-  );
   return (
-    <div className="grid gap-3">
-      {['投資先を探したい', '事業提携先を探したい', 'M&A候補を探したい', '起業家を支援したい'].map((item) => (
-        <label key={item} className="flex items-center gap-3 rounded-2xl bg-white/5 p-4">
-          <input type="checkbox" onChange={(e) => {
-            const next = new Set(form.purpose ?? []);
-            if (e.target.checked) next.add(item); else next.delete(item);
-            set('purpose', Array.from(next));
-          }} />
-          {item}
-        </label>
-      ))}
+    <div className="grid gap-4 sm:grid-cols-2">
+      <FieldGrid fields={['account_name:アカウント名', 'full_name:名前', 'company_name:会社名']} form={form} set={set} />
+      <label className="label">設立年月<input className="field" type="month" value={form.founded_month ?? ''} onChange={(e) => set('founded_month', e.target.value)} /></label>
+      <OptionSelect label="従業員数" value={form.employee_size ?? ''} options={employeeSizeOptions} onChange={(value) => set('employee_size', value)} />
+      <OptionSelect label="年商規模" value={form.annual_revenue_scale ?? ''} options={revenueScaleOptions} onChange={(value) => set('annual_revenue_scale', value)} />
     </div>
   );
 }
@@ -937,7 +862,6 @@ function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: 
           <Metric label="進捗投稿" value={`${posts.length}`} icon={FileText} />
         </div>
       </section>
-      <PublicationPaymentPanel profile={profile} refresh={refresh} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
       <EntrepreneurMeetingManager profile={profile} meetings={meetings} refresh={refresh} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
@@ -951,125 +875,6 @@ function EntrepreneurHome({ profile, posts, kpis, follows, meetings, refresh }: 
       </section>
       <KpiDashboard profile={profile} kpis={kpis} compact />
     </div>
-  );
-}
-
-function PublicationPaymentPanel({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
-  const status = profile.payment_status ?? 'unpaid';
-  const isPublished = !profile.is_hidden && status === 'paid';
-  const [showApplication, setShowApplication] = useState(status !== 'unpaid');
-  const [acceptedTerms, setAcceptedTerms] = useState(status !== 'unpaid');
-  const [transferName, setTransferName] = useState(profile.payment_transfer_name ?? `${profile.company_name} `);
-  const [selectedPlanId, setSelectedPlanId] = useState(profile.payment_plan_id ?? entrepreneurPaymentPlans[0].id);
-  const selectedPlan = entrepreneurPaymentPlans.find((plan) => plan.id === selectedPlanId) ?? entrepreneurPaymentPlans[0];
-  const canShowBank = acceptedTerms || status !== 'unpaid';
-
-  async function requestReview() {
-    if (!supabase) return;
-    await supabase
-      .from('entrepreneur_profiles')
-      .update({
-        payment_status: 'pending_review',
-        payment_transfer_name: transferName.trim() || profile.company_name,
-        payment_plan_id: selectedPlan.id,
-        payment_plan_label: selectedPlan.label,
-        payment_plan_months: selectedPlan.months,
-        payment_plan_amount: selectedPlan.amount,
-        payment_requested_at: new Date().toISOString(),
-        is_hidden: true,
-      })
-      .eq('id', profile.id);
-    await supabase.from('notifications').insert({
-      user_id: profile.user_id,
-      type: 'payment_review_requested',
-      body: '銀行振込の確認依頼を受け付けました。運営確認後にプロフィールが公開されます。',
-    });
-    await refresh();
-  }
-
-  return (
-    <section className={`glass rounded-[24px] p-5 ${isPublished ? 'border-emerald-300/40' : 'border-cyan-300/30'}`}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-emerald-300">公開設定</p>
-          <h3 className="mt-2 text-2xl font-black">{isPublished ? 'プロフィールは公開中です' : '入金確認後にプロフィールが公開されます'}</h3>
-          <p className="mt-2 max-w-3xl leading-7 text-slate-300">
-            起業家プロフィールは月額費用のお支払い確認後に、投資家の検索結果とフィードへ表示されます。支払い方法は銀行振込のみです。
-          </p>
-        </div>
-        <span className="pill"><Landmark size={14} /> {paymentLabels[status] ?? status}</span>
-      </div>
-      {!isPublished && !showApplication && (
-        <button className="btn-primary mt-5 w-full" onClick={() => setShowApplication(true)}>
-          月額費用の支払いを申請する
-        </button>
-      )}
-      {!isPublished && showApplication && (
-        <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4">
-          <p className="text-sm font-bold text-cyan-100">お振込名義を設定してください</p>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            お振込名義は、登録時の会社名がある場合は会社名、続けてお名前をカタカナで入力してください。
-          </p>
-          <label className="label mt-4">
-            お振込名義
-            <input className="field" value={transferName} onChange={(e) => setTransferName(e.target.value)} placeholder="例：カ）リープ ヤマダタロウ" />
-          </label>
-          <div className="mt-4">
-            <p className="text-sm font-bold text-cyan-100">公開プランを選択してください</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-4">
-              {entrepreneurPaymentPlans.map((plan) => (
-                <button
-                  key={plan.id}
-                  className={`rounded-2xl border p-4 text-left transition ${selectedPlanId === plan.id ? 'border-cyan-300 bg-cyan-300/15' : 'border-white/10 bg-black/25 hover:border-cyan-300/40'}`}
-                  onClick={() => setSelectedPlanId(plan.id)}
-                  type="button"
-                >
-                  <span className="text-sm font-bold text-white">{plan.label}</span>
-                  <b className="mt-2 block text-xl">{yen(plan.amount)}</b>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
-            <p className="font-bold text-white">利用規約への同意</p>
-            <p className="mt-2">
-              Leapは投資判断を代行・推奨するサービスではありません。プロフィール公開後も、掲載情報をもとにした投資判断は各利用者の責任で行われます。月額費用は起業家プロフィールの公開・運営確認・プラットフォーム利用に関する費用です。
-            </p>
-            <label className="mt-4 flex items-center gap-3 text-white">
-              <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} />
-              利用規約に同意する
-            </label>
-          </div>
-        </div>
-      )}
-      {canShowBank ? (
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-          <p className="text-xs font-bold text-slate-400">選択プラン</p>
-          <p className="mt-1 text-2xl font-black">{selectedPlan.label} {yen(selectedPlan.amount)}</p>
-          <p className="mt-3 text-xs leading-6 text-slate-400">入金後、下のボタンで運営へ確認依頼を送ってください。</p>
-          <p className="mt-3 rounded-xl bg-emerald-300/10 p-3 text-xs leading-6 text-emerald-100">
-            運営にメッセージでお振込明細書のお写真を送ると、早急に対応できる場合があります。
-          </p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-slate-300">
-          <p><b className="text-white">銀行名:</b> {bankAccount.bank}</p>
-          <p><b className="text-white">支店:</b> {bankAccount.branch}</p>
-          <p><b className="text-white">種別:</b> {bankAccount.type}</p>
-          <p><b className="text-white">口座番号:</b> {bankAccount.number}</p>
-          <p><b className="text-white">口座名義:</b> {bankAccount.holder}</p>
-          <p><b className="text-white">お振込名義:</b> {transferName || '未入力'}</p>
-        </div>
-      </div>
-      ) : (
-        showApplication && <p className="mt-4 rounded-2xl bg-white/8 p-4 text-sm leading-6 text-slate-300">利用規約に同意すると、振込先口座情報が表示されます。</p>
-      )}
-      {!isPublished && (
-        <button className="btn-primary mt-5 w-full" onClick={requestReview} disabled={status === 'pending_review' || !canShowBank || !transferName.trim()}>
-          {status === 'pending_review' ? '運営が入金確認中です' : '振込済みとして確認を依頼する'}
-        </button>
-      )}
-    </section>
   );
 }
 
@@ -1088,6 +893,7 @@ function InvestorHome({ currentUser, investor, profiles, posts, follows, followe
           <Metric label="新着進捗" value={`${posts.length}`} icon={TrendingUp} />
           <Metric label="面談状況" value={`${meetings.length}`} icon={CalendarClock} />
           <Metric label="未返信メッセージ" value={`${messages.filter((m) => !m.read_at).length}`} icon={Mail} />
+          <Metric label="累計投資金額" value={yen(investor?.total_investment_amount)} icon={CircleDollarSign} />
         </div>
       </section>
       <InvestorDocumentPanel investor={investor} refresh={refresh} />
@@ -1128,25 +934,37 @@ function InvestorHome({ currentUser, investor, profiles, posts, follows, followe
 
 function InvestorDocumentPanel({ investor, refresh }: { investor: InvestorProfile | null; refresh: () => Promise<void> }) {
   const [file, setFile] = useState<File | null>(null);
-  const [docType, setDocType] = useState(investor?.document_type ?? 'corporate_registry');
+  const [investorType, setInvestorType] = useState(investor?.investor_type ?? investorTypeOptions[0]);
+  const [corporateNumber, setCorporateNumber] = useState(investor?.corporate_number ?? '');
   const [message, setMessage] = useState('');
-  const submitted = Boolean(investor?.document_file_path);
+  const submitted = Boolean(investor?.corporate_number || investor?.license_file_path);
 
   async function uploadDocument() {
-    if (!supabase || !investor || !file) return;
-    const path = `${investor.user_id}/${Date.now()}-${file.name}`;
-    const { error } = await supabase.storage.from('compliance-documents').upload(path, file, { upsert: false });
-    if (error) {
-      setMessage(toJapaneseError(error.message));
+    if (!supabase || !investor) return;
+    let path = investor.license_file_path;
+    if (investorType === '個人事業主') {
+      if (!file) {
+        setMessage('個人事業主の場合は運転免許証の写真を選択してください。');
+        return;
+      }
+      path = `${investor.user_id}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage.from('compliance-documents').upload(path, file, { upsert: false });
+      if (error) {
+        setMessage(toJapaneseError(error.message));
+        return;
+      }
+    } else if (!corporateNumber.trim()) {
+      setMessage('法人の場合は法人番号を入力してください。');
       return;
     }
     await supabase.from('investor_profiles').update({
-      document_type: docType,
-      document_file_path: path,
+      investor_type: investorType,
+      corporate_number: investorType === '法人' ? corporateNumber.trim() : null,
+      license_file_path: investorType === '個人事業主' ? path : null,
       document_status: 'submitted',
       document_submitted_at: new Date().toISOString(),
     }).eq('id', investor.id);
-    setMessage('確認書類を提出しました。提出後、コメントとメッセージが利用できます。');
+    setMessage('確認情報を提出しました。提出後、コメントとメッセージが利用できます。');
     await refresh();
   }
 
@@ -1155,19 +973,19 @@ function InvestorDocumentPanel({ investor, refresh }: { investor: InvestorProfil
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-emerald-300">投資家確認書類</p>
-          <h3 className="mt-2 text-2xl font-black">{submitted ? '確認書類を提出済みです' : '書類提出後にコメント・メッセージが利用できます'}</h3>
-          <p className="mt-2 leading-7 text-slate-300">法人は直近3ヶ月以内の登記簿謄本、個人事業主は開業届または直近の確定申告書を提出してください。</p>
+          <h3 className="mt-2 text-2xl font-black">{submitted ? '確認情報を提出済みです' : '法人番号または運転免許証の提出後にコメント・メッセージが利用できます'}</h3>
+          <p className="mt-2 leading-7 text-slate-300">法人は法人番号、個人事業主は運転免許証の写真を提出してください。</p>
         </div>
         <span className="pill"><ShieldCheck size={14} /> {submitted ? '提出済み' : '未提出'}</span>
       </div>
       {!submitted && (
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <select className="field" value={docType} onChange={(e) => setDocType(e.target.value)}>
-            <option value="corporate_registry">法人：登記簿謄本</option>
-            <option value="sole_proprietor_filing">個人事業主：開業届</option>
-            <option value="tax_return">個人事業主：確定申告書</option>
+          <select className="field" value={investorType} onChange={(e) => setInvestorType(e.target.value)}>
+            {investorTypeOptions.map((option) => <option key={option}>{option}</option>)}
           </select>
-          <input className="field" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          {investorType === '法人'
+            ? <input className="field" value={corporateNumber} onChange={(e) => setCorporateNumber(e.target.value)} placeholder="法人番号を入力" />
+            : <input className="field" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
           <button className="btn-primary" onClick={uploadDocument}>提出する</button>
         </div>
       )}
@@ -1346,10 +1164,11 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
   useEffect(() => {
     async function loadGate() {
       if (!supabase || currentUser.role !== 'investor') return;
-      const { data } = await supabase.from('investor_profiles').select('document_file_path').eq('user_id', currentUser.id).maybeSingle();
+      const { data } = await supabase.from('investor_profiles').select('corporate_number, license_file_path').eq('user_id', currentUser.id).maybeSingle();
+      const verified = Boolean(data?.corporate_number || data?.license_file_path);
       setInvestorGate({
-        canContact: Boolean(data?.document_file_path),
-        message: data?.document_file_path ? '' : '投資家確認書類の提出が完了するまで、コメント・メッセージ・面談希望は利用できません。',
+        canContact: verified,
+        message: verified ? '' : '法人番号または運転免許証の提出が完了するまで、コメント・メッセージ・面談希望は利用できません。',
       });
     }
     loadGate();
@@ -1416,12 +1235,13 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
         <BadgeRow profile={profile} />
         {profile.is_hidden && (
           <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
-            このプロフィールは現在非公開です。月額費用の入金確認後、投資家に公開されます。
+            このプロフィールは現在非公開です。運営確認後、投資家に公開されます。
           </div>
         )}
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <Metric label="現在フェーズ" value={profile.current_phase ?? '未入力'} icon={Rocket} />
           <Metric label="調達希望額" value={yen(profile.fundraising_amount)} icon={CircleDollarSign} />
+          <Metric label="累計投資金額" value={yen(profile.total_investment_amount)} icon={CircleDollarSign} />
           <Metric label="業界" value={profile.industry ?? '未入力'} icon={Building2} />
           <Metric label="所在地" value={profile.location ?? '未入力'} icon={UserRound} />
           <Metric label="最終ログイン" value={formatLastLogin((profile as any).users?.last_login_at)} icon={UserRound} />
@@ -1455,15 +1275,19 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
 }
 
 function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
-  const [form, setForm] = useState<Record<string, string>>({ visibility: 'public' });
+  const [form, setForm] = useState<Record<string, string>>({ visibility: 'public', post_type: 'progress' });
+  const isPrivatePost = form.post_type === 'private';
   async function submit() {
     const { error } = await supabase!.from('progress_posts').insert({
       entrepreneur_id: profile.id,
       user_id: profile.user_id,
-      did_today: form.did_today,
-      metric_change: form.metric_change,
-      issue: form.issue,
-      next_action: form.next_action,
+      post_type: form.post_type,
+      title: isPrivatePost ? form.title : null,
+      body: isPrivatePost ? form.body : null,
+      did_today: isPrivatePost ? form.title : form.did_today,
+      metric_change: isPrivatePost ? null : form.metric_change,
+      issue: isPrivatePost ? null : form.issue,
+      next_action: isPrivatePost ? null : form.next_action,
       related_kpi: form.related_kpi,
       tags: splitTags(form.tags),
       visibility: form.visibility,
@@ -1475,11 +1299,16 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
   }
   return (
     <section className="glass rounded-[24px] p-5">
-      <h3 className="text-xl font-black">進捗投稿</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-400">投資家が見たいのは、実行、数値、課題、次の検証です。</p>
-      <FieldGrid textarea fields={['did_today:今日やったこと', 'metric_change:数値の変化', 'issue:課題', 'next_action:次にやること', 'related_kpi:関連KPI', 'tags:タグ（カンマ区切り）']} form={form} set={(n, v) => setForm({ ...form, [n]: v })} />
+      <h3 className="text-xl font-black">投稿</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-400">進捗投稿と、自由に書ける通常投稿を使い分けできます。</p>
+      <label className="label mt-4">投稿タイプ<select className="field" value={form.post_type} onChange={(e) => setForm({ ...form, post_type: e.target.value })}><option value="progress">進捗投稿</option><option value="private">通常投稿</option></select></label>
+      {isPrivatePost ? (
+        <FieldGrid textarea fields={['title:タイトル', 'body:本文', 'tags:タグ（カンマ区切り）']} form={form} set={(n, v) => setForm({ ...form, [n]: v })} />
+      ) : (
+        <FieldGrid textarea fields={['did_today:今日やったこと', 'metric_change:数値の変化', 'issue:課題', 'next_action:次にやること', 'related_kpi:関連KPI', 'tags:タグ（カンマ区切り）']} form={form} set={(n, v) => setForm({ ...form, [n]: v })} />
+      )}
       <label className="label mt-4">公開範囲<select className="field" value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })}>{visibilityOptions.map((v) => <option key={v} value={v}>{visibilityLabels[v]}</option>)}</select></label>
-      <button className="btn-primary mt-4 w-full" onClick={submit}><Plus size={17} /> 進捗を投稿する</button>
+      <button className="btn-primary mt-4 w-full" onClick={submit}><Plus size={17} /> 投稿する</button>
     </section>
   );
 }
@@ -1590,8 +1419,8 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
   const reports = adminData.reports ?? [];
   const entrepreneurs = adminData.entrepreneurs ?? [];
   const investors = adminData.investors ?? [];
-  const missingPayment = entrepreneurs.filter((row) => row.payment_status !== 'paid' || row.is_hidden);
-  const missingDocuments = investors.filter((row) => !row.document_file_path);
+  const ticketPaymentPending = entrepreneurs.filter((row) => row.meeting_ticket_payment_status === 'pending_review');
+  const missingDocuments = investors.filter((row) => !row.corporate_number && !row.license_file_path);
   return (
     <div className="grid gap-5">
       <div className="grid gap-3 sm:grid-cols-4">
@@ -1611,7 +1440,7 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
           </AdminRow>
         );
       }} />
-      <AdminTable title="未対応ユーザー一覧" rows={[...missingPayment.map((row) => ({ ...row, kind: '起業家：月額費用未払い・非公開' })), ...missingDocuments.map((row) => ({ ...row, kind: '投資家：確認書類未提出' }))]} render={(row) => (
+      <AdminTable title="未対応ユーザー一覧" rows={[...ticketPaymentPending.map((row) => ({ ...row, kind: '起業家：面談チケット入金確認待ち' })), ...missingDocuments.map((row) => ({ ...row, kind: '投資家：法人番号または免許証未提出' }))]} render={(row) => (
         <AdminRow key={`${row.kind}-${row.id}`} title={row.company_name || row.full_name || row.user_id} meta={row.kind}>
           <span className="pill">確認待ち</span>
         </AdminRow>
@@ -1622,12 +1451,11 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         </AdminRow>
       )} />
       <AdminTable title="起業家審査・バッジ付与" rows={adminData.entrepreneurs ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 支払い: ${paymentLabels[row.payment_status] ?? '未入金'} / プラン: ${row.payment_plan_label ?? '未選択'} ${row.payment_plan_amount ? yen(row.payment_plan_amount) : ''} / 振込名義: ${row.payment_transfer_name ?? '未申請'}`}>
+        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)} / チケット: ${row.meeting_ticket_plan ?? '未申請'} ${row.meeting_ticket_requested_amount ? yen(row.meeting_ticket_requested_amount) : ''}`}>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_revenue: !row.verified_revenue }, '売上確認済みバッジ付与')}>売上確認</button>
-          <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { payment_status: 'paid', paid_at: new Date().toISOString(), subscription_ends_at: calcSubscriptionEnd(row.payment_plan_months), is_hidden: false }, '入金確認・プロフィール公開')}>入金確認して公開</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { meeting_ticket_balance: (row.meeting_ticket_balance ?? 0) + (row.meeting_ticket_requested_count ?? 0), meeting_ticket_payment_status: 'paid' }, '面談チケット着金確認')}>チケット付与</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
         </AdminRow>
@@ -1754,9 +1582,6 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
           </button>
         </div>
       </div>
-      <p className="mt-4 rounded-2xl bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-100">
-        メール送信はSupabaseの通知キューに保存されます。Resendなどの送信処理を接続すると、コメント・メッセージ通知が自動送信されます。
-      </p>
       {message && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
     </section>
   );
@@ -1833,7 +1658,7 @@ function StartupCard({ profile, onClick }: { profile: EntrepreneurProfile; onCli
       <h3 className="mt-4 text-xl font-black">{profile.company_name}</h3>
       <p className="mt-2 line-clamp-3 min-h-16 leading-7 text-slate-300">{profile.tagline || profile.overview || '事業説明は未入力です。'}</p>
       <BadgeRow profile={profile} />
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-400"><span>業界 <b className="block text-white">{profile.industry ?? '未入力'}</b></span><span>フェーズ <b className="block text-white">{profile.current_phase ?? '未入力'}</b></span></div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-400"><span>業界 <b className="block text-white">{profile.industry ?? '未入力'}</b></span><span>累計投資金額 <b className="block text-white">{yen(profile.total_investment_amount)}</b></span></div>
     </button>
   );
 }
@@ -1851,7 +1676,8 @@ function BadgeRow({ profile }: { profile: EntrepreneurProfile }) {
 
 function PostCard({ post, currentUser, investor }: { post: ProgressPost; currentUser?: AppUser; investor?: InvestorProfile | null }) {
   const [comment, setComment] = useState('');
-  const canComment = currentUser?.role !== 'investor' || Boolean(investor?.document_file_path);
+  const canComment = currentUser?.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
+  const isPrivatePost = post.post_type === 'private';
   async function like() {
     if (!supabase || !currentUser) return;
     await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUser.id });
@@ -1879,14 +1705,14 @@ function PostCard({ post, currentUser, investor }: { post: ProgressPost; current
   return (
     <article className="glass rounded-[24px] p-5">
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-sm text-slate-400">{new Date(post.created_at).toLocaleString('ja-JP')} / {visibilityLabels[post.visibility] ?? post.visibility}</p><h3 className="mt-2 text-xl font-black">{post.did_today}</h3></div>
-        <span className="pill"><TrendingUp size={13} /> 進捗</span>
+        <div><p className="text-sm text-slate-400">{new Date(post.created_at).toLocaleString('ja-JP')} / {visibilityLabels[post.visibility] ?? post.visibility}</p><h3 className="mt-2 text-xl font-black">{isPrivatePost ? post.title : post.did_today}</h3></div>
+        <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? '通常投稿' : '進捗'}</span>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      {isPrivatePost ? <p className="mt-4 whitespace-pre-line leading-7 text-slate-300">{post.body || '本文はありません。'}</p> : <div className="mt-4 grid gap-3 md:grid-cols-3">
         <Detail title="数値の変化" body={post.metric_change} />
         <Detail title="課題" body={post.issue} />
         <Detail title="次にやること" body={post.next_action} />
-      </div>
+      </div>}
       <div className="mt-4 flex flex-wrap gap-2">{post.tags?.map((tag) => <span className="pill" key={tag}>#{tag}</span>)}</div>
       {currentUser?.role === 'investor' && (
         <div className="mt-4 grid gap-3">
@@ -1936,7 +1762,7 @@ function AdminRow({ title, meta, children }: { title: string; meta: string; chil
 }
 
 function calcCompleteness(profile: EntrepreneurProfile) {
-  const keys = ['company_name', 'founder_name', 'location', 'industry', 'tagline', 'overview', 'problem', 'solution', 'business_model', 'current_phase', 'fundraising_amount'];
+  const keys = ['account_name', 'company_name', 'founder_name', 'founded_month', 'employee_size', 'annual_revenue_scale'];
   const filled = keys.filter((key) => Boolean((profile as any)[key])).length;
   return Math.round((filled / keys.length) * 100);
 }
@@ -1966,10 +1792,4 @@ function containsContactInfo(value: string) {
 function formatLastLogin(value?: string | null) {
   if (!value) return '未ログイン';
   return new Date(value).toLocaleString('ja-JP');
-}
-
-function calcSubscriptionEnd(months?: number | null) {
-  const date = new Date();
-  date.setMonth(date.getMonth() + (months && months > 0 ? months : 1));
-  return date.toISOString();
 }

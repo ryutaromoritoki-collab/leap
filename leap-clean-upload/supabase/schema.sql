@@ -29,12 +29,15 @@ alter table public.users
 create table public.entrepreneur_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.users(id) on delete cascade,
+  account_name text,
   company_name text not null,
   founder_name text not null,
   location text,
   industry text,
   founded_month text,
   employee_count int,
+  employee_size text,
+  annual_revenue_scale text,
   tagline text,
   overview text,
   problem text,
@@ -51,8 +54,9 @@ create table public.entrepreneur_profiles (
   verified_interview boolean not null default false,
   verified_revenue boolean not null default false,
   is_fast_growing boolean not null default false,
-  is_hidden boolean not null default true,
-  payment_status text not null default 'unpaid' check (payment_status in ('unpaid', 'pending_review', 'paid')),
+  is_hidden boolean not null default false,
+  payment_status text not null default 'paid' check (payment_status in ('unpaid', 'pending_review', 'paid')),
+  total_investment_amount numeric not null default 0,
   payment_transfer_name text,
   payment_plan_id text,
   payment_plan_label text,
@@ -72,7 +76,11 @@ create table public.entrepreneur_profiles (
 );
 
 alter table public.entrepreneur_profiles
-  add column if not exists payment_status text not null default 'unpaid',
+  add column if not exists account_name text,
+  add column if not exists employee_size text,
+  add column if not exists annual_revenue_scale text,
+  add column if not exists payment_status text not null default 'paid',
+  add column if not exists total_investment_amount numeric not null default 0,
   add column if not exists payment_transfer_name text,
   add column if not exists payment_plan_id text,
   add column if not exists payment_plan_label text,
@@ -89,21 +97,32 @@ alter table public.entrepreneur_profiles
   add column if not exists meeting_ticket_transfer_name text;
 
 alter table public.entrepreneur_profiles
-  alter column is_hidden set default true;
+  alter column is_hidden set default false;
+
+alter table public.entrepreneur_profiles
+  alter column payment_status set default 'paid';
 
 create table public.investor_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.users(id) on delete cascade,
+  account_name text,
   full_name text not null,
   company_name text,
   position text,
   location text,
+  founded_month text,
+  employee_size text,
+  annual_revenue_scale text,
   investment_fields text,
   investable_amount numeric,
   interested_phases text,
   past_investments text,
   support_areas text,
   purpose text[],
+  investor_type text,
+  corporate_number text,
+  license_file_path text,
+  total_investment_amount numeric not null default 0,
   document_type text,
   document_file_path text,
   document_status text not null default 'unsubmitted',
@@ -113,6 +132,14 @@ create table public.investor_profiles (
 );
 
 alter table public.investor_profiles
+  add column if not exists account_name text,
+  add column if not exists founded_month text,
+  add column if not exists employee_size text,
+  add column if not exists annual_revenue_scale text,
+  add column if not exists investor_type text,
+  add column if not exists corporate_number text,
+  add column if not exists license_file_path text,
+  add column if not exists total_investment_amount numeric not null default 0,
   add column if not exists document_type text,
   add column if not exists document_file_path text,
   add column if not exists document_status text not null default 'unsubmitted',
@@ -135,6 +162,9 @@ create table public.progress_posts (
   id uuid primary key default gen_random_uuid(),
   entrepreneur_id uuid not null references public.entrepreneur_profiles(id) on delete cascade,
   user_id uuid not null references public.users(id) on delete cascade,
+  post_type text not null default 'progress',
+  title text,
+  body text,
   did_today text not null,
   metric_change text,
   issue text,
@@ -146,6 +176,11 @@ create table public.progress_posts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.progress_posts
+  add column if not exists post_type text not null default 'progress',
+  add column if not exists title text,
+  add column if not exists body text;
 
 create table public.post_comments (
   id uuid primary key default gen_random_uuid(),
@@ -479,7 +514,8 @@ begin
       select u.id
       from public.users u
       join public.investor_profiles ip on ip.user_id = u.id
-      where ip.document_file_path is null
+      where ip.corporate_number is null
+        and ip.license_file_path is null
         and u.created_at <= now() - make_interval(days => day_value)
         and not exists (
           select 1 from public.automated_reminders ar
@@ -487,28 +523,9 @@ begin
         )
     loop
       insert into public.contact_inquiries (user_id, category, body)
-      values (user_row.id, 'system_message', '投資家確認書類の提出をお願いします。法人は直近3ヶ月以内の登記簿謄本、個人事業主は開業届または直近の確定申告書をご提出ください。');
+      values (user_row.id, 'system_message', '投資家確認情報の提出をお願いします。法人は法人番号、個人事業主は運転免許証の写真をご提出ください。');
       insert into public.automated_reminders (user_id, reminder_type, day_offset)
       values (user_row.id, 'investor_document', day_value)
-      on conflict do nothing;
-    end loop;
-
-    for user_row in
-      select u.id
-      from public.users u
-      join public.entrepreneur_profiles ep on ep.user_id = u.id
-      where ep.is_hidden = true
-        and ep.payment_status <> 'paid'
-        and ep.created_at <= now() - make_interval(days => day_value)
-        and not exists (
-          select 1 from public.automated_reminders ar
-          where ar.user_id = u.id and ar.reminder_type = 'entrepreneur_payment' and ar.day_offset = day_value
-        )
-    loop
-      insert into public.contact_inquiries (user_id, category, body)
-      values (user_row.id, 'system_message', '現在プロフィールは非公開です。月額費用のお支払い確認後、投資家の検索結果とフィードへ公開されます。');
-      insert into public.automated_reminders (user_id, reminder_type, day_offset)
-      values (user_row.id, 'entrepreneur_payment', day_value)
       on conflict do nothing;
     end loop;
   end loop;

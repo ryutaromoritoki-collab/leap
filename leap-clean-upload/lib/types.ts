@@ -15,12 +15,15 @@ export type AppUser = {
 export type EntrepreneurProfile = {
   id: string;
   user_id: string;
+  account_name: string | null;
   company_name: string;
   founder_name: string;
   location: string | null;
   industry: string | null;
   founded_month: string | null;
   employee_count: number | null;
+  employee_size: string | null;
+  annual_revenue_scale: string | null;
   tagline: string | null;
   overview: string | null;
   problem: string | null;
@@ -47,6 +50,7 @@ export type EntrepreneurProfile = {
   payment_requested_at: string | null;
   paid_at: string | null;
   subscription_ends_at: string | null;
+  total_investment_amount: number | null;
   meeting_ticket_balance: number | null;
   meeting_ticket_plan: string | null;
   meeting_ticket_requested_count: number | null;
@@ -58,10 +62,18 @@ export type EntrepreneurProfile = {
 export type InvestorProfile = {
   id: string;
   user_id: string;
+  account_name: string | null;
   full_name: string;
   company_name: string | null;
   position: string | null;
   location: string | null;
+  founded_month: string | null;
+  employee_size: string | null;
+  annual_revenue_scale: string | null;
+  investor_type: string | null;
+  corporate_number: string | null;
+  license_file_path: string | null;
+  total_investment_amount: number | null;
   investment_fields: string | null;
   investable_amount: number | null;
   interested_phases: string | null;
@@ -93,6 +105,9 @@ export type ProgressPost = {
   metric_change: string | null;
   issue: string | null;
   next_action: string | null;
+  post_type: string | null;
+  title: string | null;
+  body: string | null;
   related_kpi: string | null;
   tags: string[] | null;
   visibility: string;
