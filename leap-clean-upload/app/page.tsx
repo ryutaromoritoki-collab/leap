@@ -284,7 +284,7 @@ export default function LeapApp() {
         const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(500),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(1000),
+          supabase.from('entrepreneur_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
@@ -310,7 +310,7 @@ export default function LeapApp() {
       const [{ data: investorProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] =
         await Promise.all([
           supabase.from('investor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').order('created_at', { ascending: false }).limit(1000),
+          supabase.from('entrepreneur_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase
             .from('progress_posts')
@@ -1566,7 +1566,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
       setNotice('プロフィール情報を取得できませんでした。');
       return;
     }
-    const { data, error } = await supabase.from('entrepreneur_profiles').select('*, users(last_login_at)').eq('id', post.entrepreneur_id).maybeSingle();
+    const { data, error } = await supabase.from('entrepreneur_profiles').select('*').eq('id', post.entrepreneur_id).maybeSingle();
     if (error || !data) {
       if (post.entrepreneur_profiles) {
         openProfile(post.entrepreneur_profiles);
@@ -1680,7 +1680,8 @@ function FeedPost({
   const [viewCount, setViewCount] = useState(post.view_count ?? 0);
   const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
   const [commentCount] = useState(post.comment_count ?? 0);
-  const profile = post.entrepreneur_profiles;
+  const [resolvedProfile, setResolvedProfile] = useState<EntrepreneurProfile | undefined>(post.entrepreneur_profiles);
+  const profile = resolvedProfile ?? post.entrepreneur_profiles;
   const isPrivatePost = post.post_type === 'private';
   const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const companyName = profile?.company_name || '起業家';
@@ -1703,6 +1704,26 @@ function FeedPost({
       cancelled = true;
     };
   }, [currentUser?.id, post.id, post.user_id]);
+
+  useEffect(() => {
+    setResolvedProfile(post.entrepreneur_profiles);
+  }, [post.entrepreneur_profiles?.id, post.entrepreneur_profiles?.account_name, post.entrepreneur_profiles?.company_name]);
+
+  useEffect(() => {
+    if (!supabase || !post.entrepreneur_id) return;
+    let cancelled = false;
+    supabase
+      .from('entrepreneur_profiles')
+      .select('*')
+      .eq('id', post.entrepreneur_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled && data) setResolvedProfile(data as EntrepreneurProfile);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [post.entrepreneur_id]);
 
   return (
     <article className="border-b border-white/10 p-4 last:border-b-0 sm:p-5">
