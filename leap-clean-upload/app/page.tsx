@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
+  EyeOff,
   FileText,
   Flag,
   Gauge,
@@ -41,6 +42,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Trash2,
   TrendingUp,
   UserRound,
   UsersRound,
@@ -911,7 +913,7 @@ function EntrepreneurHome({ currentUser, profile, posts, kpis, follows, meetings
       <PitchUpload profile={profile} refresh={refresh} />
       <section className="grid gap-3">
         <h3 className="text-xl font-black">進捗ログ</h3>
-        {posts.length === 0 ? <EmptyState title="まだ投稿がありません。まずは短い近況から投稿しましょう。" cta="投稿する" /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} />)}
+        {posts.length === 0 ? <EmptyState title="まだ投稿がありません。まずは短い近況から投稿しましょう。" cta="投稿する" /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} refresh={refresh} />)}
       </section>
       <KpiDashboard profile={profile} kpis={kpis} compact />
     </div>
@@ -962,11 +964,11 @@ function InvestorHome({ currentUser, investor, profiles, posts, follows, followe
       </section>
       <section className="grid gap-3">
         <h3 className="text-xl font-black">フォロー中の新着進捗ログ</h3>
-        {followedPosts.length === 0 ? <EmptyState title="フォロー中の新着進捗ログはまだありません" body="フォローした起業家の進捗がここに表示されます。" /> : followedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} />)}
+        {followedPosts.length === 0 ? <EmptyState title="フォロー中の新着進捗ログはまだありません" body="フォローした起業家の進捗がここに表示されます。" /> : followedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} refresh={refresh} />)}
       </section>
       <section className="grid gap-3">
         <h3 className="text-xl font-black">興味を惹きそうな投稿</h3>
-        {recommendedPosts.length === 0 ? <EmptyState title="おすすめ投稿はまだありません" body="フォローしていない起業家の投稿がここに表示されます。" /> : recommendedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} />)}
+        {recommendedPosts.length === 0 ? <EmptyState title="おすすめ投稿はまだありません" body="フォローしていない起業家の投稿がここに表示されます。" /> : recommendedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} refresh={refresh} />)}
       </section>
     </div>
   );
@@ -1360,15 +1362,14 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
   async function submit() {
     setErrorMessage('');
     const body = form.body?.trim() ?? '';
-    const title = (form.title?.trim() || body.slice(0, 40) || '近況投稿').trim();
-    const didToday = (form.did_today?.trim() || title || '今日の進捗').trim();
+    const didToday = (form.did_today?.trim() || body.slice(0, 80) || '今日の投稿').trim();
     const { error } = await supabase!.from('progress_posts').insert({
       entrepreneur_id: profile.id,
       user_id: profile.user_id,
       post_type: form.post_type,
-      title: isPrivatePost ? title : null,
+      title: null,
       body: isPrivatePost ? body : null,
-      did_today: isPrivatePost ? title : didToday,
+      did_today: isPrivatePost ? body.slice(0, 80) || '通常投稿' : didToday,
       metric_change: isPrivatePost ? null : form.metric_change,
       issue: isPrivatePost ? null : form.issue,
       next_action: isPrivatePost ? null : form.next_action,
@@ -1403,11 +1404,10 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
         <div className="mt-4 grid gap-4">
           <div className="flex flex-wrap gap-2">
             {quickPostIdeas.map((idea) => (
-              <button key={idea} type="button" className="pill" onClick={() => setForm({ ...form, title: idea, body: form.body || `${idea}について共有します。` })}>{idea}</button>
+              <button key={idea} type="button" className="pill" onClick={() => setForm({ ...form, body: form.body || `${idea}について共有します。` })}>{idea}</button>
             ))}
           </div>
           <label className="label">本文<textarea className="field min-h-32" value={form.body ?? ''} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="例：今日は商談で良い反応がありました。次は導入条件を整理します。" /></label>
-          <label className="label">タイトル（任意）<input className="field" value={form.title ?? ''} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="未入力なら本文から自動作成します" /></label>
           <label className="label">タグ（任意）<input className="field" value={form.tags ?? ''} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="例：営業, プロダクト" /></label>
         </div>
       ) : (
@@ -1571,6 +1571,46 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
     openProfile(data as EntrepreneurProfile);
   }
 
+  async function hideOwnPost(post: ProgressPost) {
+    if (!supabase || post.user_id !== currentUser.id) return;
+    const { error } = await supabase.from('progress_posts').update({ is_hidden: true }).eq('id', post.id).eq('user_id', currentUser.id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setNotice('投稿を非公開にしました。');
+    await refresh();
+  }
+
+  async function deleteOwnPost(post: ProgressPost) {
+    if (!supabase || post.user_id !== currentUser.id) return;
+    const ok = window.confirm('この投稿を削除します。元に戻せません。よろしいですか？');
+    if (!ok) return;
+    const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', currentUser.id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setNotice('投稿を削除しました。');
+    await refresh();
+  }
+
+  async function reactToPost(post: ProgressPost, action: 'like' | 'save' | 'report') {
+    if (!supabase) return;
+    if (action === 'like') {
+      const { error } = await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUser.id });
+      setNotice(error ? toJapaneseError(error.message) : 'いいねしました。');
+      return;
+    }
+    if (action === 'save') {
+      const { error } = await supabase.from('watchlists').upsert({ entrepreneur_id: post.entrepreneur_id, investor_id: currentUser.id, memo: `保存した投稿: ${post.did_today.slice(0, 80)}` });
+      setNotice(error ? toJapaneseError(error.message) : '保存しました。');
+      return;
+    }
+    const { error } = await supabase.from('reports').insert({ reporter_id: currentUser.id, target_type: 'progress_posts', target_id: post.id, reason: '投稿内容の確認依頼' });
+    setNotice(error ? toJapaneseError(error.message) : '通報を送信しました。');
+  }
+
   return (
     <section className="mx-auto grid w-full max-w-2xl gap-4">
       <div className="px-1">
@@ -1594,6 +1634,9 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
               openTimelineProfile={openTimelineProfile}
               quickFollow={quickFollow}
               quickMessage={quickMessage}
+              hideOwnPost={hideOwnPost}
+              deleteOwnPost={deleteOwnPost}
+              reactToPost={reactToPost}
             />
           ))}
         </div>
@@ -1611,6 +1654,9 @@ function FeedPost({
   openTimelineProfile,
   quickFollow,
   quickMessage,
+  hideOwnPost,
+  deleteOwnPost,
+  reactToPost,
 }: {
   post: ProgressPost;
   currentUser: AppUser;
@@ -1620,13 +1666,16 @@ function FeedPost({
   openTimelineProfile: (post: ProgressPost) => Promise<void>;
   quickFollow: (profile?: EntrepreneurProfile) => Promise<void>;
   quickMessage: (post: ProgressPost) => Promise<void>;
+  hideOwnPost: (post: ProgressPost) => Promise<void>;
+  deleteOwnPost: (post: ProgressPost) => Promise<void>;
+  reactToPost: (post: ProgressPost, action: 'like' | 'save' | 'report') => Promise<void>;
 }) {
   const [viewCount, setViewCount] = useState(post.view_count ?? 0);
   const profile = post.entrepreneur_profiles;
   const isPrivatePost = post.post_type === 'private';
   const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const companyName = profile?.company_name || '起業家';
-  const accountName = profile?.account_name || profile?.founder_name || companyName;
+  const accountName = profile?.account_name || 'アカウント名未設定';
   const postedAt = new Date(post.created_at).toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
@@ -1669,7 +1718,7 @@ function FeedPost({
           <button type="button" className="mt-1 text-left text-xs font-bold text-cyan-300 hover:text-cyan-100" onClick={() => openTimelineProfile(post)}>
             プロフィールを見る
           </button>
-          <h3 className="mt-3 break-words text-lg font-black leading-7 text-slate-50">{isPrivatePost ? post.title : post.did_today}</h3>
+          {!isPrivatePost && <h3 className="mt-3 break-words text-lg font-black leading-7 text-slate-50">{post.did_today}</h3>}
           {isPrivatePost ? (
             <p className="mt-2 whitespace-pre-line break-words leading-7 text-slate-300">{post.body || '本文はありません。'}</p>
           ) : (
@@ -1689,8 +1738,17 @@ function FeedPost({
             <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? '通常投稿' : '進捗投稿'}</span>
             {currentUser.role === 'investor' && profile && (
               <>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => reactToPost(post, 'like')}><Heart size={15} /> いいね</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => reactToPost(post, 'save')}><Bookmark size={15} /> 保存</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => reactToPost(post, 'report')}><Flag size={15} /> 通報</button>
                 <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => quickFollow(profile)}><Heart size={15} /> フォロー</button>
                 <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => setMessage(messageValue ?? '投稿を拝見しました。詳しくお話を伺いたいです。')}><Send size={15} /> メッセージ</button>
+              </>
+            )}
+            {currentUser.id === post.user_id && (
+              <>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => hideOwnPost(post)}><EyeOff size={15} /> 非公開</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => deleteOwnPost(post)}><Trash2 size={15} /> 削除</button>
               </>
             )}
           </div>
@@ -1865,6 +1923,29 @@ function Messages({ currentUser, messages, meetings, refresh }: { currentUser: A
 function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh: () => Promise<void> }) {
   const [emailEnabled, setEmailEnabled] = useState(currentUser.notification_email_enabled !== false);
   const [message, setMessage] = useState('');
+  const [profileForm, setProfileForm] = useState<Record<string, string>>({});
+  const [profileId, setProfileId] = useState('');
+  const [profileMessage, setProfileMessage] = useState('');
+
+  useEffect(() => {
+    async function loadProfileForSettings() {
+      if (!supabase || currentUser.role === 'admin') return;
+      const table = currentUser.role === 'entrepreneur' ? 'entrepreneur_profiles' : 'investor_profiles';
+      const { data } = await supabase.from(table).select('*').eq('user_id', currentUser.id).maybeSingle();
+      if (!data) return;
+      setProfileId(data.id);
+      setProfileForm({
+        account_name: data.account_name ?? '',
+        name: currentUser.role === 'entrepreneur' ? data.founder_name ?? '' : data.full_name ?? '',
+        company_name: data.company_name ?? '',
+        founded_month: data.founded_month ?? '',
+        employee_size: data.employee_size ?? '',
+        annual_revenue_scale: data.annual_revenue_scale ?? '',
+        location: data.location ?? '',
+      });
+    }
+    loadProfileForSettings();
+  }, [currentUser.id, currentUser.role]);
 
   async function saveNotificationSetting(nextValue: boolean) {
     if (!supabase) return;
@@ -1879,25 +1960,74 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
     await refresh();
   }
 
+  async function saveProfileSettings() {
+    if (!supabase || !profileId || currentUser.role === 'admin') return;
+    const table = currentUser.role === 'entrepreneur' ? 'entrepreneur_profiles' : 'investor_profiles';
+    const patch: Record<string, string> = {
+      account_name: profileForm.account_name,
+      company_name: profileForm.company_name,
+      founded_month: profileForm.founded_month,
+      employee_size: profileForm.employee_size,
+      annual_revenue_scale: profileForm.annual_revenue_scale,
+      location: profileForm.location,
+    };
+    if (currentUser.role === 'entrepreneur') {
+      patch.founder_name = profileForm.name;
+    } else {
+      patch.full_name = profileForm.name;
+    }
+    const { error } = await supabase.from(table).update(patch).eq('id', profileId).eq('user_id', currentUser.id);
+    if (error) {
+      setProfileMessage(toJapaneseError(error.message));
+      return;
+    }
+    setProfileMessage('プロフィール情報を更新しました。');
+    await refresh();
+  }
+
   return (
-    <section className="glass rounded-[28px] p-6">
-      <p className="text-sm font-bold text-emerald-300">通知設定</p>
-      <h2 className="mt-2 text-3xl font-black">メール通知</h2>
-      <p className="mt-3 max-w-3xl leading-7 text-slate-300">
-        メッセージやコメントが届いたとき、登録メールアドレスへ通知します。通知が多い場合はいつでもオフにできます。
-      </p>
-      <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-bold">登録メールアドレス</p>
-            <p className="mt-1 text-sm text-slate-400">{currentUser.email ?? '未設定'}</p>
+    <section className="grid gap-5">
+      <article className="glass rounded-[28px] p-6">
+        <p className="text-sm font-bold text-emerald-300">通知設定</p>
+        <h2 className="mt-2 text-3xl font-black">メール通知</h2>
+        <p className="mt-3 max-w-3xl leading-7 text-slate-300">
+          メッセージやコメントが届いたとき、登録メールアドレスへ通知します。通知が多い場合はいつでもオフにできます。
+        </p>
+        <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-bold">登録メールアドレス</p>
+              <p className="mt-1 text-sm text-slate-400">{currentUser.email ?? '未設定'}</p>
+            </div>
+            <button className={emailEnabled ? 'btn-primary' : 'btn-secondary'} onClick={() => saveNotificationSetting(!emailEnabled)}>
+              <Bell size={17} /> {emailEnabled ? '通知オン' : '通知オフ'}
+            </button>
           </div>
-          <button className={emailEnabled ? 'btn-primary' : 'btn-secondary'} onClick={() => saveNotificationSetting(!emailEnabled)}>
-            <Bell size={17} /> {emailEnabled ? '通知オン' : '通知オフ'}
-          </button>
         </div>
-      </div>
-      {message && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
+        {message && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
+      </article>
+      {currentUser.role !== 'admin' && (
+        <article className="glass rounded-[28px] p-6">
+          <p className="text-sm font-bold text-emerald-300">アカウント情報</p>
+          <h2 className="mt-2 text-3xl font-black">プロフィールを編集</h2>
+          <p className="mt-3 max-w-3xl leading-7 text-slate-300">タイムラインや検索結果に表示されるアカウント名、名前、会社名などを変更できます。</p>
+          {!profileId ? (
+            <p className="mt-4 rounded-2xl bg-amber-300/10 p-3 text-sm text-amber-100">プロフィール作成後に編集できます。</p>
+          ) : (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="label">アカウント名<input className="field" value={profileForm.account_name ?? ''} onChange={(e) => setProfileForm({ ...profileForm, account_name: e.target.value })} placeholder="例：leap_taro" /></label>
+              <label className="label">名前<input className="field" value={profileForm.name ?? ''} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} /></label>
+              <label className="label">会社名<input className="field" value={profileForm.company_name ?? ''} onChange={(e) => setProfileForm({ ...profileForm, company_name: e.target.value })} /></label>
+              <label className="label">所在地<select className="field" value={profileForm.location ?? ''} onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}><option value="">未選択</option>{locationOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+              <label className="label">設立年月<input className="field" type="month" value={profileForm.founded_month ?? ''} onChange={(e) => setProfileForm({ ...profileForm, founded_month: e.target.value })} /></label>
+              <label className="label">従業員数<select className="field" value={profileForm.employee_size ?? ''} onChange={(e) => setProfileForm({ ...profileForm, employee_size: e.target.value })}><option value="">未選択</option>{employeeSizeOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+              <label className="label sm:col-span-2">年商規模<select className="field" value={profileForm.annual_revenue_scale ?? ''} onChange={(e) => setProfileForm({ ...profileForm, annual_revenue_scale: e.target.value })}><option value="">未選択</option>{revenueScaleOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+              <button className="btn-primary sm:col-span-2" onClick={saveProfileSettings}>プロフィールを保存する</button>
+            </div>
+          )}
+          {profileMessage && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{profileMessage}</p>}
+        </article>
+      )}
     </section>
   );
 }
@@ -2009,9 +2139,10 @@ function BadgeRow({ profile }: { profile: EntrepreneurProfile }) {
   return <div className="mt-4 flex flex-wrap gap-2">{badges.length ? badges.map((b) => <span className="pill" key={String(b)}><BadgeCheck size={13} /> {b}</span>) : <span className="pill">認証審査前</span>}</div>;
 }
 
-function PostCard({ post, currentUser, investor }: { post: ProgressPost; currentUser?: AppUser; investor?: InvestorProfile | null }) {
+function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost; currentUser?: AppUser; investor?: InvestorProfile | null; refresh?: () => Promise<void> }) {
   const [comment, setComment] = useState('');
   const [viewCount, setViewCount] = useState(post.view_count ?? 0);
+  const [notice, setNotice] = useState('');
   const canComment = currentUser?.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const isPrivatePost = post.post_type === 'private';
 
@@ -2028,15 +2159,39 @@ function PostCard({ post, currentUser, investor }: { post: ProgressPost; current
 
   async function like() {
     if (!supabase || !currentUser) return;
-    await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUser.id });
+    const { error } = await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentUser.id });
+    setNotice(error ? toJapaneseError(error.message) : 'いいねしました。');
   }
   async function save() {
     if (!supabase || !currentUser) return;
-    await supabase.from('watchlists').upsert({ entrepreneur_id: post.entrepreneur_id, investor_id: currentUser.id, memo: `保存した投稿: ${post.did_today.slice(0, 80)}` });
+    const { error } = await supabase.from('watchlists').upsert({ entrepreneur_id: post.entrepreneur_id, investor_id: currentUser.id, memo: `保存した投稿: ${post.did_today.slice(0, 80)}` });
+    setNotice(error ? toJapaneseError(error.message) : '保存しました。');
   }
   async function report() {
     if (!supabase || !currentUser) return;
-    await supabase.from('reports').insert({ reporter_id: currentUser.id, target_type: 'progress_posts', target_id: post.id, reason: '投稿内容の確認依頼' });
+    const { error } = await supabase.from('reports').insert({ reporter_id: currentUser.id, target_type: 'progress_posts', target_id: post.id, reason: '投稿内容の確認依頼' });
+    setNotice(error ? toJapaneseError(error.message) : '通報を送信しました。');
+  }
+  async function hideOwnPost() {
+    if (!supabase || !currentUser || currentUser.id !== post.user_id) return;
+    const { error } = await supabase.from('progress_posts').update({ is_hidden: true }).eq('id', post.id).eq('user_id', currentUser.id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setNotice('投稿を非公開にしました。');
+    await refresh?.();
+  }
+  async function deleteOwnPost() {
+    if (!supabase || !currentUser || currentUser.id !== post.user_id) return;
+    if (!window.confirm('この投稿を削除します。元に戻せません。よろしいですか？')) return;
+    const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', currentUser.id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setNotice('投稿を削除しました。');
+    await refresh?.();
   }
   async function submitComment() {
     if (!supabase || !currentUser || !comment.trim()) return;
@@ -2046,14 +2201,19 @@ function PostCard({ post, currentUser, investor }: { post: ProgressPost; current
       setComment('連絡先交換につながる可能性がある内容は送信できません。');
       return;
     }
-    await supabase.from('post_comments').insert({ post_id: post.id, user_id: currentUser.id, body: comment });
+    const { error } = await supabase.from('post_comments').insert({ post_id: post.id, user_id: currentUser.id, body: comment });
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
     await supabase.from('notifications').insert({ user_id: post.user_id, type: 'comment', body: '進捗投稿にコメントがつきました。' });
     setComment('');
+    setNotice('コメントしました。');
   }
   return (
     <article className="glass rounded-[24px] p-5">
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-sm text-slate-400">{new Date(post.created_at).toLocaleString('ja-JP')} / {visibilityLabels[post.visibility] ?? post.visibility}</p><h3 className="mt-2 text-xl font-black">{isPrivatePost ? post.title : post.did_today}</h3></div>
+        <div><p className="text-sm text-slate-400">{new Date(post.created_at).toLocaleString('ja-JP')} / {visibilityLabels[post.visibility] ?? post.visibility}</p>{!isPrivatePost && <h3 className="mt-2 text-xl font-black">{post.did_today}</h3>}</div>
         <div className="flex flex-wrap justify-end gap-2">
           <span className="pill"><Gauge size={13} /> 閲覧 {viewCount.toLocaleString()}回</span>
           <span className="pill"><TrendingUp size={13} /> {isPrivatePost ? 'ひとこと' : '進捗'}</span>
@@ -2065,6 +2225,12 @@ function PostCard({ post, currentUser, investor }: { post: ProgressPost; current
         <Detail title="次にやること" body={post.next_action} />
       </div>}
       <div className="mt-4 flex flex-wrap gap-2">{post.tags?.map((tag) => <span className="pill" key={tag}>#{tag}</span>)}</div>
+      {currentUser?.id === post.user_id && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button className="btn-secondary" onClick={hideOwnPost}><EyeOff size={16} /> 非公開</button>
+          <button className="btn-secondary" onClick={deleteOwnPost}><Trash2 size={16} /> 削除</button>
+        </div>
+      )}
       {currentUser?.role === 'investor' && (
         <div className="mt-4 grid gap-3">
           {!canComment && <p className="rounded-2xl bg-amber-300/10 p-3 text-sm text-amber-100">確認書類の提出が完了するまで、コメントは利用できません。</p>}
@@ -2079,6 +2245,7 @@ function PostCard({ post, currentUser, investor }: { post: ProgressPost; current
           </div>
         </div>
       )}
+      {notice && <p className="mt-3 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
     </article>
   );
 }
