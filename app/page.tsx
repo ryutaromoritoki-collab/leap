@@ -64,7 +64,7 @@ type View =
   | 'launch';
 
 type LegalSlug = 'terms' | 'privacy' | 'commerce' | 'disclaimer' | 'contact' | 'report';
-type DirectMessageTarget = { userId: string; name: string; accountName?: string | null };
+type DirectMessageTarget = { userId: string; name: string; accountName?: string | null; entrepreneurId?: string | null };
 
 const supabase = getSupabaseClient();
 
@@ -516,7 +516,7 @@ export default function LeapApp() {
           <StartupProfile profile={selectedProfile} currentUser={user} followers={followers} following={following} profiles={profiles} investors={investorProfiles} setView={setView} setMessageTarget={setMessageTarget} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
-        {view === 'messages' && <Messages currentUser={user} messages={messages} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} refresh={loadWorkspace} />}
+        {view === 'messages' && <Messages currentUser={user} entrepreneurProfile={profile} messages={messages} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} setView={setView} refresh={loadWorkspace} />}
         {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
         {view === 'settings' && <SettingsPage currentUser={user} refresh={async () => { await loadUser(); await loadWorkspace(); }} />}
         {view === 'legal' && <LegalPage slug={legalSlug} currentUser={user} />}
@@ -1261,6 +1261,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   const [profileFollowing, setProfileFollowing] = useState<any[]>(following);
   const [investorGate, setInvestorGate] = useState<{ canContact: boolean; message: string }>({ canContact: currentUser.role !== 'investor', message: '' });
   const isOwnProfile = currentUser.id === profile.user_id;
+  const isFollowingProfile = following.some((row) => row.entrepreneur_id === profile.id && row.investor_id === currentUser.id);
 
   useEffect(() => {
     async function loadGate() {
@@ -1302,9 +1303,14 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       setActionMessage('自分のプロフィールはフォローできません。');
       return;
     }
-    await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
-    setActionMessage(`${profile.company_name}をフォローしました。`);
+    if (isFollowingProfile) {
+      await supabase.from('follows').delete().eq('entrepreneur_id', profile.id).eq('investor_id', currentUser.id);
+      setActionMessage(`${profile.company_name}のフォローを解除しました。`);
+    } else {
+      await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
+      await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
+      setActionMessage(`${profile.company_name}をフォローしました。`);
+    }
     await refresh();
   }
 
@@ -1353,7 +1359,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       setActionMessage('自分のプロフィールにはメッセージを送信できません。');
       return;
     }
-    setMessageTarget({ userId: profile.user_id, name: profile.company_name, accountName: profile.account_name });
+    setMessageTarget({ userId: profile.user_id, name: profile.company_name, accountName: profile.account_name, entrepreneurId: profile.id });
     setView('messages');
   }
 
@@ -1369,7 +1375,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
           </div>
           {!isOwnProfile && (
             <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
-              <button className="btn-primary" onClick={follow}><Heart size={17} /> フォロー</button>
+              <button className={isFollowingProfile ? 'btn-secondary' : 'btn-primary'} onClick={follow}><Heart size={17} /> {isFollowingProfile ? 'フォロー解除' : 'フォロー'}</button>
               <button className="btn-secondary" onClick={quickMessage}><Send size={17} /> メッセージ</button>
               {currentUser.role === 'investor' && <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>}
             </div>
@@ -1950,15 +1956,20 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
   );
 }
 
-function Messages({ currentUser, messages, meetings, profiles, investors, target, refresh }: { currentUser: AppUser; messages: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; refresh: () => Promise<void> }) {
+function Messages({ currentUser, entrepreneurProfile, messages, meetings, profiles, investors, target, setView, refresh }: { currentUser: AppUser; entrepreneurProfile: EntrepreneurProfile | null; messages: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; setView: (view: View) => void; refresh: () => Promise<void> }) {
   const [supportBody, setSupportBody] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
   const [selectedPartnerId, setSelectedPartnerId] = useState(target?.userId ?? '');
   const [messageBody, setMessageBody] = useState('');
   const [directMessage, setDirectMessage] = useState('');
+  const [meetingNotice, setMeetingNotice] = useState('');
+  const [meetingMessageById, setMeetingMessageById] = useState<Record<string, string>>({});
+  const [candidateDateById, setCandidateDateById] = useState<Record<string, string>>({});
+  const [finalDateById, setFinalDateById] = useState<Record<string, string>>({});
+  const [adminReportById, setAdminReportById] = useState<Record<string, string>>({});
   const participantByUserId = useMemo(() => {
     const map = new Map<string, DirectMessageTarget>();
-    profiles.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name, accountName: profile.account_name }));
+    profiles.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name, accountName: profile.account_name, entrepreneurId: profile.id }));
     investors.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name || profile.full_name || '投資家', accountName: profile.account_name }));
     if (target) map.set(target.userId, target);
     return map;
@@ -1972,6 +1983,7 @@ function Messages({ currentUser, messages, meetings, profiles, investors, target
   const selectedMessages = messages
     .filter((message) => selectedPartnerId && (message.sender_id === selectedPartnerId || message.receiver_id === selectedPartnerId))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const selectedPartner = selectedPartnerId ? participantByUserId.get(selectedPartnerId) : null;
 
   useEffect(() => {
     if (target?.userId) {
@@ -2001,6 +2013,61 @@ function Messages({ currentUser, messages, meetings, profiles, investors, target
     await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
     setMessageBody('');
     setDirectMessage('メッセージを送信しました。');
+    await refresh();
+  }
+  async function requestMeetingFromDirectMessage() {
+    if (!supabase || !selectedPartnerId) return;
+    const selectedEntrepreneurProfile = profiles.find((profile) => profile.user_id === selectedPartnerId);
+    const entrepreneurId = currentUser.role === 'entrepreneur' ? entrepreneurProfile?.id : selectedEntrepreneurProfile?.id;
+    const investorId = currentUser.role === 'entrepreneur' ? selectedPartnerId : currentUser.id;
+    if (!entrepreneurId || !investorId) {
+      setMeetingNotice('面談申込できる相手を選択してください。');
+      return;
+    }
+    const { error } = await supabase.from('meeting_requests').insert({
+      entrepreneur_id: entrepreneurId,
+      investor_id: investorId,
+      message: `${currentUser.role === 'entrepreneur' ? '起業家' : '投資家'}から面談申込がありました。`,
+      status: currentUser.role === 'entrepreneur' ? 'accepted_by_entrepreneur' : 'pending',
+    });
+    if (error) {
+      setMeetingNotice(toJapaneseError(error.message));
+      return;
+    }
+    await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'meeting_request', body: '面談申込が届きました。' });
+    setMeetingNotice('面談申込を作成しました。下の面談用メッセージで日程調整できます。');
+    await refresh();
+  }
+  async function updateMeeting(id: string, patch: Record<string, any>) {
+    if (!supabase) return;
+    await supabase.from('meeting_requests').update(patch).eq('id', id);
+    await refresh();
+  }
+  async function updateMeetingMessage(meeting: any) {
+    const body = meetingMessageById[meeting.id]?.trim();
+    if (!body) return;
+    await updateMeeting(meeting.id, { message: body });
+    setMeetingMessageById({ ...meetingMessageById, [meeting.id]: '' });
+  }
+  async function reportFinalMeeting(meeting: any) {
+    if (!supabase || !entrepreneurProfile) return;
+    if ((entrepreneurProfile.meeting_ticket_balance ?? 0) <= 0) {
+      window.alert('面談チケットが不足しています');
+      setView('home');
+      return;
+    }
+    await supabase.from('meeting_requests').update({
+      status: 'reported_to_admin',
+      final_meeting_at: finalDateById[meeting.id] || null,
+      meeting_admin_report: adminReportById[meeting.id] || '面談日時が決まったため、運営へ申請しました。',
+      ticket_payment_status: 'used',
+    }).eq('id', meeting.id);
+    await supabase.from('entrepreneur_profiles').update({ meeting_ticket_balance: Math.max(0, (entrepreneurProfile.meeting_ticket_balance ?? 0) - 1) }).eq('id', entrepreneurProfile.id);
+    await supabase.from('contact_inquiries').insert({
+      user_id: currentUser.id,
+      category: 'meeting_date_report',
+      body: `${entrepreneurProfile.company_name} が面談日時を申請しました。面談ID: ${meeting.id} / 日時: ${finalDateById[meeting.id] || '未入力'}`,
+    });
     await refresh();
   }
   async function sendSupportMessage() {
@@ -2052,10 +2119,12 @@ function Messages({ currentUser, messages, meetings, profiles, investors, target
               <div className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-black">{participantByUserId.get(selectedPartnerId)?.name ?? 'メッセージ相手'}</p>
+                    <p className="font-black">{selectedPartner?.name ?? 'メッセージ相手'}</p>
                     <p className="text-xs text-slate-500">通常メッセージ</p>
                   </div>
+                  <button className="btn-secondary px-3 text-sm" onClick={requestMeetingFromDirectMessage}><CalendarClock size={15} /> 面談申込</button>
                 </div>
+                {meetingNotice && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{meetingNotice}</p>}
                 <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
                   {selectedMessages.length === 0 ? (
                     <p className="rounded-2xl bg-white/[0.04] p-3 text-sm text-slate-400">まだメッセージはありません。最初の一言を送れます。</p>
@@ -2101,19 +2170,49 @@ function Messages({ currentUser, messages, meetings, profiles, investors, target
       </article>
       <section className="grid gap-3">
         <h3 className="text-xl font-black">面談用メッセージ</h3>
-        {meetings.length === 0 ? <p className="text-sm text-slate-400">双方同意後の面談用メッセージはここに表示されます。</p> : meetings.map((meeting) => (
-          <article key={meeting.id} className="glass rounded-2xl p-4">
-            <p className="font-bold">{meeting.message || '面談リクエスト'}</p>
-            <p className="mt-1 text-xs text-slate-500">状態: {meeting.status} / 候補: {meeting.proposed_at ? new Date(meeting.proposed_at).toLocaleString('ja-JP') : '未設定'}</p>
-            {currentUser.role === 'investor' && meeting.status === 'candidate_sent' && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button className="btn-primary" onClick={async () => { await supabase!.from('meeting_requests').update({ status: 'mutual_agreed' }).eq('id', meeting.id); await refresh(); }}>この日程に同意</button>
-                <button className="btn-secondary" onClick={async () => { await supabase!.from('meeting_requests').update({ status: 'investor_rejected_candidate' }).eq('id', meeting.id); await refresh(); }}>同意しない</button>
-              </div>
-            )}
-            {meeting.status === 'mutual_agreed' && <p className="mt-3 rounded-2xl bg-emerald-300/10 p-3 text-sm text-emerald-100">双方同意済みです。起業家側が面談チケットを消費し、運営へ面談日程を報告してください。</p>}
-          </article>
-        ))}
+        {meetings.length === 0 ? <p className="text-sm text-slate-400">双方同意後の面談用メッセージはここに表示されます。</p> : meetings.map((meeting) => {
+            const isEntrepreneurSide = entrepreneurProfile?.id === meeting.entrepreneur_id;
+            const isInvestorSide = currentUser.id === meeting.investor_id;
+            return (
+              <article key={meeting.id} className="glass rounded-2xl p-4">
+                <p className="font-bold">{meeting.message || '面談リクエスト'}</p>
+                <p className="mt-1 text-xs text-slate-500">状態: {meeting.status} / 候補: {meeting.proposed_at ? new Date(meeting.proposed_at).toLocaleString('ja-JP') : '未設定'}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <textarea className="field min-h-20" value={meetingMessageById[meeting.id] ?? ''} onChange={(e) => setMeetingMessageById({ ...meetingMessageById, [meeting.id]: e.target.value })} placeholder="面談用メッセージを書く" />
+                  <button className="btn-secondary self-stretch" onClick={() => updateMeetingMessage(meeting)}>送信</button>
+                </div>
+                {isEntrepreneurSide && meeting.status === 'pending' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'accepted_by_entrepreneur' })}>承認</button>
+                    <button className="btn-secondary" onClick={() => updateMeeting(meeting.id, { status: 'rejected_by_entrepreneur' })}>非承認</button>
+                  </div>
+                )}
+                {isEntrepreneurSide && (meeting.status === 'accepted_by_entrepreneur' || meeting.status === 'investor_rejected_candidate') && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <input className="field" type="datetime-local" value={candidateDateById[meeting.id] ?? ''} onChange={(e) => setCandidateDateById({ ...candidateDateById, [meeting.id]: e.target.value })} />
+                    <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'candidate_sent', proposed_at: candidateDateById[meeting.id] || null })}>候補日時を送る</button>
+                  </div>
+                )}
+                {isInvestorSide && meeting.status === 'candidate_sent' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'mutual_agreed' })}>この日程に同意</button>
+                    <button className="btn-secondary" onClick={() => updateMeeting(meeting.id, { status: 'investor_rejected_candidate' })}>同意しない</button>
+                  </div>
+                )}
+                {isEntrepreneurSide && (meeting.status === 'candidate_sent' || meeting.status === 'mutual_agreed') && (
+                  <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
+                    <p className="text-sm leading-6 text-amber-100">面談申請前にLeap外で面談を実行したことが発覚した場合、双方強制退会となります。面談日時が決まったら、チケットを1枚消費して運営へ申請してください。</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <input className="field" type="datetime-local" value={finalDateById[meeting.id] ?? ''} onChange={(e) => setFinalDateById({ ...finalDateById, [meeting.id]: e.target.value })} />
+                      <button className="btn-primary" onClick={() => reportFinalMeeting(meeting)}>面談日時を運営へ申請</button>
+                    </div>
+                    <textarea className="field mt-2 min-h-20" value={adminReportById[meeting.id] ?? ''} onChange={(e) => setAdminReportById({ ...adminReportById, [meeting.id]: e.target.value })} placeholder="運営への補足（任意）" />
+                  </div>
+                )}
+                {meeting.status === 'reported_to_admin' && <p className="mt-3 rounded-2xl bg-emerald-300/10 p-3 text-sm text-emerald-100">運営へ面談日時を申請済みです。</p>}
+              </article>
+            );
+          })}
       </section>
     </section>
   );
