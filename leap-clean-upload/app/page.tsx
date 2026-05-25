@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
+  Clock,
+  Eye,
   EyeOff,
   FileText,
   Flag,
@@ -174,6 +176,7 @@ export default function LeapApp() {
   const [profile, setProfile] = useState<EntrepreneurProfile | null>(null);
   const [investor, setInvestor] = useState<InvestorProfile | null>(null);
   const [posts, setPosts] = useState<ProgressPost[]>([]);
+  const [hiddenPosts, setHiddenPosts] = useState<ProgressPost[]>([]);
   const [allPosts, setAllPosts] = useState<ProgressPost[]>([]);
   const [kpis, setKpis] = useState<StartupKpi[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<EntrepreneurProfile | null>(null);
@@ -278,6 +281,7 @@ export default function LeapApp() {
         await supabase.from('users').update({ profile_completed: false }).eq('id', user.id);
         setUser({ ...user, profile_completed: false });
         setPosts([]);
+        setHiddenPosts([]);
         setAllPosts([]);
         setKpis([]);
         setFollows([]);
@@ -289,8 +293,9 @@ export default function LeapApp() {
         return;
       }
       if (ownProfile) {
-        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followerRows }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: supportRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
+        const [{ data: postRows }, { data: hiddenPostRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followerRows }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: supportRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }),
+          supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).eq('is_hidden', true).order('created_at', { ascending: false }),
           supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(500),
           supabase.from('entrepreneur_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
@@ -304,8 +309,10 @@ export default function LeapApp() {
           supabase.from('post_comments').select('post_id').limit(5000),
         ]);
         const decoratedOwnPosts = attachPostProfiles(withPostReactionCounts((postRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
+        const decoratedHiddenPosts = attachPostProfiles(withPostReactionCounts((hiddenPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
         const decoratedAllPosts = attachPostProfiles(withPostReactionCounts((allPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
         setPosts(decoratedOwnPosts);
+        setHiddenPosts(decoratedHiddenPosts);
         setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
         setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
         setAllPosts(decoratedAllPosts);
@@ -502,7 +509,7 @@ export default function LeapApp() {
         {toast && <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{toast}</div>}
 
         {view === 'home' && user.role === 'entrepreneur' && (
-          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} openProfile={openStartupProfile} refresh={loadWorkspace} />
+          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} hiddenPosts={hiddenPosts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'investor' && (
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} investorProfiles={investorProfiles} posts={posts} follows={follows} following={following} followers={followers} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
@@ -918,9 +925,10 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
   );
 }
 
-function EntrepreneurHome({ currentUser, profile, posts, kpis, following, followers, profiles, investors, meetings, openProfile, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
+function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, openProfile, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   if (!profile) return <EmptyState title="プロフィールが未作成です" body="起業家プロフィールを作成すると、投資家が事業進捗を継続的に確認できます。" cta="オンボーディングを確認" />;
   const completeness = calcCompleteness(profile);
+  const scrollToComposer = () => document.getElementById('quick-post-composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
     <div className="grid gap-5">
       <section className="glass rounded-[28px] p-6">
@@ -932,6 +940,7 @@ function EntrepreneurHome({ currentUser, profile, posts, kpis, following, follow
           <Metric label="フォロー数" value={`${following.length}`} icon={Heart} />
           <Metric label="フォロワー数" value={`${followers.length}`} icon={UsersRound} />
           <Metric label="面談リクエスト" value={`${meetings.length}`} icon={CalendarClock} />
+          <Metric label="面談チケット" value={`${profile.meeting_ticket_balance ?? 0}枚`} icon={CircleDollarSign} />
           <Metric label="進捗投稿" value={`${posts.length}`} icon={FileText} />
         </div>
       </section>
@@ -945,8 +954,9 @@ function EntrepreneurHome({ currentUser, profile, posts, kpis, following, follow
       <PitchUpload profile={profile} refresh={refresh} />
       <section className="grid gap-3">
         <h3 className="text-xl font-black">進捗ログ</h3>
-        {posts.length === 0 ? <EmptyState title="まだ投稿がありません。まずは短い近況から投稿しましょう。" cta="投稿する" /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} refresh={refresh} />)}
+        {posts.length === 0 ? <EmptyState title="まだ投稿がありません。まずは短い近況から投稿しましょう。" cta="投稿する" onClick={scrollToComposer} /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} refresh={refresh} />)}
       </section>
+      <HiddenPostsPanel posts={hiddenPosts} refresh={refresh} />
       <KpiDashboard profile={profile} kpis={kpis} compact />
     </div>
   );
@@ -1076,8 +1086,9 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
   const [transferName, setTransferName] = useState(profile.company_name);
   const selectedPlan = ticketPlans.find((plan) => plan.id === selectedPlanId) ?? ticketPlans[0];
   const availableTickets = profile.meeting_ticket_balance ?? 0;
+  const isPaymentPending = profile.meeting_ticket_payment_status === 'pending_review';
   async function requestTicketReview() {
-    if (!supabase || !acceptedTerms) return;
+    if (!supabase || !acceptedTerms || isPaymentPending) return;
     await supabase.from('contact_inquiries').insert({
       user_id: profile.user_id,
       category: 'meeting_ticket_payment',
@@ -1093,15 +1104,23 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
     await refresh();
   }
   return (
-    <section className="glass rounded-[24px] p-5">
+    <section id="quick-post-composer" className="glass scroll-mt-24 rounded-[24px] p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-emerald-300">面談チケット</p>
           <h3 className="mt-2 text-2xl font-black">起業家が面談チケットを購入・消費します</h3>
           <p className="mt-2 leading-7 text-slate-300">投資家との面談日時が双方で決まったら、起業家側で面談チケットを1枚消費して運営へ面談申請します。</p>
         </div>
-        <span className="pill"><CalendarClock size={14} /> 残り {availableTickets}枚</span>
+        <div className="flex flex-wrap gap-2">
+          <span className="pill"><CalendarClock size={14} /> 残り {availableTickets}枚</span>
+          {isPaymentPending && <span className="pill"><Clock size={14} /> 入金確認依頼中</span>}
+        </div>
       </div>
+      {isPaymentPending && (
+        <p className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
+          入金確認依頼中です。運営が入金確認ボタンを押すと、選択した面談チケットが付与されます。
+        </p>
+      )}
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {ticketPlans.map((plan) => (
           <button key={plan.id} type="button" className={`glass rounded-2xl p-4 text-left ${selectedPlanId === plan.id ? 'border-cyan-300/70' : ''}`} onClick={() => setSelectedPlanId(plan.id)}>
@@ -1124,9 +1143,49 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
         <p><b className="text-white">選択チケット:</b> {selectedPlan.label} / {yen(selectedPlan.amount)}</p>
       </div>
       )}
-      <button className="btn-primary mt-4 w-full" disabled={!acceptedTerms || !transferName.trim()} onClick={requestTicketReview}>
-        面談チケットの入金確認を依頼する
+      <button className="btn-primary mt-4 w-full" disabled={isPaymentPending || !acceptedTerms || !transferName.trim()} onClick={requestTicketReview}>
+        {isPaymentPending ? '入金確認依頼中です' : '面談チケットの入金確認を依頼する'}
       </button>
+    </section>
+  );
+}
+
+function HiddenPostsPanel({ posts, refresh }: { posts: ProgressPost[]; refresh: () => Promise<void> }) {
+  const [notice, setNotice] = useState('');
+  async function republish(post: ProgressPost) {
+    if (!supabase) return;
+    const { error } = await supabase.from('progress_posts').update({ is_hidden: false }).eq('id', post.id).eq('user_id', post.user_id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setNotice('投稿を再公開しました。');
+    await refresh();
+  }
+  return (
+    <section className="glass rounded-[24px] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-emerald-300">非表示投稿</p>
+          <h3 className="mt-1 text-xl font-black">非表示にした投稿の保存先</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-400">非表示にした投稿はここに残ります。必要になったら再公開できます。</p>
+        </div>
+        <span className="pill"><EyeOff size={14} /> {posts.length}件</span>
+      </div>
+      {notice && <p className="mt-3 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
+      <div className="mt-4 grid gap-3">
+        {posts.length === 0 ? (
+          <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-400">非表示投稿はありません。</p>
+        ) : posts.map((post) => (
+          <article key={post.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+            <p className="text-xs text-slate-500">{new Date(post.created_at).toLocaleString('ja-JP')}</p>
+            <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-200">{post.body || post.did_today || '本文はありません。'}</p>
+            <button type="button" className="btn-secondary mt-3 px-3 text-sm" onClick={() => republish(post)}>
+              <Eye size={15} /> 再公開する
+            </button>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1606,7 +1665,9 @@ function KpiDashboard({ profile, kpis, compact }: { profile: EntrepreneurProfile
 function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { posts: ProgressPost[]; currentUser: AppUser; investor: InvestorProfile | null; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   const [messageByPost, setMessageByPost] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
+  const [removedPostIds, setRemovedPostIds] = useState<string[]>([]);
   const canMessage = currentUser.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
+  const visiblePosts = posts.filter((post) => !removedPostIds.includes(post.id) && !post.is_hidden);
 
   async function quickFollow(profile?: EntrepreneurProfile) {
     if (!supabase || !profile) return;
@@ -1655,27 +1716,31 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
   }
 
   async function hideOwnPost(post: ProgressPost) {
-    if (!supabase || post.user_id !== currentUser.id) return;
+    if (!supabase || post.user_id !== currentUser.id) return false;
     const { error } = await supabase.from('progress_posts').update({ is_hidden: true }).eq('id', post.id).eq('user_id', currentUser.id);
     if (error) {
       setNotice(toJapaneseError(error.message));
-      return;
+      return false;
     }
+    setRemovedPostIds((ids) => [...ids, post.id]);
     setNotice('投稿を非公開にしました。');
     await refresh();
+    return true;
   }
 
   async function deleteOwnPost(post: ProgressPost) {
-    if (!supabase || post.user_id !== currentUser.id) return;
+    if (!supabase || post.user_id !== currentUser.id) return false;
     const ok = window.confirm('この投稿を削除します。元に戻せません。よろしいですか？');
-    if (!ok) return;
+    if (!ok) return false;
     const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', currentUser.id);
     if (error) {
       setNotice(toJapaneseError(error.message));
-      return;
+      return false;
     }
+    setRemovedPostIds((ids) => [...ids, post.id]);
     setNotice('投稿を削除しました。');
     await refresh();
+    return true;
   }
 
   async function reactToPost(post: ProgressPost, action: 'like' | 'save' | 'report') {
@@ -1702,11 +1767,11 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
         <p className="mt-2 text-sm leading-6 text-slate-400">起業家の近況や進捗を時系列で確認できます。気になる投稿からすぐにプロフィール確認、フォロー、メッセージができます。</p>
       </div>
       {notice && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
-      {posts.length === 0 ? (
+      {visiblePosts.length === 0 ? (
         <EmptyState title="表示できる投稿はまだありません" body="起業家が投稿すると、この一覧に表示されます。" />
       ) : (
         <div className="overflow-hidden rounded-[24px] border border-white/10 bg-black/25">
-          {posts.map((post) => (
+          {visiblePosts.map((post) => (
             <FeedPost
               key={post.id}
               post={post}
@@ -1749,10 +1814,11 @@ function FeedPost({
   openTimelineProfile: (post: ProgressPost) => Promise<void>;
   quickFollow: (profile?: EntrepreneurProfile) => Promise<void>;
   quickMessage: (post: ProgressPost) => Promise<void>;
-  hideOwnPost: (post: ProgressPost) => Promise<void>;
-  deleteOwnPost: (post: ProgressPost) => Promise<void>;
+  hideOwnPost: (post: ProgressPost) => Promise<boolean>;
+  deleteOwnPost: (post: ProgressPost) => Promise<boolean>;
   reactToPost: (post: ProgressPost, action: 'like' | 'save' | 'report') => Promise<void>;
 }) {
+  const [removed, setRemoved] = useState(false);
   const [viewCount, setViewCount] = useState(post.view_count ?? 0);
   const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
   const [commentCount] = useState(post.comment_count ?? 0);
@@ -1800,6 +1866,8 @@ function FeedPost({
       cancelled = true;
     };
   }, [post.entrepreneur_id]);
+
+  if (removed) return null;
 
   return (
     <article className="border-b border-white/10 p-4 last:border-b-0 sm:p-5">
@@ -1855,8 +1923,8 @@ function FeedPost({
             )}
             {currentUser.id === post.user_id && (
               <>
-                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => hideOwnPost(post)}><EyeOff size={15} /> 非公開</button>
-                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={() => deleteOwnPost(post)}><Trash2 size={15} /> 削除</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={async () => { if (await hideOwnPost(post)) setRemoved(true); }}><EyeOff size={15} /> 非公開</button>
+                <button type="button" className="btn-secondary min-h-10 px-3 text-sm" onClick={async () => { if (await deleteOwnPost(post)) setRemoved(true); }}><Trash2 size={15} /> 削除</button>
               </>
             )}
           </div>
@@ -2116,7 +2184,12 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
             <h3 className="mt-1 text-xl font-black">起業家・投資家と直接やりとり</h3>
             <p className="mt-2 text-sm leading-6 text-slate-400">通常のメッセージはここで送れます。面談希望や日程調整は下の面談用メッセージで管理します。</p>
           </div>
-          <span className="pill"><Mail size={14} /> DM</span>
+          <div className="flex flex-wrap gap-2">
+            <span className="pill"><Mail size={14} /> DM</span>
+            {currentUser.role === 'entrepreneur' && entrepreneurProfile && (
+              <span className="pill"><CircleDollarSign size={14} /> 面談チケット {entrepreneurProfile.meeting_ticket_balance ?? 0}枚</span>
+            )}
+          </div>
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-[240px_1fr]">
           <div className="grid content-start gap-2">
@@ -2224,7 +2297,12 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
         {supportMessage && <p className="mt-3 text-sm text-slate-300">{supportMessage}</p>}
       </article>
       <section className="grid gap-3">
-        <h3 className="text-xl font-black">面談用メッセージ</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-xl font-black">面談用メッセージ</h3>
+          {currentUser.role === 'entrepreneur' && entrepreneurProfile && (
+            <span className="pill"><CalendarClock size={14} /> 保有チケット {entrepreneurProfile.meeting_ticket_balance ?? 0}枚</span>
+          )}
+        </div>
         {meetings.length === 0 ? <p className="text-sm text-slate-400">双方同意後の面談用メッセージはここに表示されます。</p> : meetings.map((meeting) => {
             const isEntrepreneurSide = entrepreneurProfile?.id === meeting.entrepreneur_id;
             const isInvestorSide = currentUser.id === meeting.investor_id;
