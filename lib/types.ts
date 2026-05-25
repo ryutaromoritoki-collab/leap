@@ -24,6 +24,7 @@ export type EntrepreneurProfile = {
   employee_count: number | null;
   employee_size: string | null;
   annual_revenue_scale: string | null;
+  avatar_url: string | null;
   tagline: string | null;
   overview: string | null;
   problem: string | null;
@@ -70,6 +71,7 @@ export type InvestorProfile = {
   founded_month: string | null;
   employee_size: string | null;
   annual_revenue_scale: string | null;
+  avatar_url: string | null;
   investor_type: string | null;
   corporate_number: string | null;
   license_file_path: string | null;
