@@ -38,6 +38,7 @@ create table public.entrepreneur_profiles (
   employee_count int,
   employee_size text,
   annual_revenue_scale text,
+  avatar_url text,
   tagline text,
   overview text,
   problem text,
@@ -79,6 +80,7 @@ alter table public.entrepreneur_profiles
   add column if not exists account_name text,
   add column if not exists employee_size text,
   add column if not exists annual_revenue_scale text,
+  add column if not exists avatar_url text,
   add column if not exists payment_status text not null default 'paid',
   add column if not exists total_investment_amount numeric not null default 0,
   add column if not exists payment_transfer_name text,
@@ -113,6 +115,7 @@ create table public.investor_profiles (
   founded_month text,
   employee_size text,
   annual_revenue_scale text,
+  avatar_url text,
   investment_fields text,
   investable_amount numeric,
   interested_phases text,
@@ -136,6 +139,7 @@ alter table public.investor_profiles
   add column if not exists founded_month text,
   add column if not exists employee_size text,
   add column if not exists annual_revenue_scale text,
+  add column if not exists avatar_url text,
   add column if not exists investor_type text,
   add column if not exists corporate_number text,
   add column if not exists license_file_path text,
@@ -315,6 +319,10 @@ insert into storage.buckets (id, name, public)
 values ('compliance-documents', 'compliance-documents', false)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('profile-icons', 'profile-icons', true)
+on conflict (id) do nothing;
+
 create table public.contact_inquiries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.users(id) on delete set null,
@@ -447,7 +455,7 @@ create policy "notifications own update" on public.notifications for update usin
 create policy "email queue own/admin read" on public.email_notification_queue for select using (user_id = auth.uid() or public.is_admin());
 create policy "email queue admin update" on public.email_notification_queue for update using (public.is_admin());
 create policy "contact insert" on public.contact_inquiries for insert with check (true);
-create policy "contact admin read" on public.contact_inquiries for select using (public.is_admin());
+create policy "contact admin read" on public.contact_inquiries for select using (public.is_admin() or user_id = auth.uid());
 create policy "contact admin update" on public.contact_inquiries for update using (public.is_admin());
 create policy "contact suspicions logged insert" on public.contact_suspicions for insert with check (auth.uid() is not null);
 create policy "contact suspicions admin read" on public.contact_suspicions for select using (public.is_admin());
@@ -469,6 +477,18 @@ create policy "compliance documents owner upload" on storage.objects for insert 
 );
 create policy "compliance documents owner read" on storage.objects for select using (
   bucket_id = 'compliance-documents' and (auth.uid()::text = (storage.foldername(name))[1] or public.is_admin())
+);
+
+create policy "profile icons owner upload" on storage.objects for insert with check (
+  bucket_id = 'profile-icons' and auth.uid()::text = (storage.foldername(name))[1]
+);
+create policy "profile icons public read" on storage.objects for select using (
+  bucket_id = 'profile-icons'
+);
+create policy "profile icons owner update" on storage.objects for update using (
+  bucket_id = 'profile-icons' and auth.uid()::text = (storage.foldername(name))[1]
+) with check (
+  bucket_id = 'profile-icons' and auth.uid()::text = (storage.foldername(name))[1]
 );
 
 grant usage on schema public to anon, authenticated;

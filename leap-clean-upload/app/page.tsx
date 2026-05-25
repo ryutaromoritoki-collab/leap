@@ -186,6 +186,7 @@ export default function LeapApp() {
   const [followers, setFollowers] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [supportInquiries, setSupportInquiries] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [followedKpis, setFollowedKpis] = useState<any[]>([]);
   const [adminData, setAdminData] = useState<Record<string, any[]>>({});
@@ -284,11 +285,12 @@ export default function LeapApp() {
         setFollowers([]);
         setMeetings([]);
         setMessages([]);
+        setSupportInquiries([]);
         return;
       }
       if (ownProfile) {
-        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followerRows }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
-          supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
+        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followerRows }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: supportRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
+          supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }),
           supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(500),
           supabase.from('entrepreneur_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
@@ -297,6 +299,7 @@ export default function LeapApp() {
           supabase.from('follows').select('*').eq('investor_id', user.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
+          supabase.from('contact_inquiries').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
           supabase.from('post_likes').select('post_id').limit(5000),
           supabase.from('post_comments').select('post_id').limit(5000),
         ]);
@@ -312,11 +315,12 @@ export default function LeapApp() {
         setFollowing(followingRows ?? []);
         setMeetings(meetingRows ?? []);
         setMessages(messageRows ?? []);
+        setSupportInquiries(supportRows ?? []);
       }
     }
 
     if (user.role === 'investor') {
-      const [{ data: investorProfile }, { data: ownEntrepreneurProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] =
+      const [{ data: investorProfile }, { data: ownEntrepreneurProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: supportRows }, { data: likeRows }, { data: commentRows }] =
         await Promise.all([
           supabase.from('investor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
           supabase.from('entrepreneur_profiles').select('id').eq('user_id', user.id).maybeSingle(),
@@ -331,6 +335,7 @@ export default function LeapApp() {
           supabase.from('follows').select('*').eq('investor_id', user.id),
           supabase.from('meeting_requests').select('*').eq('investor_id', user.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
+          supabase.from('contact_inquiries').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
           supabase.from('post_likes').select('post_id').limit(5000),
           supabase.from('post_comments').select('post_id').limit(5000),
         ]);
@@ -350,6 +355,7 @@ export default function LeapApp() {
       }
       setMeetings(meetingRows ?? []);
       setMessages(messageRows ?? []);
+      setSupportInquiries(supportRows ?? []);
       if (followingRows?.length) {
         const entrepreneurIds = followingRows.map((row: any) => row.entrepreneur_id);
         const { data: kpiRows } = await supabase.from('startup_kpis').select('*, entrepreneur_profiles(company_name, industry)').in('entrepreneur_id', entrepreneurIds).order('created_at', { ascending: false }).limit(12);
@@ -385,6 +391,7 @@ export default function LeapApp() {
         allMessages: allMessages.data ?? [],
       });
       setAllPosts((progressPosts.data as ProgressPost[]) ?? []);
+      setSupportInquiries(inquiries.data ?? []);
     }
 
     const { data: notificationRows } = await supabase.from('notifications').select('*').eq('user_id', user.id).is('read_at', null).limit(20);
@@ -516,7 +523,7 @@ export default function LeapApp() {
           <StartupProfile profile={selectedProfile} currentUser={user} followers={followers} following={following} profiles={profiles} investors={investorProfiles} setView={setView} setMessageTarget={setMessageTarget} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
-        {view === 'messages' && <Messages currentUser={user} entrepreneurProfile={profile} messages={messages} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} setView={setView} refresh={loadWorkspace} />}
+        {view === 'messages' && <Messages currentUser={user} entrepreneurProfile={profile} messages={messages} supportInquiries={supportInquiries} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} setView={setView} refresh={loadWorkspace} />}
         {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
         {view === 'settings' && <SettingsPage currentUser={user} refresh={async () => { await loadUser(); await loadWorkspace(); }} />}
         {view === 'legal' && <LegalPage slug={legalSlug} currentUser={user} />}
@@ -1368,7 +1375,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       <section className="glass overflow-hidden rounded-[28px] p-6">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <div className="mb-4 grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-br from-cyan-300 via-violet-400 to-emerald-300 text-2xl font-black text-slate-950">{profile.company_name.slice(0, 1)}</div>
+            <ProfileAvatar name={profile.company_name} avatarUrl={profile.avatar_url} size="lg" />
             <p className="text-sm font-bold text-emerald-300">起業家プロフィール</p>
             <h2 className="mt-2 text-4xl font-black">{profile.company_name}</h2>
             <p className="mt-3 max-w-2xl leading-7 text-slate-300">{profile.tagline || '一言説明は未入力です。'}</p>
@@ -1799,11 +1806,11 @@ function FeedPost({
       <div className="grid grid-cols-[44px_1fr] gap-3">
         <button
           type="button"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-300/30 bg-gradient-to-br from-cyan-400/25 via-violet-400/20 to-emerald-300/20 text-base font-black text-cyan-100"
+          className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-cyan-300/30 bg-gradient-to-br from-cyan-400/25 via-violet-400/20 to-emerald-300/20 text-base font-black text-cyan-100"
           onClick={() => openTimelineProfile(post)}
           aria-label={`${companyName}のプロフィールを見る`}
         >
-          {companyName.slice(0, 1)}
+          {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : companyName.slice(0, 1)}
         </button>
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -1956,9 +1963,10 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
   );
 }
 
-function Messages({ currentUser, entrepreneurProfile, messages, meetings, profiles, investors, target, setView, refresh }: { currentUser: AppUser; entrepreneurProfile: EntrepreneurProfile | null; messages: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; setView: (view: View) => void; refresh: () => Promise<void> }) {
+function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries, meetings, profiles, investors, target, setView, refresh }: { currentUser: AppUser; entrepreneurProfile: EntrepreneurProfile | null; messages: any[]; supportInquiries: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; setView: (view: View) => void; refresh: () => Promise<void> }) {
   const [supportBody, setSupportBody] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
+  const [selectedSupportKey, setSelectedSupportKey] = useState('');
   const [selectedPartnerId, setSelectedPartnerId] = useState(target?.userId ?? '');
   const [messageBody, setMessageBody] = useState('');
   const [directMessage, setDirectMessage] = useState('');
@@ -1984,6 +1992,18 @@ function Messages({ currentUser, entrepreneurProfile, messages, meetings, profil
     .filter((message) => selectedPartnerId && (message.sender_id === selectedPartnerId || message.receiver_id === selectedPartnerId))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const selectedPartner = selectedPartnerId ? participantByUserId.get(selectedPartnerId) : null;
+  const supportThreads = useMemo(() => {
+    const keys = new Map<string, any>();
+    supportInquiries.forEach((row) => {
+      const key = row.user_id || row.email || 'anonymous';
+      if (!keys.has(key)) keys.set(key, row);
+    });
+    return Array.from(keys.entries()).map(([key, row]) => ({ key, row }));
+  }, [supportInquiries]);
+  const currentSupportKey = currentUser.role === 'admin' ? selectedSupportKey || supportThreads[0]?.key || '' : currentUser.id;
+  const selectedSupportMessages = supportInquiries
+    .filter((row) => (currentUser.role === 'admin' ? (row.user_id || row.email || 'anonymous') === currentSupportKey : row.user_id === currentUser.id))
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   useEffect(() => {
     if (target?.userId) {
@@ -2072,10 +2092,11 @@ function Messages({ currentUser, entrepreneurProfile, messages, meetings, profil
   }
   async function sendSupportMessage() {
     if (!supabase || !supportBody.trim()) return;
+    const selectedSupport = supportThreads.find((thread) => thread.key === currentSupportKey)?.row;
     const { error } = await supabase.from('contact_inquiries').insert({
-      user_id: currentUser.id,
-      email: currentUser.email,
-      category: 'support_message',
+      user_id: currentUser.role === 'admin' ? selectedSupport?.user_id ?? null : currentUser.id,
+      email: currentUser.role === 'admin' ? selectedSupport?.email ?? null : currentUser.email,
+      category: currentUser.role === 'admin' ? 'support_reply' : 'support_message',
       body: supportBody,
     });
     if (error) {
@@ -2083,7 +2104,8 @@ function Messages({ currentUser, entrepreneurProfile, messages, meetings, profil
       return;
     }
     setSupportBody('');
-    setSupportMessage('運営サポートへメッセージを送信しました。');
+    setSupportMessage(currentUser.role === 'admin' ? 'ユーザーへ返信を保存しました。' : '運営サポートへメッセージを送信しました。');
+    await refresh();
   }
   return (
     <section className="grid gap-3">
@@ -2162,9 +2184,42 @@ function Messages({ currentUser, entrepreneurProfile, messages, meetings, profil
           </div>
           <span className="pill"><ShieldCheck size={14} /> 常に表示</span>
         </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
-          <textarea className="field min-h-24" value={supportBody} onChange={(e) => setSupportBody(e.target.value)} placeholder="運営へのメッセージを書く" />
-          <button className="btn-primary self-stretch" onClick={sendSupportMessage}><Send size={17} /> 送信</button>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[240px_1fr]">
+          <div className="grid content-start gap-2">
+            {currentUser.role === 'admin' ? (
+              supportThreads.length === 0 ? <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-400">運営宛メッセージはまだありません。</p> : supportThreads.map((thread) => (
+                <button key={thread.key} type="button" className={`rounded-2xl border p-3 text-left transition ${currentSupportKey === thread.key ? 'border-cyan-300/60 bg-cyan-300/10' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/40'}`} onClick={() => setSelectedSupportKey(thread.key)}>
+                  <p className="font-bold">{thread.row.email ?? thread.row.user_id ?? '匿名ユーザー'}</p>
+                  <p className="mt-1 line-clamp-1 text-xs text-slate-500">{thread.row.body}</p>
+                </button>
+              ))
+            ) : (
+              <button type="button" className="rounded-2xl border border-cyan-300/60 bg-cyan-300/10 p-3 text-left">
+                <p className="font-bold">運営サポート</p>
+                <p className="mt-1 text-xs text-cyan-300">個別メッセージ</p>
+              </button>
+            )}
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <div className="grid max-h-[300px] gap-2 overflow-y-auto pr-1">
+              {selectedSupportMessages.length === 0 ? (
+                <p className="rounded-2xl bg-white/[0.04] p-3 text-sm text-slate-400">まだ運営とのメッセージはありません。</p>
+              ) : selectedSupportMessages.map((row) => {
+                const isAdminReply = row.category === 'support_reply';
+                const mine = currentUser.role === 'admin' ? isAdminReply : !isAdminReply;
+                return (
+                  <div key={row.id} className={`grid gap-1 ${mine ? 'justify-items-end' : 'justify-items-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-6 ${mine ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-slate-100'}`}>{row.body}</div>
+                    <span className="text-[11px] text-slate-500">{new Date(row.created_at).toLocaleString('ja-JP')}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <textarea className="field min-h-24" value={supportBody} onChange={(e) => setSupportBody(e.target.value)} placeholder={currentUser.role === 'admin' ? 'ユーザーへの返信を書く' : '運営へのメッセージを書く'} />
+              <button className="btn-primary self-stretch" onClick={sendSupportMessage}><Send size={17} /> 送信</button>
+            </div>
+          </div>
         </div>
         {supportMessage && <p className="mt-3 text-sm text-slate-300">{supportMessage}</p>}
       </article>
@@ -2222,6 +2277,7 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
   const [emailEnabled, setEmailEnabled] = useState(currentUser.notification_email_enabled !== false);
   const [message, setMessage] = useState('');
   const [profileForm, setProfileForm] = useState<Record<string, string>>({});
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [profileId, setProfileId] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
 
@@ -2239,6 +2295,7 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
         founded_month: data.founded_month ?? '',
         employee_size: data.employee_size ?? '',
         annual_revenue_scale: data.annual_revenue_scale ?? '',
+        avatar_url: data.avatar_url ?? '',
         location: data.location ?? '',
       });
     }
@@ -2267,8 +2324,20 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
       founded_month: profileForm.founded_month,
       employee_size: profileForm.employee_size,
       annual_revenue_scale: profileForm.annual_revenue_scale,
+      avatar_url: profileForm.avatar_url,
       location: profileForm.location,
     };
+    if (avatarFile) {
+      const extension = avatarFile.name.split('.').pop() || 'png';
+      const path = `${currentUser.id}/avatar.${extension}`;
+      const { error: uploadError } = await supabase.storage.from('profile-icons').upload(path, avatarFile, { upsert: true });
+      if (uploadError) {
+        setProfileMessage(toJapaneseError(uploadError.message));
+        return;
+      }
+      const { data } = supabase.storage.from('profile-icons').getPublicUrl(path);
+      patch.avatar_url = data.publicUrl;
+    }
     if (currentUser.role === 'entrepreneur') {
       patch.founder_name = profileForm.name;
     } else {
@@ -2280,6 +2349,7 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
       return;
     }
     setProfileMessage('プロフィール情報を更新しました。');
+    setAvatarFile(null);
     await refresh();
   }
 
@@ -2313,6 +2383,10 @@ function SettingsPage({ currentUser, refresh }: { currentUser: AppUser; refresh:
             <p className="mt-4 rounded-2xl bg-amber-300/10 p-3 text-sm text-amber-100">プロフィール作成後に編集できます。</p>
           ) : (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-black/25 p-4">
+                <ProfileAvatar name={profileForm.company_name || profileForm.name || 'アカウント'} avatarUrl={profileForm.avatar_url} />
+                <label className="label flex-1">アイコン画像<input className="field" type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)} /></label>
+              </div>
               <label className="label">アカウント名<input className="field" value={profileForm.account_name ?? ''} onChange={(e) => setProfileForm({ ...profileForm, account_name: e.target.value })} placeholder="例：leap_taro" /></label>
               <label className="label">名前<input className="field" value={profileForm.name ?? ''} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} /></label>
               <label className="label">会社名<input className="field" value={profileForm.company_name ?? ''} onChange={(e) => setProfileForm({ ...profileForm, company_name: e.target.value })} /></label>
@@ -2394,6 +2468,14 @@ function EmptyState({ title, body, cta, onClick }: { title: string; body?: strin
   return <section className="glass rounded-[24px] p-6 text-center"><AlertTriangle className="mx-auto text-cyan-300" /><h3 className="mt-3 text-xl font-black">{title}</h3>{body && <p className="mx-auto mt-2 max-w-xl leading-7 text-slate-400">{body}</p>}{cta && <button className="btn-primary mt-5" onClick={onClick}>{cta}</button>}</section>;
 }
 
+function ProfileAvatar({ name, avatarUrl, size = 'md' }: { name: string; avatarUrl?: string | null; size?: 'md' | 'lg' }) {
+  const sizeClass = size === 'lg' ? 'h-20 w-20 rounded-3xl text-2xl' : 'h-12 w-12 rounded-2xl text-base';
+  if (avatarUrl) {
+    return <img src={avatarUrl} alt={`${name}のアイコン`} className={`${sizeClass} object-cover ring-1 ring-cyan-300/30`} />;
+  }
+  return <div className={`grid ${sizeClass} place-items-center bg-gradient-to-br from-cyan-300 via-violet-400 to-emerald-300 font-black text-slate-950`}>{name.slice(0, 1)}</div>;
+}
+
 function FollowOverview({ following, followers, profiles, investors, openProfile }: { following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; openProfile: (profile: EntrepreneurProfile) => void }) {
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const investorByUserId = new Map(investors.map((profile) => [profile.user_id, profile]));
@@ -2449,7 +2531,7 @@ function FollowOverview({ following, followers, profiles, investors, openProfile
 function StartupCard({ profile, onClick }: { profile: EntrepreneurProfile; onClick: () => void }) {
   return (
     <button className="glass rounded-[24px] p-5 text-left transition hover:border-cyan-300/50" onClick={onClick}>
-      <div className="flex items-center justify-between gap-3"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 via-violet-400 to-emerald-300 font-black text-slate-950">{profile.company_name.slice(0, 1)}</div><ChevronRight /></div>
+      <div className="flex items-center justify-between gap-3"><ProfileAvatar name={profile.company_name} avatarUrl={profile.avatar_url} /><ChevronRight /></div>
       <h3 className="mt-4 text-xl font-black">{profile.company_name}</h3>
       {profile.account_name && <p className="mt-1 text-sm font-bold text-cyan-300">@{profile.account_name}</p>}
       <p className="mt-2 line-clamp-3 min-h-16 leading-7 text-slate-300">{profile.tagline || profile.overview || '事業説明は未入力です。'}</p>
@@ -2464,7 +2546,7 @@ function InvestorAccountCard({ profile }: { profile: InvestorProfile }) {
   return (
     <article className="glass rounded-[24px] p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-emerald-300 via-cyan-300 to-violet-400 font-black text-slate-950">{title.slice(0, 1)}</div>
+        <ProfileAvatar name={title} avatarUrl={profile.avatar_url} />
         <span className="pill"><CircleDollarSign size={13} /> 投資家</span>
       </div>
       <h3 className="mt-4 text-xl font-black">{title}</h3>
@@ -2495,6 +2577,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
   const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
   const [commentCount, setCommentCount] = useState(post.comment_count ?? 0);
   const [notice, setNotice] = useState('');
+  const [removed, setRemoved] = useState(false);
   const canComment = currentUser?.role !== 'investor' || Boolean(investor?.corporate_number || investor?.license_file_path);
   const isPrivatePost = post.post_type === 'private';
 
@@ -2532,6 +2615,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
       setNotice(toJapaneseError(error.message));
       return;
     }
+    setRemoved(true);
     setNotice('投稿を非公開にしました。');
     await refresh?.();
   }
@@ -2543,6 +2627,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
       setNotice(toJapaneseError(error.message));
       return;
     }
+    setRemoved(true);
     setNotice('投稿を削除しました。');
     await refresh?.();
   }
@@ -2564,6 +2649,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
     setCommentCount((current) => current + 1);
     setNotice('コメントしました。');
   }
+  if (removed) return null;
   return (
     <article className="glass rounded-[24px] p-5">
       <div className="flex items-start justify-between gap-3">
