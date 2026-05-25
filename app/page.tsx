@@ -180,6 +180,8 @@ export default function LeapApp() {
   const [investorProfiles, setInvestorProfiles] = useState<InvestorProfile[]>([]);
   const [comments, setComments] = useState<any[]>([]);
   const [follows, setFollows] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -276,18 +278,21 @@ export default function LeapApp() {
         setAllPosts([]);
         setKpis([]);
         setFollows([]);
+        setFollowing([]);
+        setFollowers([]);
         setMeetings([]);
         setMessages([]);
         return;
       }
       if (ownProfile) {
-        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
+        const [{ data: postRows }, { data: allPostRows }, { data: allProfiles }, { data: allInvestors }, { data: kpiRows }, { data: followerRows }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] = await Promise.all([
           supabase.from('progress_posts').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('progress_posts').select('*').or('is_hidden.is.null,is_hidden.eq.false').order('created_at', { ascending: false }).limit(500),
           supabase.from('entrepreneur_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('startup_kpis').select('*').eq('entrepreneur_id', ownProfile.id).order('kpi_month', { ascending: true }),
           supabase.from('follows').select('*').eq('entrepreneur_id', ownProfile.id),
+          supabase.from('follows').select('*').eq('investor_id', user.id),
           supabase.from('meeting_requests').select('*').eq('entrepreneur_id', ownProfile.id).order('created_at', { ascending: false }),
           supabase.from('messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: false }).limit(50),
           supabase.from('post_likes').select('post_id').limit(5000),
@@ -300,16 +305,19 @@ export default function LeapApp() {
         setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
         setAllPosts(decoratedAllPosts);
         setKpis((kpiRows as StartupKpi[]) ?? []);
-        setFollows(followRows ?? []);
+        setFollows(followerRows ?? []);
+        setFollowers(followerRows ?? []);
+        setFollowing(followingRows ?? []);
         setMeetings(meetingRows ?? []);
         setMessages(messageRows ?? []);
       }
     }
 
     if (user.role === 'investor') {
-      const [{ data: investorProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] =
+      const [{ data: investorProfile }, { data: ownEntrepreneurProfile }, { data: allProfiles }, { data: allInvestors }, { data: allPosts }, { data: followingRows }, { data: meetingRows }, { data: messageRows }, { data: likeRows }, { data: commentRows }] =
         await Promise.all([
           supabase.from('investor_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+          supabase.from('entrepreneur_profiles').select('id').eq('user_id', user.id).maybeSingle(),
           supabase.from('entrepreneur_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase.from('investor_profiles').select('*').order('created_at', { ascending: false }).limit(1000),
           supabase
@@ -330,11 +338,18 @@ export default function LeapApp() {
       const postsWithProfiles = attachPostProfiles(withPostReactionCounts((allPosts as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
       setPosts(postsWithProfiles);
       setAllPosts(postsWithProfiles);
-      setFollows(followRows ?? []);
+      setFollows(followingRows ?? []);
+      setFollowing(followingRows ?? []);
+      if (ownEntrepreneurProfile?.id) {
+        const { data: followerRows } = await supabase.from('follows').select('*').eq('entrepreneur_id', ownEntrepreneurProfile.id);
+        setFollowers(followerRows ?? []);
+      } else {
+        setFollowers([]);
+      }
       setMeetings(meetingRows ?? []);
       setMessages(messageRows ?? []);
-      if (followRows?.length) {
-        const entrepreneurIds = followRows.map((row: any) => row.entrepreneur_id);
+      if (followingRows?.length) {
+        const entrepreneurIds = followingRows.map((row: any) => row.entrepreneur_id);
         const { data: kpiRows } = await supabase.from('startup_kpis').select('*, entrepreneur_profiles(company_name, industry)').in('entrepreneur_id', entrepreneurIds).order('created_at', { ascending: false }).limit(12);
         setFollowedKpis(kpiRows ?? []);
       } else {
@@ -478,10 +493,10 @@ export default function LeapApp() {
         {toast && <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{toast}</div>}
 
         {view === 'home' && user.role === 'entrepreneur' && (
-          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} kpis={kpis} follows={follows} meetings={meetings} refresh={loadWorkspace} />
+          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'investor' && (
-          <InvestorHome currentUser={user} investor={investor} profiles={profiles} posts={posts} follows={follows} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
+          <InvestorHome currentUser={user} investor={investor} profiles={profiles} investorProfiles={investorProfiles} posts={posts} follows={follows} following={following} followers={followers} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
         {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} openProfile={openStartupProfile} refresh={loadWorkspace} />}
@@ -496,7 +511,7 @@ export default function LeapApp() {
           />
         )}
         {view === 'profile' && selectedProfile && (
-          <StartupProfile profile={selectedProfile} currentUser={user} refresh={loadWorkspace} />
+          <StartupProfile profile={selectedProfile} currentUser={user} followers={followers} following={following} profiles={profiles} investors={investorProfiles} setView={setView} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
         {view === 'messages' && <Messages currentUser={user} messages={messages} meetings={meetings} refresh={loadWorkspace} />}
@@ -894,7 +909,7 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
   );
 }
 
-function EntrepreneurHome({ currentUser, profile, posts, kpis, follows, meetings, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; kpis: StartupKpi[]; follows: any[]; meetings: any[]; refresh: () => Promise<void> }) {
+function EntrepreneurHome({ currentUser, profile, posts, kpis, following, followers, profiles, investors, meetings, openProfile, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   if (!profile) return <EmptyState title="プロフィールが未作成です" body="起業家プロフィールを作成すると、投資家が事業進捗を継続的に確認できます。" cta="オンボーディングを確認" />;
   const completeness = calcCompleteness(profile);
   return (
@@ -905,11 +920,13 @@ function EntrepreneurHome({ currentUser, profile, posts, kpis, follows, meetings
         <p className="mt-3 max-w-3xl leading-7 text-slate-300">投資家に評価される投稿は、実行内容、数値変化、課題、次の検証が揃っています。小さな進捗でも、継続して残すことで信頼の材料になります。</p>
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <Metric label="プロフィール完成度" value={`${completeness}%`} icon={CheckCircle2} />
-          <Metric label="フォロワー数" value={`${follows.length}`} icon={UsersRound} />
+          <Metric label="フォロー数" value={`${following.length}`} icon={Heart} />
+          <Metric label="フォロワー数" value={`${followers.length}`} icon={UsersRound} />
           <Metric label="面談リクエスト" value={`${meetings.length}`} icon={CalendarClock} />
           <Metric label="進捗投稿" value={`${posts.length}`} icon={FileText} />
         </div>
       </section>
+      <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
       <EntrepreneurMeetingManager profile={profile} meetings={meetings} refresh={refresh} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
@@ -926,7 +943,7 @@ function EntrepreneurHome({ currentUser, profile, posts, kpis, follows, meetings
   );
 }
 
-function InvestorHome({ currentUser, investor, profiles, posts, follows, followedKpis, meetings, messages, openProfile, setView, refresh }: { currentUser: AppUser; investor: InvestorProfile | null; profiles: EntrepreneurProfile[]; posts: ProgressPost[]; follows: any[]; followedKpis: any[]; meetings: any[]; messages: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (v: View) => void; refresh: () => Promise<void> }) {
+function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts, follows, following, followers, followedKpis, meetings, messages, openProfile, setView, refresh }: { currentUser: AppUser; investor: InvestorProfile | null; profiles: EntrepreneurProfile[]; investorProfiles: InvestorProfile[]; posts: ProgressPost[]; follows: any[]; following: any[]; followers: any[]; followedKpis: any[]; meetings: any[]; messages: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (v: View) => void; refresh: () => Promise<void> }) {
   const followedIds = new Set(follows.map((row) => row.entrepreneur_id));
   const followedPosts = posts.filter((post) => followedIds.has(post.entrepreneur_id));
   const recommendedPosts = posts.filter((post) => !followedIds.has(post.entrepreneur_id));
@@ -937,7 +954,8 @@ function InvestorHome({ currentUser, investor, profiles, posts, follows, followe
         <h2 className="mt-2 text-3xl font-black">有望な起業家は、投稿の継続性とKPIの変化で見つける。</h2>
         <p className="mt-3 max-w-3xl leading-7 text-slate-300">会社概要だけではなく、毎週の進捗、課題への向き合い方、数値の改善速度、投資家コメントへの返信を確認してください。</p>
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <Metric label="フォロー中" value={`${follows.length}`} icon={Heart} />
+          <Metric label="フォロー数" value={`${following.length}`} icon={Heart} />
+          <Metric label="フォロワー数" value={`${followers.length}`} icon={UsersRound} />
           <Metric label="新着進捗" value={`${posts.length}`} icon={TrendingUp} />
           <Metric label="面談状況" value={`${meetings.length}`} icon={CalendarClock} />
           <Metric label="未返信メッセージ" value={`${messages.filter((m) => !m.read_at).length}`} icon={Mail} />
@@ -945,6 +963,7 @@ function InvestorHome({ currentUser, investor, profiles, posts, follows, followe
         </div>
       </section>
       <InvestorDocumentPanel investor={investor} refresh={refresh} />
+      <FollowOverview following={following} followers={followers} profiles={profiles} investors={investorProfiles} openProfile={openProfile} />
       {follows.length === 0 && <EmptyState title="まだフォロー中の起業家はいません。興味のある起業家を探しましょう。" cta="起業家を探す" onClick={() => setView('search')} />}
       <section className="grid gap-3">
         <h3 className="text-xl font-black">フォロー中のKPI更新</h3>
@@ -1230,12 +1249,14 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
   );
 }
 
-function StartupProfile({ profile, currentUser, refresh }: { profile: EntrepreneurProfile; currentUser: AppUser; refresh: () => Promise<void> }) {
+function StartupProfile({ profile, currentUser, followers, following, profiles, investors, setView, openProfile, refresh }: { profile: EntrepreneurProfile; currentUser: AppUser; followers: any[]; following: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; setView: (view: View) => void; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   const [note, setNote] = useState('');
   const [meetingMessage, setMeetingMessage] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
   const [comment, setComment] = useState('');
   const [actionMessage, setActionMessage] = useState('');
+  const [profileFollowers, setProfileFollowers] = useState<any[]>(followers);
+  const [profileFollowing, setProfileFollowing] = useState<any[]>(following);
   const [investorGate, setInvestorGate] = useState<{ canContact: boolean; message: string }>({ canContact: currentUser.role !== 'investor', message: '' });
   const isOwnProfile = currentUser.id === profile.user_id;
 
@@ -1251,6 +1272,27 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
     }
     loadGate();
   }, [currentUser.id, currentUser.role]);
+
+  useEffect(() => {
+    setProfileFollowers(followers);
+    setProfileFollowing(following);
+  }, [followers, following, profile.id]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let cancelled = false;
+    Promise.all([
+      supabase.from('follows').select('*').eq('entrepreneur_id', profile.id),
+      supabase.from('follows').select('*').eq('investor_id', profile.user_id),
+    ]).then(([followerResult, followingResult]) => {
+      if (cancelled) return;
+      setProfileFollowers(followerResult.data ?? []);
+      setProfileFollowing(followingResult.data ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id, profile.user_id]);
 
   async function follow() {
     if (!supabase) return;
@@ -1301,6 +1343,8 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
     await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setComment('');
     setActionMessage('メッセージを送信しました。');
+    await refresh();
+    setView('messages');
   }
 
   async function quickMessage() {
@@ -1314,6 +1358,7 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
     await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setActionMessage('メッセージを送信しました。');
     await refresh();
+    setView('messages');
   }
 
   return (
@@ -1346,11 +1391,14 @@ function StartupProfile({ profile, currentUser, refresh }: { profile: Entreprene
           <Metric label="現在フェーズ" value={profile.current_phase ?? '未入力'} icon={Rocket} />
           <Metric label="調達希望額" value={yen(profile.fundraising_amount)} icon={CircleDollarSign} />
           <Metric label="累計投資金額" value={yen(profile.total_investment_amount)} icon={CircleDollarSign} />
+          <Metric label="フォロー数" value={`${profileFollowing.length}`} icon={Heart} />
+          <Metric label="フォロワー数" value={`${profileFollowers.length}`} icon={UsersRound} />
           <Metric label="業界" value={profile.industry ?? '未入力'} icon={Building2} />
           <Metric label="所在地" value={profile.location ?? '未入力'} icon={UserRound} />
           <Metric label="最終ログイン" value={formatLastLogin((profile as any).users?.last_login_at)} icon={UserRound} />
         </div>
       </section>
+      <FollowOverview following={profileFollowing} followers={profileFollowers} profiles={profiles} investors={investors} openProfile={openProfile} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
         <section className="glass rounded-[24px] p-5">
           <h3 className="text-xl font-black">事業概要</h3>
@@ -2145,6 +2193,58 @@ function Metric({ label, value, icon: Icon }: { label: string; value: string; ic
 
 function EmptyState({ title, body, cta, onClick }: { title: string; body?: string; cta?: string; onClick?: () => void }) {
   return <section className="glass rounded-[24px] p-6 text-center"><AlertTriangle className="mx-auto text-cyan-300" /><h3 className="mt-3 text-xl font-black">{title}</h3>{body && <p className="mx-auto mt-2 max-w-xl leading-7 text-slate-400">{body}</p>}{cta && <button className="btn-primary mt-5" onClick={onClick}>{cta}</button>}</section>;
+}
+
+function FollowOverview({ following, followers, profiles, investors, openProfile }: { following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; openProfile: (profile: EntrepreneurProfile) => void }) {
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const investorByUserId = new Map(investors.map((profile) => [profile.user_id, profile]));
+  return (
+    <section className="grid gap-4 lg:grid-cols-2">
+      <article className="glass rounded-[24px] p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xl font-black">フォロー先</h3>
+          <span className="pill"><Heart size={13} /> {following.length}</span>
+        </div>
+        {following.length === 0 ? (
+          <p className="mt-4 text-sm leading-6 text-slate-400">まだフォローしているアカウントはありません。</p>
+        ) : (
+          <div className="mt-4 grid gap-2">
+            {following.map((row) => {
+              const followedProfile = profileById.get(row.entrepreneur_id);
+              return (
+                <button key={`${row.entrepreneur_id}-${row.investor_id}`} type="button" className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-cyan-300/50" onClick={() => followedProfile && openProfile(followedProfile)}>
+                  <p className="font-bold">{followedProfile?.company_name ?? '起業家プロフィール'}</p>
+                  <p className="mt-1 text-xs text-cyan-300">{followedProfile?.account_name ? `@${followedProfile.account_name}` : 'プロフィールを確認'}</p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </article>
+      <article className="glass rounded-[24px] p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-xl font-black">フォロワー</h3>
+          <span className="pill"><UsersRound size={13} /> {followers.length}</span>
+        </div>
+        {followers.length === 0 ? (
+          <p className="mt-4 text-sm leading-6 text-slate-400">まだフォロワーはいません。</p>
+        ) : (
+          <div className="mt-4 grid gap-2">
+            {followers.map((row) => {
+              const follower = investorByUserId.get(row.investor_id);
+              const title = follower?.company_name || follower?.full_name || `ユーザー ${String(row.investor_id).slice(0, 8)}`;
+              return (
+                <div key={`${row.entrepreneur_id}-${row.investor_id}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <p className="font-bold">{title}</p>
+                  <p className="mt-1 text-xs text-cyan-300">{follower?.account_name ? `@${follower.account_name}` : '投資家アカウント'}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </article>
+    </section>
+  );
 }
 
 function StartupCard({ profile, onClick }: { profile: EntrepreneurProfile; onClick: () => void }) {
