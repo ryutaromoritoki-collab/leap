@@ -64,6 +64,7 @@ type View =
   | 'launch';
 
 type LegalSlug = 'terms' | 'privacy' | 'commerce' | 'disclaimer' | 'contact' | 'report';
+type DirectMessageTarget = { userId: string; name: string; accountName?: string | null };
 
 const supabase = getSupabaseClient();
 
@@ -176,6 +177,7 @@ export default function LeapApp() {
   const [allPosts, setAllPosts] = useState<ProgressPost[]>([]);
   const [kpis, setKpis] = useState<StartupKpi[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<EntrepreneurProfile | null>(null);
+  const [messageTarget, setMessageTarget] = useState<DirectMessageTarget | null>(null);
   const [profiles, setProfiles] = useState<EntrepreneurProfile[]>([]);
   const [investorProfiles, setInvestorProfiles] = useState<InvestorProfile[]>([]);
   const [comments, setComments] = useState<any[]>([]);
@@ -511,10 +513,10 @@ export default function LeapApp() {
           />
         )}
         {view === 'profile' && selectedProfile && (
-          <StartupProfile profile={selectedProfile} currentUser={user} followers={followers} following={following} profiles={profiles} investors={investorProfiles} setView={setView} openProfile={openStartupProfile} refresh={loadWorkspace} />
+          <StartupProfile profile={selectedProfile} currentUser={user} followers={followers} following={following} profiles={profiles} investors={investorProfiles} setView={setView} setMessageTarget={setMessageTarget} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
-        {view === 'messages' && <Messages currentUser={user} messages={messages} meetings={meetings} refresh={loadWorkspace} />}
+        {view === 'messages' && <Messages currentUser={user} messages={messages} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} refresh={loadWorkspace} />}
         {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
         {view === 'settings' && <SettingsPage currentUser={user} refresh={async () => { await loadUser(); await loadWorkspace(); }} />}
         {view === 'legal' && <LegalPage slug={legalSlug} currentUser={user} />}
@@ -1249,7 +1251,7 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
   );
 }
 
-function StartupProfile({ profile, currentUser, followers, following, profiles, investors, setView, openProfile, refresh }: { profile: EntrepreneurProfile; currentUser: AppUser; followers: any[]; following: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; setView: (view: View) => void; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
+function StartupProfile({ profile, currentUser, followers, following, profiles, investors, setView, setMessageTarget, openProfile, refresh }: { profile: EntrepreneurProfile; currentUser: AppUser; followers: any[]; following: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; setView: (view: View) => void; setMessageTarget: (target: DirectMessageTarget | null) => void; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   const [note, setNote] = useState('');
   const [meetingMessage, setMeetingMessage] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
@@ -1333,7 +1335,6 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       setActionMessage('自分のプロフィールにはメッセージを送信できません。');
       return;
     }
-    if (!investorGate.canContact) return;
     if (containsContactInfo(comment)) {
       await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body: comment, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
       setComment('連絡先交換につながる可能性がある内容は送信できません。');
@@ -1348,16 +1349,11 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   }
 
   async function quickMessage() {
-    if (!supabase || !investorGate.canContact) return;
     if (isOwnProfile) {
       setActionMessage('自分のプロフィールにはメッセージを送信できません。');
       return;
     }
-    const body = 'プロフィールを拝見しました。詳しくお話を伺いたいです。';
-    await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
-    setActionMessage('メッセージを送信しました。');
-    await refresh();
+    setMessageTarget({ userId: profile.user_id, name: profile.company_name, accountName: profile.account_name });
     setView('messages');
   }
 
@@ -1374,13 +1370,13 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
           {!isOwnProfile && (
             <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
               <button className="btn-primary" onClick={follow}><Heart size={17} /> フォロー</button>
-              <button className="btn-secondary" disabled={!investorGate.canContact} onClick={quickMessage}><Send size={17} /> メッセージ</button>
+              <button className="btn-secondary" onClick={quickMessage}><Send size={17} /> メッセージ</button>
               {currentUser.role === 'investor' && <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>}
             </div>
           )}
         </div>
         {actionMessage && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{actionMessage}</p>}
-        {!isOwnProfile && !investorGate.canContact && <p className="mt-4 rounded-2xl bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">{investorGate.message}</p>}
+        {!isOwnProfile && !investorGate.canContact && <p className="mt-4 rounded-2xl bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">通常メッセージは送信できます。コメント・面談希望は、法人番号または運転免許証の提出後に利用できます。</p>}
         <BadgeRow profile={profile} />
         {profile.is_hidden && (
           <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">
@@ -1418,7 +1414,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
             <label className="label mt-4">面談希望日時<input className="field" type="datetime-local" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} /></label>
             <button className="btn-primary mt-4 w-full" disabled={!investorGate.canContact} onClick={requestMeeting}><CalendarClock size={17} /> 面談希望を送る</button>
             <label className="label mt-4">メッセージ<textarea className="field min-h-24" value={comment} onChange={(e) => setComment(e.target.value)} /></label>
-            <button className="btn-secondary mt-4 w-full" disabled={!investorGate.canContact} onClick={sendMessage}><Send size={17} /> メッセージ送信</button>
+            <button className="btn-secondary mt-4 w-full" onClick={sendMessage}><Send size={17} /> メッセージ送信</button>
           </section>
         )}
       </div>
@@ -1954,11 +1950,57 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
   );
 }
 
-function Messages({ currentUser, messages, meetings, refresh }: { currentUser: AppUser; messages: any[]; meetings: any[]; refresh: () => Promise<void> }) {
+function Messages({ currentUser, messages, meetings, profiles, investors, target, refresh }: { currentUser: AppUser; messages: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; refresh: () => Promise<void> }) {
   const [supportBody, setSupportBody] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
+  const [selectedPartnerId, setSelectedPartnerId] = useState(target?.userId ?? '');
+  const [messageBody, setMessageBody] = useState('');
+  const [directMessage, setDirectMessage] = useState('');
+  const participantByUserId = useMemo(() => {
+    const map = new Map<string, DirectMessageTarget>();
+    profiles.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name, accountName: profile.account_name }));
+    investors.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name || profile.full_name || '投資家', accountName: profile.account_name }));
+    if (target) map.set(target.userId, target);
+    return map;
+  }, [profiles, investors, target]);
+  const partnerIds = useMemo(() => {
+    const ids = new Set<string>();
+    messages.forEach((message) => ids.add(message.sender_id === currentUser.id ? message.receiver_id : message.sender_id));
+    if (target) ids.add(target.userId);
+    return Array.from(ids);
+  }, [messages, currentUser.id, target]);
+  const selectedMessages = messages
+    .filter((message) => selectedPartnerId && (message.sender_id === selectedPartnerId || message.receiver_id === selectedPartnerId))
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  useEffect(() => {
+    if (target?.userId) {
+      setSelectedPartnerId(target.userId);
+      return;
+    }
+    if (!selectedPartnerId && partnerIds[0]) setSelectedPartnerId(partnerIds[0]);
+  }, [target?.userId, partnerIds, selectedPartnerId]);
+
   async function markRead(id: string) {
     await supabase!.from('messages').update({ read_at: new Date().toISOString() }).eq('id', id);
+    await refresh();
+  }
+  async function sendDirectMessage() {
+    if (!supabase || !selectedPartnerId || !messageBody.trim()) return;
+    const body = messageBody.trim();
+    if (containsContactInfo(body)) {
+      await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: selectedPartnerId, body, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
+      setDirectMessage('連絡先交換につながる可能性がある内容は送信できません。');
+      return;
+    }
+    const { error } = await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: selectedPartnerId, body });
+    if (error) {
+      setDirectMessage(toJapaneseError(error.message));
+      return;
+    }
+    await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
+    setMessageBody('');
+    setDirectMessage('メッセージを送信しました。');
     await refresh();
   }
   async function sendSupportMessage() {
@@ -1978,6 +2020,70 @@ function Messages({ currentUser, messages, meetings, refresh }: { currentUser: A
   }
   return (
     <section className="grid gap-3">
+      <article className="glass rounded-2xl p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-emerald-300">個別メッセージ</p>
+            <h3 className="mt-1 text-xl font-black">起業家・投資家と直接やりとり</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-400">通常のメッセージはここで送れます。面談希望や日程調整は下の面談用メッセージで管理します。</p>
+          </div>
+          <span className="pill"><Mail size={14} /> DM</span>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[240px_1fr]">
+          <div className="grid content-start gap-2">
+            {partnerIds.length === 0 ? (
+              <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-400">プロフィールのメッセージボタンから相手を選べます。</p>
+            ) : partnerIds.map((partnerId) => {
+              const partner = participantByUserId.get(partnerId);
+              const latest = messages.find((message) => message.sender_id === partnerId || message.receiver_id === partnerId);
+              return (
+                <button key={partnerId} type="button" className={`rounded-2xl border p-3 text-left transition ${selectedPartnerId === partnerId ? 'border-cyan-300/60 bg-cyan-300/10' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/40'}`} onClick={() => setSelectedPartnerId(partnerId)}>
+                  <p className="font-bold">{partner?.name ?? `ユーザー ${partnerId.slice(0, 8)}`}</p>
+                  <p className="mt-1 text-xs text-cyan-300">{partner?.accountName ? `@${partner.accountName}` : '個別メッセージ'}</p>
+                  {latest && <p className="mt-2 line-clamp-1 text-xs text-slate-500">{latest.body}</p>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            {!selectedPartnerId ? (
+              <EmptyState title="メッセージ相手を選択してください" body="相手プロフィールのメッセージボタンを押すと、ここで個別にやりとりできます。" />
+            ) : (
+              <div className="grid gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black">{participantByUserId.get(selectedPartnerId)?.name ?? 'メッセージ相手'}</p>
+                    <p className="text-xs text-slate-500">通常メッセージ</p>
+                  </div>
+                </div>
+                <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
+                  {selectedMessages.length === 0 ? (
+                    <p className="rounded-2xl bg-white/[0.04] p-3 text-sm text-slate-400">まだメッセージはありません。最初の一言を送れます。</p>
+                  ) : selectedMessages.map((message) => {
+                    const isMine = message.sender_id === currentUser.id;
+                    return (
+                      <div key={message.id} className={`grid gap-1 ${isMine ? 'justify-items-end' : 'justify-items-start'}`}>
+                        <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-6 ${isMine ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-slate-100'}`}>
+                          {message.body}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <span>{new Date(message.created_at).toLocaleString('ja-JP')}</span>
+                          {message.receiver_id === currentUser.id && !message.read_at && <button className="text-cyan-300" onClick={() => markRead(message.id)}>既読にする</button>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <textarea className="field min-h-20" value={messageBody} onChange={(e) => setMessageBody(e.target.value)} placeholder="メッセージを書く" />
+                  <button className="btn-primary self-stretch" onClick={sendDirectMessage}><Send size={17} /> 送信</button>
+                </div>
+                {directMessage && <p className="text-sm text-slate-300">{directMessage}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      </article>
       <article className="glass rounded-2xl p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -2009,12 +2115,6 @@ function Messages({ currentUser, messages, meetings, refresh }: { currentUser: A
           </article>
         ))}
       </section>
-      {messages.length === 0 ? <EmptyState title="メッセージはまだありません" body="フォローや面談リクエスト後の1対1チャットがここに表示されます。" /> : messages.map((m) => (
-        <article key={m.id} className="glass flex items-center justify-between gap-3 rounded-2xl p-4">
-          <div><p className="font-bold">{m.body}</p><span className="text-xs text-slate-500">{new Date(m.created_at).toLocaleString('ja-JP')}</span></div>
-          {m.receiver_id === currentUser.id && !m.read_at && <button className="btn-secondary" onClick={() => markRead(m.id)}>既読</button>}
-        </article>
-      ))}
     </section>
   );
 }
