@@ -384,7 +384,7 @@ create policy "entrepreneur public read" on public.entrepreneur_profiles for sel
 create policy "entrepreneur own insert" on public.entrepreneur_profiles for insert with check (user_id = auth.uid());
 create policy "entrepreneur own update" on public.entrepreneur_profiles for update using (user_id = auth.uid() or public.is_admin());
 
-create policy "investor own/admin read" on public.investor_profiles for select using (user_id = auth.uid() or public.is_admin());
+create policy "investor own/admin read" on public.investor_profiles for select using (true);
 create policy "investor own insert" on public.investor_profiles for insert with check (user_id = auth.uid());
 create policy "investor own update" on public.investor_profiles for update using (user_id = auth.uid() or public.is_admin());
 
