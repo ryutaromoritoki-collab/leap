@@ -14,6 +14,7 @@ import {
 import {
   AlertTriangle,
   BadgeCheck,
+  Ban,
   Bell,
   Bookmark,
   Building2,
@@ -51,7 +52,7 @@ import {
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabaseClient } from '@/lib/supabase';
-import type { AppUser, EntrepreneurProfile, InvestorProfile, ProgressPost, StartupKpi, UserRole } from '@/lib/types';
+import type { AppUser, EntrepreneurProfile, InvestorProfile, ProgressPost, StartupKpi, UserBlock, UserRole } from '@/lib/types';
 
 type View =
   | 'home'
@@ -310,20 +311,24 @@ export default function LeapApp() {
           supabase.from('post_likes').select('post_id').limit(5000),
           supabase.from('post_comments').select('post_id').limit(5000),
         ]);
-        const decoratedOwnPosts = attachPostProfiles(withPostReactionCounts((postRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
-        const decoratedHiddenPosts = attachPostProfiles(withPostReactionCounts((hiddenPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
-        const decoratedAllPosts = attachPostProfiles(withPostReactionCounts((allPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
+        const { data: blockRows } = await supabase.from('user_blocks').select('*').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+        const blockedIds = getBlockedUserIds((blockRows as UserBlock[]) ?? [], user.id);
+        const safeProfiles = filterProfilesByBlocks((allProfiles as EntrepreneurProfile[]) ?? [], blockedIds, user.id);
+        const safeInvestors = filterInvestorsByBlocks((allInvestors as InvestorProfile[]) ?? [], blockedIds, user.id);
+        const decoratedOwnPosts = attachPostProfiles(withPostReactionCounts((postRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), safeProfiles);
+        const decoratedHiddenPosts = attachPostProfiles(withPostReactionCounts((hiddenPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), safeProfiles);
+        const decoratedAllPosts = filterPostsByBlocks(attachPostProfiles(withPostReactionCounts((allPostRows as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), safeProfiles), blockedIds);
         setPosts(decoratedOwnPosts);
         setHiddenPosts(decoratedHiddenPosts);
-        setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
-        setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
+        setProfiles(safeProfiles);
+        setInvestorProfiles(safeInvestors);
         setAllPosts(decoratedAllPosts);
         setKpis((kpiRows as StartupKpi[]) ?? []);
         setFollows(followerRows ?? []);
         setFollowers(followerRows ?? []);
         setFollowing(followingRows ?? []);
-        setMeetings(meetingRows ?? []);
-        setMessages(messageRows ?? []);
+        setMeetings(filterMeetingsByBlocks(meetingRows ?? [], blockedIds, safeProfiles));
+        setMessages(filterMessagesByBlocks(messageRows ?? [], blockedIds));
         setSupportInquiries(supportRows ?? []);
       }
     }
@@ -348,10 +353,14 @@ export default function LeapApp() {
           supabase.from('post_likes').select('post_id').limit(5000),
           supabase.from('post_comments').select('post_id').limit(5000),
         ]);
+      const { data: blockRows } = await supabase.from('user_blocks').select('*').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      const blockedIds = getBlockedUserIds((blockRows as UserBlock[]) ?? [], user.id);
+      const safeProfiles = filterProfilesByBlocks((allProfiles as EntrepreneurProfile[]) ?? [], blockedIds, user.id);
+      const safeInvestors = filterInvestorsByBlocks((allInvestors as InvestorProfile[]) ?? [], blockedIds, user.id);
       setInvestor((investorProfile as InvestorProfile | null) ?? null);
-      setProfiles((allProfiles as EntrepreneurProfile[]) ?? []);
-      setInvestorProfiles((allInvestors as InvestorProfile[]) ?? []);
-      const postsWithProfiles = attachPostProfiles(withPostReactionCounts((allPosts as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), (allProfiles as EntrepreneurProfile[]) ?? []);
+      setProfiles(safeProfiles);
+      setInvestorProfiles(safeInvestors);
+      const postsWithProfiles = filterPostsByBlocks(attachPostProfiles(withPostReactionCounts((allPosts as ProgressPost[]) ?? [], likeRows ?? [], commentRows ?? []), safeProfiles), blockedIds);
       setPosts(postsWithProfiles);
       setAllPosts(postsWithProfiles);
       setFollows(followingRows ?? []);
@@ -362,8 +371,8 @@ export default function LeapApp() {
       } else {
         setFollowers([]);
       }
-      setMeetings(meetingRows ?? []);
-      setMessages(messageRows ?? []);
+      setMeetings(filterMeetingsByBlocks(meetingRows ?? [], blockedIds, safeProfiles));
+      setMessages(filterMessagesByBlocks(messageRows ?? [], blockedIds));
       setSupportInquiries(supportRows ?? []);
       if (followingRows?.length) {
         const entrepreneurIds = followingRows.map((row: any) => row.entrepreneur_id);
@@ -1215,6 +1224,10 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
     await supabase!.from('meeting_requests').update(patch).eq('id', id);
     await refresh();
   }
+  async function rejectMeeting(id: string) {
+    await supabase!.from('meeting_requests').delete().eq('id', id);
+    await refresh();
+  }
 
   async function reportMeeting(meeting: any) {
     if ((profile.meeting_ticket_balance ?? 0) <= 0) return;
@@ -1240,7 +1253,7 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
             {meeting.status === 'pending' && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'accepted_by_entrepreneur' })}>承認</button>
-                <button className="btn-secondary" onClick={() => updateMeeting(meeting.id, { status: 'rejected_by_entrepreneur' })}>非承認</button>
+                <button className="btn-secondary" onClick={() => rejectMeeting(meeting.id)}>非承認</button>
               </div>
             )}
             {meeting.status === 'accepted_by_entrepreneur' && (
@@ -1406,6 +1419,16 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   async function requestMeeting() {
     if (!supabase) return;
     if (!investorGate.canContact) return;
+    const { data: existing } = await supabase
+      .from('meeting_requests')
+      .select('id,status')
+      .eq('entrepreneur_id', profile.id)
+      .eq('investor_id', currentUser.id)
+      .in('status', ['pending', 'accepted_by_entrepreneur', 'candidate_sent', 'investor_rejected_candidate', 'mutual_agreed', 'reported_to_admin']);
+    if (existing?.length) {
+      setActionMessage('同じ相手への面談申込は、承認または非承認まで再送できません。');
+      return;
+    }
     await supabase.from('meeting_requests').insert({
       entrepreneur_id: profile.id,
       investor_id: currentUser.id,
@@ -1417,6 +1440,15 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
     setMeetingDate('');
     setActionMessage('面談申込をしました');
     await refresh();
+  }
+
+  async function blockProfileUser() {
+    if (!supabase || isOwnProfile) return;
+    await supabase.from('user_blocks').upsert({ blocker_id: currentUser.id, blocked_id: profile.user_id });
+    await supabase.from('follows').delete().eq('entrepreneur_id', profile.id).eq('investor_id', currentUser.id);
+    setActionMessage('このアカウントをブロックしました。相手のプロフィール、投稿、メッセージ、検索結果は表示されなくなります。');
+    await refresh();
+    setView('search');
   }
 
   async function sendMessage() {
@@ -1458,10 +1490,11 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
             <p className="mt-3 max-w-2xl leading-7 text-slate-300">{profile.tagline || '一言説明は未入力です。'}</p>
           </div>
           {!isOwnProfile && (
-            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
+            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-4">
               <button className={isFollowingProfile ? 'btn-secondary' : 'btn-primary'} onClick={follow}><Heart size={17} /> {isFollowingProfile ? 'フォロー解除' : 'フォロー'}</button>
               <button className="btn-secondary" onClick={quickMessage}><Send size={17} /> メッセージ</button>
               {currentUser.role === 'investor' && <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>}
+              <button className="btn-secondary" onClick={blockProfileUser}><Ban size={17} /> ブロック</button>
             </div>
           )}
         </div>
@@ -2005,6 +2038,13 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
       meeting_ticket_transfer_name: null,
     }, '面談チケット着金確認・専用画面から付与');
   }
+  async function approveMeetingDate(row: any) {
+    const entrepreneur = entrepreneurs.find((profile) => profile.id === row.entrepreneur_id);
+    if (entrepreneur) {
+      await supabase!.from('entrepreneur_profiles').update({ meeting_ticket_balance: Math.max(0, (entrepreneur.meeting_ticket_balance ?? 0) - 1) }).eq('id', entrepreneur.id);
+    }
+    await update('meeting_requests', row.id, { status: 'meeting_date_approved', confirmed_at: new Date().toISOString(), ticket_payment_status: 'used' }, '面談日程申請承認・チケット消費');
+  }
   const reports = adminData.reports ?? [];
   const entrepreneurs = adminData.entrepreneurs ?? [];
   const investors = adminData.investors ?? [];
@@ -2018,6 +2058,17 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
     entrepreneur: entrepreneurs.find((profile) => profile.user_id === row.id),
     investor: investors.find((profile) => profile.user_id === row.id),
   }));
+  const userById = new Map(users.map((row) => [row.id, row]));
+  const entrepreneurById = new Map(entrepreneurs.map((row) => [row.id, row]));
+  const investorByUserId = new Map(investors.map((row) => [row.user_id, row]));
+  function meetingAdminMeta(row: any) {
+    const entrepreneur = entrepreneurById.get(row.entrepreneur_id);
+    const investor = investorByUserId.get(row.investor_id);
+    const investorUser = userById.get(row.investor_id);
+    const investorName = investor?.account_name || investor?.company_name || investor?.full_name || investorUser?.email || row.investor_id;
+    const entrepreneurName = entrepreneur?.account_name || entrepreneur?.company_name || row.entrepreneur_id;
+    return { entrepreneur, investor, investorName, entrepreneurName };
+  }
   const messageRows = (adminData.allMessages ?? []).filter((row) => {
     if (!messageSearch.trim()) return true;
     const term = messageSearch.trim().toLowerCase();
@@ -2088,8 +2139,9 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
         </AdminRow>
       )} />
       <AdminTable title="面談日程申込申請" rows={meetingDatePending} render={(row) => (
-        <AdminRow key={row.id} title={row.message || '面談日程申請'} meta={`日時: ${row.final_meeting_at ? new Date(row.final_meeting_at).toLocaleString('ja-JP') : '未入力'} / 補足: ${row.meeting_admin_report ?? 'なし'}`}>
-          <button className="btn-primary" onClick={() => update('meeting_requests', row.id, { status: 'meeting_date_approved', confirmed_at: new Date().toISOString(), ticket_payment_status: 'used' }, '面談日程申請承認')}>承認</button>
+        <AdminRow key={row.id} title={`${meetingAdminMeta(row).investorName} → ${meetingAdminMeta(row).entrepreneurName}`} meta={`日時: ${row.final_meeting_at ? new Date(row.final_meeting_at).toLocaleString('ja-JP') : '未入力'} / 補足: ${row.meeting_admin_report ?? 'なし'}`}>
+          {meetingAdminMeta(row).entrepreneur && <button className="btn-secondary" onClick={() => openProfile(meetingAdminMeta(row).entrepreneur)}>起業家確認</button>}
+          <button className="btn-primary" onClick={() => approveMeetingDate(row)}>承認</button>
           <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { status: 'meeting_date_rejected' }, '面談日程申請非承認')}>非承認</button>
         </AdminRow>
       )} />
@@ -2135,7 +2187,8 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
         </AdminRow>
       )} />
       <AdminTable title="面談リクエスト・チケット確認" rows={adminData.meetings ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.message || '面談リクエスト'} meta={`状態: ${row.status} / チケット: ${row.ticket_plan ?? '1枚'} ${yen(row.ticket_amount)} / 入金: ${row.ticket_payment_status === 'paid' ? '確認済み' : '未確認'}`}>
+        <AdminRow key={row.id} title={`${meetingAdminMeta(row).investorName} から ${meetingAdminMeta(row).entrepreneurName} への面談申込`} meta={`状態: ${meetingStatusLabel(row.status)} / チケット: ${row.ticket_plan ?? '1枚'} ${yen(row.ticket_amount)} / 入金: ${row.ticket_payment_status === 'paid' ? '確認済み' : '未確認'}`}>
+          {meetingAdminMeta(row).entrepreneur && <button className="btn-secondary" onClick={() => openProfile(meetingAdminMeta(row).entrepreneur)}>起業家確認</button>}
           <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { status: 'confirmed', confirmed_at: new Date().toISOString() }, '面談日程確定')}>日程確定</button>
           <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { ticket_payment_status: 'paid' }, '面談チケット入金確認')}>チケット入金確認</button>
           <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { status: 'cancelled' }, '面談キャンセル')}>キャンセル</button>
@@ -2282,6 +2335,16 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       setMeetingNotice('面談申込できる相手を選択してください。');
       return;
     }
+    const { data: existing } = await supabase
+      .from('meeting_requests')
+      .select('id,status')
+      .eq('entrepreneur_id', entrepreneurId)
+      .eq('investor_id', investorId)
+      .in('status', ['pending', 'accepted_by_entrepreneur', 'candidate_sent', 'investor_rejected_candidate', 'mutual_agreed', 'reported_to_admin']);
+    if (existing?.length) {
+      setMeetingNotice('同じ相手への面談申込は、承認または非承認まで再送できません。');
+      return;
+    }
     const { error } = await supabase.from('meeting_requests').insert({
       entrepreneur_id: entrepreneurId,
       investor_id: investorId,
@@ -2301,6 +2364,13 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   async function updateMeeting(id: string, patch: Record<string, any>) {
     if (!supabase) return;
     await supabase.from('meeting_requests').update(patch).eq('id', id);
+    await refresh();
+  }
+  async function rejectMeeting(id: string) {
+    if (!supabase) return;
+    await supabase.from('meeting_requests').delete().eq('id', id);
+    setMeetingNotice('面談申込を非承認にして削除しました。');
+    setSelectedMeetingId('');
     await refresh();
   }
   async function updateMeetingMessage(meeting: any) {
@@ -2326,7 +2396,6 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       meeting_admin_report: adminReportById[meeting.id] || '面談日時が決まったため、運営へ申請しました。',
       ticket_payment_status: 'used',
     }).eq('id', meeting.id);
-    await supabase.from('entrepreneur_profiles').update({ meeting_ticket_balance: Math.max(0, (entrepreneurProfile.meeting_ticket_balance ?? 0) - 1) }).eq('id', entrepreneurProfile.id);
     await supabase.from('contact_inquiries').insert({
       user_id: currentUser.id,
       category: 'meeting_date_report',
@@ -2555,7 +2624,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
                 {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && selectedMeeting.status === 'pending' && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="btn-primary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'accepted_by_entrepreneur' })}>承認</button>
-                    <button className="btn-secondary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'rejected_by_entrepreneur' })}>非承認</button>
+                    <button className="btn-secondary" onClick={() => rejectMeeting(selectedMeeting.id)}>非承認</button>
                   </div>
                 )}
                 {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && (selectedMeeting.status === 'accepted_by_entrepreneur' || selectedMeeting.status === 'investor_rejected_candidate') && (
@@ -3092,6 +3161,39 @@ function attachPostProfiles(posts: ProgressPost[], profiles: EntrepreneurProfile
     ...post,
     entrepreneur_profiles: profileById.get(post.entrepreneur_id) ?? post.entrepreneur_profiles,
   }));
+}
+
+function getBlockedUserIds(blocks: UserBlock[], currentUserId: string) {
+  const ids = new Set<string>();
+  blocks.forEach((block) => {
+    if (block.blocker_id === currentUserId) ids.add(block.blocked_id);
+    if (block.blocked_id === currentUserId) ids.add(block.blocker_id);
+  });
+  return ids;
+}
+
+function filterProfilesByBlocks(profiles: EntrepreneurProfile[], blockedIds: Set<string>, currentUserId: string) {
+  return profiles.filter((profile) => profile.user_id === currentUserId || !blockedIds.has(profile.user_id));
+}
+
+function filterInvestorsByBlocks(investors: InvestorProfile[], blockedIds: Set<string>, currentUserId: string) {
+  return investors.filter((profile) => profile.user_id === currentUserId || !blockedIds.has(profile.user_id));
+}
+
+function filterPostsByBlocks(posts: ProgressPost[], blockedIds: Set<string>) {
+  return posts.filter((post) => !blockedIds.has(post.user_id) && !blockedIds.has(post.entrepreneur_profiles?.user_id ?? ''));
+}
+
+function filterMessagesByBlocks(messages: any[], blockedIds: Set<string>) {
+  return messages.filter((message) => !blockedIds.has(message.sender_id) && !blockedIds.has(message.receiver_id));
+}
+
+function filterMeetingsByBlocks(meetings: any[], blockedIds: Set<string>, profiles: EntrepreneurProfile[]) {
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  return meetings.filter((meeting) => {
+    const entrepreneur = profileById.get(meeting.entrepreneur_id);
+    return !blockedIds.has(meeting.investor_id) && !blockedIds.has(entrepreneur?.user_id ?? '');
+  });
 }
 
 function withPostReactionCounts(posts: ProgressPost[], likes: any[], comments: any[]) {
