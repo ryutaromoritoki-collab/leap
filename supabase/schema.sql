@@ -403,6 +403,7 @@ create policy "kpi owner update" on public.startup_kpis for update using (user_i
 create policy "posts readable" on public.progress_posts for select using (coalesce(is_hidden, false) = false or user_id = auth.uid() or public.is_admin());
 create policy "posts owner insert" on public.progress_posts for insert with check (user_id = auth.uid());
 create policy "posts owner/admin update" on public.progress_posts for update using (user_id = auth.uid() or public.is_admin());
+create policy "posts owner/admin delete" on public.progress_posts for delete using (user_id = auth.uid() or public.is_admin());
 
 create policy "comments readable" on public.post_comments for select using (coalesce(is_hidden, false) = false or user_id = auth.uid() or public.is_admin());
 create policy "comments logged insert" on public.post_comments for insert with check (user_id = auth.uid());
