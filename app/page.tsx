@@ -1219,13 +1219,17 @@ function HiddenPostsPanel({ posts, refresh }: { posts: ProgressPost[]; refresh: 
 function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: EntrepreneurProfile; meetings: any[]; refresh: () => Promise<void> }) {
   const [dateById, setDateById] = useState<Record<string, string>>({});
   const [messageById, setMessageById] = useState<Record<string, string>>({});
+  const [removedMeetingIds, setRemovedMeetingIds] = useState<string[]>([]);
+  const visibleMeetings = meetings.filter((meeting) => !removedMeetingIds.includes(meeting.id) && !['rejected_by_entrepreneur', 'cancelled'].includes(meeting.status));
 
   async function updateMeeting(id: string, patch: Record<string, any>) {
     await supabase!.from('meeting_requests').update(patch).eq('id', id);
     await refresh();
   }
   async function rejectMeeting(id: string) {
-    await supabase!.from('meeting_requests').delete().eq('id', id);
+    const { error } = await supabase!.from('meeting_requests').delete().eq('id', id);
+    if (error) await supabase!.from('meeting_requests').update({ status: 'rejected_by_entrepreneur' }).eq('id', id);
+    setRemovedMeetingIds((ids) => [...ids, id]);
     await refresh();
   }
 
@@ -1237,7 +1241,6 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
       meeting_admin_report: messageById[meeting.id] || '面談日時を運営へ報告しました。',
       ticket_payment_status: 'used',
     }).eq('id', meeting.id);
-    await supabase!.from('entrepreneur_profiles').update({ meeting_ticket_balance: Math.max(0, (profile.meeting_ticket_balance ?? 0) - 1) }).eq('id', profile.id);
     await refresh();
   }
 
@@ -1246,7 +1249,7 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
       <h3 className="text-xl font-black">面談希望・面談用メッセージ</h3>
       <p className="mt-2 text-sm leading-6 text-amber-100">面談申請前にLeap外で面談を実行したことが発覚した場合、双方強制退会となります。</p>
       <div className="mt-4 grid gap-3">
-        {meetings.length === 0 ? <p className="text-slate-400">面談希望はまだありません。</p> : meetings.map((meeting) => (
+        {visibleMeetings.length === 0 ? <p className="text-slate-400">面談希望はまだありません。</p> : visibleMeetings.map((meeting) => (
           <article key={meeting.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <p className="font-bold">{meeting.message || '面談希望が届いています'}</p>
             <p className="mt-1 text-xs text-slate-500">状態: {meeting.status} / 希望日時: {meeting.proposed_at ? new Date(meeting.proposed_at).toLocaleString('ja-JP') : '未指定'}</p>
@@ -1265,8 +1268,8 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
             {(meeting.status === 'candidate_sent' || meeting.status === 'mutual_agreed') && (
               <div className="mt-3 grid gap-3">
                 <textarea className="field min-h-24" value={messageById[meeting.id] ?? ''} onChange={(e) => setMessageById({ ...messageById, [meeting.id]: e.target.value })} placeholder="面談用メッセージ・運営への報告内容" />
-                <button className="btn-primary" disabled={(profile.meeting_ticket_balance ?? 0) <= 0} onClick={() => reportMeeting(meeting)}>
-                  面談チケット1枚を消費して運営へ面談日程を報告する
+                <button className="btn-primary" disabled={(profile.meeting_ticket_balance ?? 0) <= 0 || !dateById[meeting.id]} onClick={() => reportMeeting(meeting)}>
+                  面談日程申込申請
                 </button>
               </div>
             )}
@@ -2250,6 +2253,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const [candidateDateById, setCandidateDateById] = useState<Record<string, string>>({});
   const [finalDateById, setFinalDateById] = useState<Record<string, string>>({});
   const [adminReportById, setAdminReportById] = useState<Record<string, string>>({});
+  const [removedMeetingIds, setRemovedMeetingIds] = useState<string[]>([]);
   const participantByUserId = useMemo(() => {
     const map = new Map<string, DirectMessageTarget>();
     profiles.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name, accountName: profile.account_name, entrepreneurId: profile.id }));
@@ -2279,7 +2283,8 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const selectedSupportMessages = supportInquiries
     .filter((row) => (currentUser.role === 'admin' ? (row.user_id || row.email || 'anonymous') === currentSupportKey : row.user_id === currentUser.id))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  const selectedMeeting = meetings.find((meeting) => meeting.id === selectedMeetingId) ?? meetings[0];
+  const visibleMeetings = meetings.filter((meeting) => !removedMeetingIds.includes(meeting.id) && !['rejected_by_entrepreneur', 'cancelled'].includes(meeting.status));
+  const selectedMeeting = visibleMeetings.find((meeting) => meeting.id === selectedMeetingId) ?? visibleMeetings[0];
   const selectedMeetingPartner = selectedMeeting ? meetingPartner(selectedMeeting, currentUser, entrepreneurProfile, profiles, investors) : null;
   const selectedMeetingApproved = selectedMeeting?.status === 'meeting_date_approved';
   const contactExchangeAllowed = selectedPartnerId
@@ -2293,8 +2298,9 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     : false;
 
   useEffect(() => {
-    if (!selectedMeetingId && meetings[0]) setSelectedMeetingId(meetings[0].id);
-  }, [meetings, selectedMeetingId]);
+    if (!selectedMeetingId && visibleMeetings[0]) setSelectedMeetingId(visibleMeetings[0].id);
+    if (selectedMeetingId && !visibleMeetings.some((meeting) => meeting.id === selectedMeetingId)) setSelectedMeetingId(visibleMeetings[0]?.id ?? '');
+  }, [visibleMeetings, selectedMeetingId]);
 
   useEffect(() => {
     if (target?.userId) {
@@ -2368,9 +2374,11 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   }
   async function rejectMeeting(id: string) {
     if (!supabase) return;
-    await supabase.from('meeting_requests').delete().eq('id', id);
+    const { error } = await supabase.from('meeting_requests').delete().eq('id', id);
+    if (error) await supabase.from('meeting_requests').update({ status: 'rejected_by_entrepreneur' }).eq('id', id);
     setMeetingNotice('面談申込を非承認にして削除しました。');
-    setSelectedMeetingId('');
+    setRemovedMeetingIds((ids) => [...ids, id]);
+    setSelectedMeetingId(visibleMeetings.find((meeting) => meeting.id !== id)?.id ?? '');
     await refresh();
   }
   async function updateMeetingMessage(meeting: any) {
@@ -2574,12 +2582,12 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
             <span className="pill"><CalendarClock size={14} /> 保有チケット {entrepreneurProfile.meeting_ticket_balance ?? 0}枚</span>
           )}
         </div>
-        {meetings.length === 0 ? (
+        {visibleMeetings.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-400">面談申込が入ると、ここに相手ごとの面談メッセージが表示されます。</p>
         ) : (
           <div className="mt-4 grid gap-3 lg:grid-cols-[260px_1fr]">
             <div className="grid content-start gap-2">
-              {meetings.map((meeting) => {
+              {visibleMeetings.map((meeting) => {
                 const partner = meetingPartner(meeting, currentUser, entrepreneurProfile, profiles, investors);
                 return (
                   <button key={meeting.id} type="button" className={`rounded-2xl border p-3 text-left transition ${selectedMeeting?.id === meeting.id ? 'border-cyan-300/60 bg-cyan-300/10' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/40'}`} onClick={() => setSelectedMeetingId(meeting.id)}>
@@ -2639,12 +2647,12 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
                     <button className="btn-secondary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'investor_rejected_candidate' })}>同意しない</button>
                   </div>
                 )}
-                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && ['candidate_sent', 'mutual_agreed', 'meeting_date_rejected'].includes(selectedMeeting.status) && (
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && ['accepted_by_entrepreneur', 'candidate_sent', 'investor_rejected_candidate', 'mutual_agreed', 'meeting_date_rejected'].includes(selectedMeeting.status) && (
                   <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
                     <p className="text-sm leading-6 text-amber-100">面談申請前にLeap外で面談を実行したことが発覚した場合、双方強制退会となります。面談日時が決まったら、チケットを1枚消費して運営へ申請してください。</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                       <input className="field" type="datetime-local" value={finalDateById[selectedMeeting.id] ?? ''} onChange={(e) => setFinalDateById({ ...finalDateById, [selectedMeeting.id]: e.target.value })} />
-                      <button className="btn-primary" onClick={() => reportFinalMeeting(selectedMeeting)}>面談日程申請</button>
+                      <button className="btn-primary" disabled={!finalDateById[selectedMeeting.id]} onClick={() => reportFinalMeeting(selectedMeeting)}>面談日程申込申請</button>
                     </div>
                     <textarea className="field mt-2 min-h-20" value={adminReportById[selectedMeeting.id] ?? ''} onChange={(e) => setAdminReportById({ ...adminReportById, [selectedMeeting.id]: e.target.value })} placeholder="運営への補足（任意）" />
                   </div>
