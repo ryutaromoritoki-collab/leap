@@ -222,6 +222,14 @@ create table public.follows (
   primary key (entrepreneur_id, investor_id)
 );
 
+create table public.user_blocks (
+  blocker_id uuid not null references public.users(id) on delete cascade,
+  blocked_id uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_id),
+  check (blocker_id <> blocked_id)
+);
+
 create table public.watchlists (
   entrepreneur_id uuid not null references public.entrepreneur_profiles(id) on delete cascade,
   investor_id uuid not null references public.users(id) on delete cascade,
@@ -371,6 +379,7 @@ alter table public.post_comments enable row level security;
 alter table public.post_likes enable row level security;
 alter table public.post_views enable row level security;
 alter table public.follows enable row level security;
+alter table public.user_blocks enable row level security;
 alter table public.watchlists enable row level security;
 alter table public.messages enable row level security;
 alter table public.meeting_requests enable row level security;
@@ -423,6 +432,9 @@ create policy "views logged insert" on public.post_views for insert with check (
 create policy "follows readable" on public.follows for select using (true);
 create policy "follows investor insert" on public.follows for insert with check (investor_id = auth.uid());
 create policy "follows investor delete" on public.follows for delete using (investor_id = auth.uid());
+create policy "blocks own read" on public.user_blocks for select using (blocker_id = auth.uid() or blocked_id = auth.uid() or public.is_admin());
+create policy "blocks own insert" on public.user_blocks for insert with check (blocker_id = auth.uid());
+create policy "blocks own delete" on public.user_blocks for delete using (blocker_id = auth.uid() or public.is_admin());
 
 create policy "watchlists owner read" on public.watchlists for select using (investor_id = auth.uid() or public.is_admin());
 create policy "watchlists owner write" on public.watchlists for insert with check (investor_id = auth.uid());
@@ -440,6 +452,11 @@ create policy "meetings participants read" on public.meeting_requests for select
 );
 create policy "meetings investor insert" on public.meeting_requests for insert with check (investor_id = auth.uid());
 create policy "meetings participant update" on public.meeting_requests for update using (
+  investor_id = auth.uid()
+  or public.is_admin()
+  or exists(select 1 from public.entrepreneur_profiles p where p.id = entrepreneur_id and p.user_id = auth.uid())
+);
+create policy "meetings participant delete" on public.meeting_requests for delete using (
   investor_id = auth.uid()
   or public.is_admin()
   or exists(select 1 from public.entrepreneur_profiles p where p.id = entrepreneur_id and p.user_id = auth.uid())

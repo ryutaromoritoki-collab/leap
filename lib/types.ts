@@ -122,3 +122,9 @@ export type ProgressPost = {
   created_at: string;
   entrepreneur_profiles?: EntrepreneurProfile;
 };
+
+export type UserBlock = {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+};
