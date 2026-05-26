@@ -8,6 +8,8 @@ export type AppUser = {
   profile_completed: boolean;
   is_suspended: boolean;
   notification_email_enabled: boolean;
+  following_visible: boolean;
+  followers_visible: boolean;
   phone: string | null;
   last_login_at: string | null;
 };

@@ -258,6 +258,8 @@ export default function LeapApp() {
         role,
         phone: session.user.user_metadata?.phone ?? null,
         available_roles: [role],
+        following_visible: true,
+        followers_visible: true,
         last_login_at: new Date().toISOString(),
         profile_completed: false,
       })
@@ -514,7 +516,7 @@ export default function LeapApp() {
         {view === 'home' && user.role === 'investor' && (
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} investorProfiles={investorProfiles} posts={posts} follows={follows} following={following} followers={followers} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
-        {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
+        {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} openProfile={openStartupProfile} />}
         {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} openProfile={openStartupProfile} refresh={loadWorkspace} />}
         {view === 'search' && (
           <SearchPage
@@ -530,8 +532,8 @@ export default function LeapApp() {
           <StartupProfile profile={selectedProfile} currentUser={user} followers={followers} following={following} profiles={profiles} investors={investorProfiles} setView={setView} setMessageTarget={setMessageTarget} openProfile={openStartupProfile} refresh={loadWorkspace} />
         )}
         {view === 'kpi' && <KpiDashboard profile={profile ?? selectedProfile} kpis={kpis} />}
-        {view === 'messages' && <Messages currentUser={user} entrepreneurProfile={profile} messages={messages} supportInquiries={supportInquiries} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} setView={setView} refresh={loadWorkspace} />}
-        {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} />}
+        {view === 'messages' && <Messages currentUser={user} entrepreneurProfile={profile} messages={messages} supportInquiries={supportInquiries} meetings={meetings} profiles={profiles} investors={investorProfiles} target={messageTarget} setView={setView} openProfile={openStartupProfile} refresh={loadWorkspace} />}
+        {view === 'admin' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} openProfile={openStartupProfile} />}
         {view === 'settings' && <SettingsPage currentUser={user} refresh={async () => { await loadUser(); await loadWorkspace(); }} />}
         {view === 'legal' && <LegalPage slug={legalSlug} currentUser={user} />}
         {view === 'launch' && <LaunchChecklist />}
@@ -926,7 +928,7 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
 }
 
 function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, openProfile, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
-  if (!profile) return <EmptyState title="プロフィールが未作成です" body="起業家プロフィールを作成すると、投資家が事業進捗を継続的に確認できます。" cta="オンボーディングを確認" />;
+  if (!profile) return <Onboarding user={currentUser} onDone={refresh} />;
   const completeness = calcCompleteness(profile);
   const scrollToComposer = () => document.getElementById('quick-post-composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
@@ -944,7 +946,7 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
           <Metric label="進捗投稿" value={`${posts.length}`} icon={FileText} />
         </div>
       </section>
-      <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} />
+      <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} viewer={currentUser} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
       <EntrepreneurMeetingManager profile={profile} meetings={meetings} refresh={refresh} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
@@ -982,7 +984,7 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
         </div>
       </section>
       <InvestorDocumentPanel investor={investor} refresh={refresh} />
-      <FollowOverview following={following} followers={followers} profiles={profiles} investors={investorProfiles} openProfile={openProfile} />
+      <FollowOverview following={following} followers={followers} profiles={profiles} investors={investorProfiles} openProfile={openProfile} viewer={currentUser} />
       {follows.length === 0 && <EmptyState title="まだフォロー中の起業家はいません。興味のある起業家を探しましょう。" cta="起業家を探す" onClick={() => setView('search')} />}
       <section className="grid gap-3">
         <h3 className="text-xl font-black">フォロー中のKPI更新</h3>
@@ -1104,7 +1106,7 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
     await refresh();
   }
   return (
-    <section id="quick-post-composer" className="glass scroll-mt-24 rounded-[24px] p-5">
+    <section className="glass rounded-[24px] p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-emerald-300">面談チケット</p>
@@ -1152,6 +1154,8 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
 
 function HiddenPostsPanel({ posts, refresh }: { posts: ProgressPost[]; refresh: () => Promise<void> }) {
   const [notice, setNotice] = useState('');
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const visiblePosts = posts.filter((post) => !removedIds.includes(post.id));
   async function republish(post: ProgressPost) {
     if (!supabase) return;
     const { error } = await supabase.from('progress_posts').update({ is_hidden: false }).eq('id', post.id).eq('user_id', post.user_id);
@@ -1162,27 +1166,40 @@ function HiddenPostsPanel({ posts, refresh }: { posts: ProgressPost[]; refresh: 
     setNotice('投稿を再公開しました。');
     await refresh();
   }
+  async function deletePost(post: ProgressPost) {
+    if (!supabase) return;
+    if (!window.confirm('この非表示投稿を削除します。元に戻せません。よろしいですか？')) return;
+    const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', post.user_id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setRemovedIds((ids) => [...ids, post.id]);
+    setNotice('非表示投稿を削除しました。');
+    await refresh();
+  }
   return (
-    <section className="glass rounded-[24px] p-5">
+    <section id="quick-post-composer" className="glass scroll-mt-24 rounded-[24px] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-emerald-300">非表示投稿</p>
           <h3 className="mt-1 text-xl font-black">非表示にした投稿の保存先</h3>
           <p className="mt-2 text-sm leading-6 text-slate-400">非表示にした投稿はここに残ります。必要になったら再公開できます。</p>
         </div>
-        <span className="pill"><EyeOff size={14} /> {posts.length}件</span>
+        <span className="pill"><EyeOff size={14} /> {visiblePosts.length}件</span>
       </div>
       {notice && <p className="mt-3 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
       <div className="mt-4 grid gap-3">
-        {posts.length === 0 ? (
+        {visiblePosts.length === 0 ? (
           <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-400">非表示投稿はありません。</p>
-        ) : posts.map((post) => (
+        ) : visiblePosts.map((post) => (
           <article key={post.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <p className="text-xs text-slate-500">{new Date(post.created_at).toLocaleString('ja-JP')}</p>
             <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-200">{post.body || post.did_today || '本文はありません。'}</p>
-            <button type="button" className="btn-secondary mt-3 px-3 text-sm" onClick={() => republish(post)}>
-              <Eye size={15} /> 再公開する
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn-secondary px-3 text-sm" onClick={() => republish(post)}><Eye size={15} /> 再公開する</button>
+              <button type="button" className="btn-secondary px-3 text-sm" onClick={() => deletePost(post)}><Trash2 size={15} /> 削除</button>
+            </div>
           </article>
         ))}
       </div>
@@ -1327,7 +1344,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   const [profileFollowing, setProfileFollowing] = useState<any[]>(following);
   const [investorGate, setInvestorGate] = useState<{ canContact: boolean; message: string }>({ canContact: currentUser.role !== 'investor', message: '' });
   const isOwnProfile = currentUser.id === profile.user_id;
-  const isFollowingProfile = following.some((row) => row.entrepreneur_id === profile.id && row.investor_id === currentUser.id);
+  const isFollowingProfile = profileFollowers.some((row) => row.entrepreneur_id === profile.id && row.investor_id === currentUser.id);
 
   useEffect(() => {
     async function loadGate() {
@@ -1398,6 +1415,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
     await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'meeting_request', body: '面談リクエストが届きました。' });
     setMeetingMessage('');
     setMeetingDate('');
+    setActionMessage('面談申込をしました');
     await refresh();
   }
 
@@ -1957,10 +1975,22 @@ function TimelineDetail({ title, body }: { title: string; body?: string | null }
   );
 }
 
-function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; refresh: () => Promise<void> }) {
+function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<string, any[]>; refresh: () => Promise<void>; openProfile: (profile: EntrepreneurProfile) => void }) {
+  const [adminSection, setAdminSection] = useState<'dashboard' | 'members' | 'messages'>('dashboard');
+  const [messageSearch, setMessageSearch] = useState('');
   async function update(table: string, id: string, patch: Record<string, any>, action: string) {
     await supabase!.from(table).update(patch).eq('id', id);
     await supabase!.from('admin_actions').insert({ target_type: table, target_id: id, action });
+    await refresh();
+  }
+  async function resolveInquiry(row: any, status: 'hold' | 'done') {
+    if (status === 'done') {
+      await supabase!.from('contact_inquiries').delete().eq('id', row.id);
+      await supabase!.from('admin_actions').insert({ target_type: 'contact_inquiries', target_id: row.id, action: '問い合わせ対応済み' });
+    } else {
+      await update('contact_inquiries', row.id, { status: 'hold' }, '問い合わせ保留');
+      return;
+    }
     await refresh();
   }
   async function approveTicketPayment(row: EntrepreneurProfile) {
@@ -1979,7 +2009,61 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
   const entrepreneurs = adminData.entrepreneurs ?? [];
   const investors = adminData.investors ?? [];
   const ticketPaymentPending = entrepreneurs.filter((row) => row.meeting_ticket_payment_status === 'pending_review');
+  const meetingDatePending = (adminData.meetings ?? []).filter((row) => row.status === 'reported_to_admin');
+  const visibleInquiries = (adminData.inquiries ?? []).filter((row) => !['support_message', 'support_reply'].includes(row.category));
   const missingDocuments = investors.filter((row) => !row.corporate_number && !row.license_file_path);
+  const users = adminData.users ?? [];
+  const memberRows = users.map((row) => ({
+    ...row,
+    entrepreneur: entrepreneurs.find((profile) => profile.user_id === row.id),
+    investor: investors.find((profile) => profile.user_id === row.id),
+  }));
+  const messageRows = (adminData.allMessages ?? []).filter((row) => {
+    if (!messageSearch.trim()) return true;
+    const term = messageSearch.trim().toLowerCase();
+    const sender = memberRows.find((member) => member.id === row.sender_id);
+    const receiver = memberRows.find((member) => member.id === row.receiver_id);
+    return [sender?.email, sender?.entrepreneur?.account_name, sender?.investor?.account_name, sender?.entrepreneur?.company_name, sender?.investor?.company_name, receiver?.email, receiver?.entrepreneur?.account_name, receiver?.investor?.account_name, receiver?.entrepreneur?.company_name, receiver?.investor?.company_name, row.body]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(term));
+  });
+  if (adminSection === 'members') {
+    return (
+      <section className="grid gap-4">
+        <button className="btn-secondary w-fit" onClick={() => setAdminSection('dashboard')}>管理者画面へ戻る</button>
+        <AdminTable title="メンバー一覧" rows={memberRows} render={(row) => (
+          <AdminRow
+            key={row.id}
+            title={row.email ?? row.id}
+            meta={`起業家: ${row.entrepreneur?.company_name ?? 'なし'} / 投資家: ${row.investor?.company_name ?? row.investor?.full_name ?? 'なし'}`}
+          >
+            {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>起業家プロフィール</button>}
+            {row.investor && <span className="pill"><CircleDollarSign size={13} /> 投資家</span>}
+          </AdminRow>
+        )} />
+      </section>
+    );
+  }
+  if (adminSection === 'messages') {
+    return (
+      <section className="grid gap-4">
+        <button className="btn-secondary w-fit" onClick={() => setAdminSection('dashboard')}>管理者画面へ戻る</button>
+        <input className="field" value={messageSearch} onChange={(e) => setMessageSearch(e.target.value)} placeholder="アカウント名、会社名、メールアドレスで検索" />
+        <AdminTable title="ユーザーメッセージ一覧" rows={messageRows} render={(row) => {
+          const sender = memberRows.find((member) => member.id === row.sender_id);
+          const receiver = memberRows.find((member) => member.id === row.receiver_id);
+          const senderName = sender?.entrepreneur?.account_name || sender?.investor?.account_name || sender?.entrepreneur?.company_name || sender?.investor?.company_name || sender?.email || row.sender_id;
+          const receiverName = receiver?.entrepreneur?.account_name || receiver?.investor?.account_name || receiver?.entrepreneur?.company_name || receiver?.investor?.company_name || receiver?.email || row.receiver_id;
+          return (
+            <AdminRow key={row.id} title={row.body} meta={`${senderName} → ${receiverName} / ${new Date(row.created_at).toLocaleString('ja-JP')}`}>
+              {sender?.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(sender.entrepreneur)}>送信者プロフィール</button>}
+              {receiver?.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(receiver.entrepreneur)}>受信者プロフィール</button>}
+            </AdminRow>
+          );
+        }} />
+      </section>
+    );
+  }
   return (
     <div className="grid gap-5">
       <div className="grid gap-3 sm:grid-cols-4">
@@ -1988,6 +2072,10 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         <Metric label="投稿一覧" value={`${adminData.posts?.length ?? 0}`} icon={FileText} />
         <Metric label="運営相談" value={`${adminData.inquiries?.length ?? 0}`} icon={MessageCircle} />
         <Metric label="チケット申請" value={`${ticketPaymentPending.length}`} icon={CircleDollarSign} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-secondary" onClick={() => setAdminSection('members')}><UsersRound size={16} /> メンバー一覧を開く</button>
+        <button className="btn-secondary" onClick={() => setAdminSection('messages')}><Mail size={16} /> メッセージ確認を開く</button>
       </div>
       {reports.length === 0 && <EmptyState title="現在確認が必要な通報はありません。" />}
       <AdminTable title="面談チケット入金確認申請" rows={ticketPaymentPending} render={(row) => (
@@ -1999,21 +2087,18 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
           <button className="btn-primary" onClick={() => approveTicketPayment(row)}>入金確認してチケット付与</button>
         </AdminRow>
       )} />
-      <AdminTable title="運営相談・お問い合わせ" rows={adminData.inquiries ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.category ?? '問い合わせ'} meta={`${row.email ?? 'メール未登録'} / ${new Date(row.created_at).toLocaleString('ja-JP')} / ${row.body ?? ''}`}>
-          <span className="pill"><MessageCircle size={13} /> 未対応</span>
+      <AdminTable title="面談日程申込申請" rows={meetingDatePending} render={(row) => (
+        <AdminRow key={row.id} title={row.message || '面談日程申請'} meta={`日時: ${row.final_meeting_at ? new Date(row.final_meeting_at).toLocaleString('ja-JP') : '未入力'} / 補足: ${row.meeting_admin_report ?? 'なし'}`}>
+          <button className="btn-primary" onClick={() => update('meeting_requests', row.id, { status: 'meeting_date_approved', confirmed_at: new Date().toISOString(), ticket_payment_status: 'used' }, '面談日程申請承認')}>承認</button>
+          <button className="btn-secondary" onClick={() => update('meeting_requests', row.id, { status: 'meeting_date_rejected' }, '面談日程申請非承認')}>非承認</button>
         </AdminRow>
       )} />
-      <AdminTable title="メンバー一覧" rows={adminData.users ?? []} render={(row) => {
-        const hasEntrepreneur = entrepreneurs.some((p) => p.user_id === row.id);
-        const hasInvestor = investors.some((p) => p.user_id === row.id);
-        return (
-          <AdminRow key={row.id} title={row.email ?? row.id} meta={`電話番号: ${row.phone ?? '未登録'} / 最終ログイン: ${formatLastLogin(row.last_login_at)}`}>
-            {hasEntrepreneur && <span className="pill"><Rocket size={13} /> 起業家</span>}
-            {hasInvestor && <span className="pill"><CircleDollarSign size={13} /> 投資家</span>}
-          </AdminRow>
-        );
-      }} />
+      <AdminTable title="運営相談・お問い合わせ" rows={visibleInquiries} render={(row) => (
+        <AdminRow key={row.id} title={row.category ?? '問い合わせ'} meta={`${row.email ?? 'メール未登録'} / ${new Date(row.created_at).toLocaleString('ja-JP')} / ${row.body ?? ''}`}>
+          <button className="btn-secondary" onClick={() => resolveInquiry(row, 'hold')}>保留</button>
+          <button className="btn-primary" onClick={() => resolveInquiry(row, 'done')}>対応済</button>
+        </AdminRow>
+      )} />
       <AdminTable title="未対応ユーザー一覧" rows={[...ticketPaymentPending.map((row) => ({ ...row, kind: '起業家：面談チケット入金確認待ち' })), ...missingDocuments.map((row) => ({ ...row, kind: '投資家：法人番号または免許証未提出' }))]} render={(row) => (
         <AdminRow key={`${row.kind}-${row.id}`} title={row.company_name || row.full_name || row.user_id} meta={row.kind}>
           <span className="pill">確認待ち</span>
@@ -2038,11 +2123,12 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
           <span className="pill">送信ブロック済み</span>
         </AdminRow>
       )} />
-      <AdminTable title="ユーザーメッセージ確認" rows={adminData.allMessages ?? []} render={(row) => (
+      <AdminTable title="ユーザーメッセージ確認" rows={(adminData.allMessages ?? []).slice(0, 3)} render={(row) => (
         <AdminRow key={row.id} title={row.body} meta={`送信者: ${row.sender_id} / 受信者: ${row.receiver_id} / ${new Date(row.created_at).toLocaleString('ja-JP')}`}>
           <span className="pill">管理確認</span>
         </AdminRow>
       )} />
+      <button className="btn-secondary w-fit" onClick={() => setAdminSection('messages')}>もっと見る</button>
       <AdminTable title="投稿非表示" rows={adminData.posts ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.did_today} meta={new Date(row.created_at).toLocaleString('ja-JP')}>
           <button className="btn-secondary" onClick={() => update('progress_posts', row.id, { is_hidden: !row.is_hidden }, '投稿非表示')}>{row.is_hidden ? '再表示' : '非表示'}</button>
@@ -2059,7 +2145,45 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
   );
 }
 
-function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries, meetings, profiles, investors, target, setView, refresh }: { currentUser: AppUser; entrepreneurProfile: EntrepreneurProfile | null; messages: any[]; supportInquiries: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; setView: (view: View) => void; refresh: () => Promise<void> }) {
+function meetingPartner(meeting: any, currentUser: AppUser, entrepreneurProfile: EntrepreneurProfile | null, profiles: EntrepreneurProfile[], investors: InvestorProfile[]) {
+  const entrepreneur = profiles.find((profile) => profile.id === meeting.entrepreneur_id) ?? (entrepreneurProfile?.id === meeting.entrepreneur_id ? entrepreneurProfile : null);
+  const investor = investors.find((profile) => profile.user_id === meeting.investor_id) ?? null;
+  if (currentUser.role === 'entrepreneur') {
+    return {
+      userId: meeting.investor_id as string,
+      name: investor?.company_name || investor?.full_name || '投資家',
+      accountName: investor?.account_name || '',
+      investor,
+      entrepreneur,
+    };
+  }
+  return {
+    userId: entrepreneur?.user_id || '',
+    name: entrepreneur?.company_name || '起業家',
+    accountName: entrepreneur?.account_name || '',
+    investor,
+    entrepreneur,
+  };
+}
+
+function meetingStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    pending: '承認待ち',
+    accepted_by_entrepreneur: '日程候補待ち',
+    rejected_by_entrepreneur: '非承認',
+    candidate_sent: '候補日時確認中',
+    investor_rejected_candidate: '再調整中',
+    mutual_agreed: '双方同意済み',
+    reported_to_admin: '運営確認中',
+    meeting_date_approved: '面談承認済み',
+    meeting_date_rejected: '非承認',
+    confirmed: '確定',
+    cancelled: 'キャンセル',
+  };
+  return labels[status ?? ''] ?? '確認中';
+}
+
+function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries, meetings, profiles, investors, target, setView, openProfile, refresh }: { currentUser: AppUser; entrepreneurProfile: EntrepreneurProfile | null; messages: any[]; supportInquiries: any[]; meetings: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; target: DirectMessageTarget | null; setView: (view: View) => void; openProfile: (profile: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
   const [supportBody, setSupportBody] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
   const [selectedSupportKey, setSelectedSupportKey] = useState('');
@@ -2067,6 +2191,8 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const [messageBody, setMessageBody] = useState('');
   const [directMessage, setDirectMessage] = useState('');
   const [meetingNotice, setMeetingNotice] = useState('');
+  const [meetingToast, setMeetingToast] = useState('');
+  const [selectedMeetingId, setSelectedMeetingId] = useState('');
   const [meetingMessageById, setMeetingMessageById] = useState<Record<string, string>>({});
   const [candidateDateById, setCandidateDateById] = useState<Record<string, string>>({});
   const [finalDateById, setFinalDateById] = useState<Record<string, string>>({});
@@ -2100,6 +2226,22 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const selectedSupportMessages = supportInquiries
     .filter((row) => (currentUser.role === 'admin' ? (row.user_id || row.email || 'anonymous') === currentSupportKey : row.user_id === currentUser.id))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const selectedMeeting = meetings.find((meeting) => meeting.id === selectedMeetingId) ?? meetings[0];
+  const selectedMeetingPartner = selectedMeeting ? meetingPartner(selectedMeeting, currentUser, entrepreneurProfile, profiles, investors) : null;
+  const selectedMeetingApproved = selectedMeeting?.status === 'meeting_date_approved';
+  const contactExchangeAllowed = selectedPartnerId
+    ? meetings.some((meeting) => {
+      const partnerEntrepreneur = profiles.find((profile) => profile.user_id === selectedPartnerId);
+      return meeting.status === 'meeting_date_approved' && (
+        (currentUser.role === 'entrepreneur' && entrepreneurProfile?.id === meeting.entrepreneur_id && meeting.investor_id === selectedPartnerId)
+        || (currentUser.role === 'investor' && meeting.investor_id === currentUser.id && partnerEntrepreneur?.id === meeting.entrepreneur_id)
+      );
+    })
+    : false;
+
+  useEffect(() => {
+    if (!selectedMeetingId && meetings[0]) setSelectedMeetingId(meetings[0].id);
+  }, [meetings, selectedMeetingId]);
 
   useEffect(() => {
     if (target?.userId) {
@@ -2116,7 +2258,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   async function sendDirectMessage() {
     if (!supabase || !selectedPartnerId || !messageBody.trim()) return;
     const body = messageBody.trim();
-    if (containsContactInfo(body)) {
+    if (!contactExchangeAllowed && containsContactInfo(body)) {
       await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: selectedPartnerId, body, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
       setDirectMessage('連絡先交換につながる可能性がある内容は送信できません。');
       return;
@@ -2151,7 +2293,9 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       return;
     }
     await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'meeting_request', body: '面談申込が届きました。' });
-    setMeetingNotice('面談申込を作成しました。下の面談用メッセージで日程調整できます。');
+    setMeetingNotice('面談申込をしました。下の面談用メッセージで日程調整できます。');
+    setMeetingToast('面談申込をしました');
+    setTimeout(() => setMeetingToast(''), 2200);
     await refresh();
   }
   async function updateMeeting(id: string, patch: Record<string, any>) {
@@ -2162,6 +2306,10 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   async function updateMeetingMessage(meeting: any) {
     const body = meetingMessageById[meeting.id]?.trim();
     if (!body) return;
+    if (meeting.status !== 'meeting_date_approved' && containsContactInfo(body)) {
+      setMeetingNotice('面談承認前は連絡先交換につながる内容を送信できません。');
+      return;
+    }
     await updateMeeting(meeting.id, { message: body });
     setMeetingMessageById({ ...meetingMessageById, [meeting.id]: '' });
   }
@@ -2203,8 +2351,25 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     setSupportMessage(currentUser.role === 'admin' ? 'ユーザーへ返信を保存しました。' : '運営サポートへメッセージを送信しました。');
     await refresh();
   }
+  async function resolveSupportThread(status: 'hold' | 'done') {
+    if (!supabase || currentUser.role !== 'admin' || selectedSupportMessages.length === 0) return;
+    const ids = selectedSupportMessages.map((row) => row.id);
+    if (status === 'done') {
+      await supabase.from('contact_inquiries').delete().in('id', ids);
+      setSupportMessage('対応済みにしました。');
+    } else {
+      await supabase.from('contact_inquiries').update({ status: 'hold' }).in('id', ids);
+      setSupportMessage('保留にしました。');
+    }
+    await refresh();
+  }
   return (
     <section className="grid gap-3">
+      {meetingToast && (
+        <div className="fixed left-1/2 top-4 z-50 w-[calc(100vw-32px)] max-w-sm -translate-x-1/2 rounded-2xl border border-emerald-300/40 bg-slate-950/95 px-5 py-4 text-center text-base font-black text-emerald-100 shadow-2xl shadow-cyan-500/20">
+          {meetingToast}
+        </div>
+      )}
       <article className="glass rounded-2xl p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -2285,6 +2450,12 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
           </div>
           <span className="pill"><ShieldCheck size={14} /> 常に表示</span>
         </div>
+        {currentUser.role === 'admin' && currentSupportKey && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => resolveSupportThread('hold')}>保留</button>
+            <button className="btn-primary" onClick={() => resolveSupportThread('done')}>対応済</button>
+          </div>
+        )}
         <div className="mt-4 grid gap-3 lg:grid-cols-[240px_1fr]">
           <div className="grid content-start gap-2">
             {currentUser.role === 'admin' ? (
@@ -2324,57 +2495,97 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
         </div>
         {supportMessage && <p className="mt-3 text-sm text-slate-300">{supportMessage}</p>}
       </article>
-      <section className="grid gap-3">
+      <article className="glass rounded-2xl p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-xl font-black">面談用メッセージ</h3>
+          <div>
+            <p className="text-sm font-bold text-emerald-300">面談用メッセージ</p>
+            <h3 className="mt-1 text-xl font-black">面談の承認・日程調整</h3>
+          </div>
           {currentUser.role === 'entrepreneur' && entrepreneurProfile && (
             <span className="pill"><CalendarClock size={14} /> 保有チケット {entrepreneurProfile.meeting_ticket_balance ?? 0}枚</span>
           )}
         </div>
-        {meetings.length === 0 ? <p className="text-sm text-slate-400">双方同意後の面談用メッセージはここに表示されます。</p> : meetings.map((meeting) => {
-            const isEntrepreneurSide = entrepreneurProfile?.id === meeting.entrepreneur_id;
-            const isInvestorSide = currentUser.id === meeting.investor_id;
-            return (
-              <article key={meeting.id} className="glass rounded-2xl p-4">
-                <p className="font-bold">{meeting.message || '面談リクエスト'}</p>
-                <p className="mt-1 text-xs text-slate-500">状態: {meeting.status} / 候補: {meeting.proposed_at ? new Date(meeting.proposed_at).toLocaleString('ja-JP') : '未設定'}</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <textarea className="field min-h-20" value={meetingMessageById[meeting.id] ?? ''} onChange={(e) => setMeetingMessageById({ ...meetingMessageById, [meeting.id]: e.target.value })} placeholder="面談用メッセージを書く" />
-                  <button className="btn-secondary self-stretch" onClick={() => updateMeetingMessage(meeting)}>送信</button>
+        {meetings.length === 0 ? (
+          <p className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-400">面談申込が入ると、ここに相手ごとの面談メッセージが表示されます。</p>
+        ) : (
+          <div className="mt-4 grid gap-3 lg:grid-cols-[260px_1fr]">
+            <div className="grid content-start gap-2">
+              {meetings.map((meeting) => {
+                const partner = meetingPartner(meeting, currentUser, entrepreneurProfile, profiles, investors);
+                return (
+                  <button key={meeting.id} type="button" className={`rounded-2xl border p-3 text-left transition ${selectedMeeting?.id === meeting.id ? 'border-cyan-300/60 bg-cyan-300/10' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/40'}`} onClick={() => setSelectedMeetingId(meeting.id)}>
+                    <p className="font-bold">{partner.name}</p>
+                    <p className="mt-1 text-xs text-cyan-300">{partner.accountName ? `@${partner.accountName}` : '面談相手'}</p>
+                    <p className="mt-2 text-xs text-slate-500">{meetingStatusLabel(meeting.status)}</p>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedMeeting && selectedMeetingPartner && (
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black">{selectedMeetingPartner.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">状態: {meetingStatusLabel(selectedMeeting.status)} / 候補: {selectedMeeting.proposed_at ? new Date(selectedMeeting.proposed_at).toLocaleString('ja-JP') : '未設定'}</p>
+                  </div>
+                  {selectedMeetingPartner.entrepreneur && <button className="btn-secondary px-3 text-sm" onClick={() => openProfile(selectedMeetingPartner.entrepreneur!)}>相手のプロフィール</button>}
                 </div>
-                {isEntrepreneurSide && meeting.status === 'pending' && (
+                {selectedMeeting.status === 'pending' && currentUser.role === 'entrepreneur' && (
+                  <p className="mt-3 rounded-2xl bg-cyan-300/10 p-3 text-sm text-cyan-100">{selectedMeetingPartner.name} から面談申込が届いています。</p>
+                )}
+                {selectedMeetingApproved && (
+                  <p className="mt-3 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 p-3 text-sm font-bold text-emerald-100">面談承認済みです。以降、この相手とは連絡先交換ができます。</p>
+                )}
+                <div className="mt-4 grid max-h-[320px] gap-2 overflow-y-auto pr-1">
+                  <div className="grid justify-items-start gap-1">
+                    <div className="max-w-[85%] rounded-2xl bg-white/10 p-3 text-sm leading-6 text-slate-100">{selectedMeeting.message || '面談申込がありました。'}</div>
+                    <span className="text-[11px] text-slate-500">{new Date(selectedMeeting.created_at).toLocaleString('ja-JP')}</span>
+                  </div>
+                  {selectedMeeting.meeting_admin_report && (
+                    <div className="grid justify-items-end gap-1">
+                      <div className="max-w-[85%] rounded-2xl bg-cyan-300 p-3 text-sm leading-6 text-slate-950">{selectedMeeting.meeting_admin_report}</div>
+                      <span className="text-[11px] text-slate-500">運営への面談日程申請</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <textarea className="field min-h-20" value={meetingMessageById[selectedMeeting.id] ?? ''} onChange={(e) => setMeetingMessageById({ ...meetingMessageById, [selectedMeeting.id]: e.target.value })} placeholder="面談用メッセージを書く" />
+                  <button className="btn-secondary self-stretch" onClick={() => updateMeetingMessage(selectedMeeting)}>送信</button>
+                </div>
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && selectedMeeting.status === 'pending' && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'accepted_by_entrepreneur' })}>承認</button>
-                    <button className="btn-secondary" onClick={() => updateMeeting(meeting.id, { status: 'rejected_by_entrepreneur' })}>非承認</button>
+                    <button className="btn-primary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'accepted_by_entrepreneur' })}>承認</button>
+                    <button className="btn-secondary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'rejected_by_entrepreneur' })}>非承認</button>
                   </div>
                 )}
-                {isEntrepreneurSide && (meeting.status === 'accepted_by_entrepreneur' || meeting.status === 'investor_rejected_candidate') && (
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && (selectedMeeting.status === 'accepted_by_entrepreneur' || selectedMeeting.status === 'investor_rejected_candidate') && (
                   <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                    <input className="field" type="datetime-local" value={candidateDateById[meeting.id] ?? ''} onChange={(e) => setCandidateDateById({ ...candidateDateById, [meeting.id]: e.target.value })} />
-                    <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'candidate_sent', proposed_at: candidateDateById[meeting.id] || null })}>候補日時を送る</button>
+                    <input className="field" type="datetime-local" value={candidateDateById[selectedMeeting.id] ?? ''} onChange={(e) => setCandidateDateById({ ...candidateDateById, [selectedMeeting.id]: e.target.value })} />
+                    <button className="btn-primary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'candidate_sent', proposed_at: candidateDateById[selectedMeeting.id] || null })}>候補日時を送る</button>
                   </div>
                 )}
-                {isInvestorSide && meeting.status === 'candidate_sent' && (
+                {currentUser.id === selectedMeeting.investor_id && selectedMeeting.status === 'candidate_sent' && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="btn-primary" onClick={() => updateMeeting(meeting.id, { status: 'mutual_agreed' })}>この日程に同意</button>
-                    <button className="btn-secondary" onClick={() => updateMeeting(meeting.id, { status: 'investor_rejected_candidate' })}>同意しない</button>
+                    <button className="btn-primary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'mutual_agreed' })}>この日程に同意</button>
+                    <button className="btn-secondary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'investor_rejected_candidate' })}>同意しない</button>
                   </div>
                 )}
-                {isEntrepreneurSide && (meeting.status === 'candidate_sent' || meeting.status === 'mutual_agreed') && (
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && ['candidate_sent', 'mutual_agreed', 'meeting_date_rejected'].includes(selectedMeeting.status) && (
                   <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
                     <p className="text-sm leading-6 text-amber-100">面談申請前にLeap外で面談を実行したことが発覚した場合、双方強制退会となります。面談日時が決まったら、チケットを1枚消費して運営へ申請してください。</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                      <input className="field" type="datetime-local" value={finalDateById[meeting.id] ?? ''} onChange={(e) => setFinalDateById({ ...finalDateById, [meeting.id]: e.target.value })} />
-                      <button className="btn-primary" onClick={() => reportFinalMeeting(meeting)}>面談日時を運営へ申請</button>
+                      <input className="field" type="datetime-local" value={finalDateById[selectedMeeting.id] ?? ''} onChange={(e) => setFinalDateById({ ...finalDateById, [selectedMeeting.id]: e.target.value })} />
+                      <button className="btn-primary" onClick={() => reportFinalMeeting(selectedMeeting)}>面談日程申請</button>
                     </div>
-                    <textarea className="field mt-2 min-h-20" value={adminReportById[meeting.id] ?? ''} onChange={(e) => setAdminReportById({ ...adminReportById, [meeting.id]: e.target.value })} placeholder="運営への補足（任意）" />
+                    <textarea className="field mt-2 min-h-20" value={adminReportById[selectedMeeting.id] ?? ''} onChange={(e) => setAdminReportById({ ...adminReportById, [selectedMeeting.id]: e.target.value })} placeholder="運営への補足（任意）" />
                   </div>
                 )}
-                {meeting.status === 'reported_to_admin' && <p className="mt-3 rounded-2xl bg-emerald-300/10 p-3 text-sm text-emerald-100">運営へ面談日時を申請済みです。</p>}
-              </article>
-            );
-          })}
-      </section>
+                {selectedMeeting.status === 'reported_to_admin' && <p className="mt-3 rounded-2xl bg-emerald-300/10 p-3 text-sm text-emerald-100">運営へ面談日程申請済みです。</p>}
+              </div>
+            )}
+          </div>
+        )}
+      </article>
     </section>
   );
 }
@@ -2582,17 +2793,36 @@ function ProfileAvatar({ name, avatarUrl, size = 'md' }: { name: string; avatarU
   return <div className={`grid ${sizeClass} place-items-center bg-gradient-to-br from-cyan-300 via-violet-400 to-emerald-300 font-black text-slate-950`}>{name.slice(0, 1)}</div>;
 }
 
-function FollowOverview({ following, followers, profiles, investors, openProfile }: { following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; openProfile: (profile: EntrepreneurProfile) => void }) {
+function FollowOverview({ following, followers, profiles, investors, openProfile, viewer }: { following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; openProfile: (profile: EntrepreneurProfile) => void; viewer?: AppUser }) {
+  const [followingVisible, setFollowingVisible] = useState(viewer?.following_visible !== false);
+  const [followersVisible, setFollowersVisible] = useState(viewer?.followers_visible !== false);
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const investorByUserId = new Map(investors.map((profile) => [profile.user_id, profile]));
+  async function toggleVisibility(kind: 'following' | 'followers') {
+    if (!supabase || !viewer) return;
+    const next = kind === 'following' ? !followingVisible : !followersVisible;
+    const column = kind === 'following' ? 'following_visible' : 'followers_visible';
+    if (kind === 'following') setFollowingVisible(next);
+    if (kind === 'followers') setFollowersVisible(next);
+    const { error } = await supabase.from('users').update({ [column]: next }).eq('id', viewer.id);
+    if (error) {
+      if (kind === 'following') setFollowingVisible(!next);
+      if (kind === 'followers') setFollowersVisible(!next);
+    }
+  }
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <article className="glass rounded-[24px] p-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-black">フォロー先</h3>
-          <span className="pill"><Heart size={13} /> {following.length}</span>
+          <div className="flex flex-wrap gap-2">
+            <span className="pill"><Heart size={13} /> {following.length}</span>
+            {viewer && <button type="button" className="pill" onClick={() => toggleVisibility('following')}>{followingVisible ? '公開中' : '非表示'}</button>}
+          </div>
         </div>
-        {following.length === 0 ? (
+        {!followingVisible ? (
+          <p className="mt-4 text-sm leading-6 text-slate-400">フォロー先は非表示です。</p>
+        ) : following.length === 0 ? (
           <p className="mt-4 text-sm leading-6 text-slate-400">まだフォローしているアカウントはありません。</p>
         ) : (
           <div className="mt-4 grid gap-2">
@@ -2611,9 +2841,14 @@ function FollowOverview({ following, followers, profiles, investors, openProfile
       <article className="glass rounded-[24px] p-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-xl font-black">フォロワー</h3>
-          <span className="pill"><UsersRound size={13} /> {followers.length}</span>
+          <div className="flex flex-wrap gap-2">
+            <span className="pill"><UsersRound size={13} /> {followers.length}</span>
+            {viewer && <button type="button" className="pill" onClick={() => toggleVisibility('followers')}>{followersVisible ? '公開中' : '非表示'}</button>}
+          </div>
         </div>
-        {followers.length === 0 ? (
+        {!followersVisible ? (
+          <p className="mt-4 text-sm leading-6 text-slate-400">フォロワーは非表示です。</p>
+        ) : followers.length === 0 ? (
           <p className="mt-4 text-sm leading-6 text-slate-400">まだフォロワーはいません。</p>
         ) : (
           <div className="mt-4 grid gap-2">

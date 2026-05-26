@@ -15,6 +15,8 @@ create table public.users (
   profile_completed boolean not null default false,
   is_suspended boolean not null default false,
   notification_email_enabled boolean not null default true,
+  following_visible boolean not null default true,
+  followers_visible boolean not null default true,
   last_login_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -24,6 +26,8 @@ alter table public.users
   add column if not exists available_roles public.user_role[] not null default '{}',
   add column if not exists phone text,
   add column if not exists notification_email_enabled boolean not null default true,
+  add column if not exists following_visible boolean not null default true,
+  add column if not exists followers_visible boolean not null default true,
   add column if not exists last_login_at timestamptz;
 
 create table public.entrepreneur_profiles (
@@ -458,6 +462,7 @@ create policy "email queue admin update" on public.email_notification_queue for 
 create policy "contact insert" on public.contact_inquiries for insert with check (true);
 create policy "contact admin read" on public.contact_inquiries for select using (public.is_admin() or user_id = auth.uid());
 create policy "contact admin update" on public.contact_inquiries for update using (public.is_admin());
+create policy "contact admin delete" on public.contact_inquiries for delete using (public.is_admin());
 create policy "contact suspicions logged insert" on public.contact_suspicions for insert with check (auth.uid() is not null);
 create policy "contact suspicions admin read" on public.contact_suspicions for select using (public.is_admin());
 create policy "contact suspicions admin update" on public.contact_suspicions for update using (public.is_admin());
