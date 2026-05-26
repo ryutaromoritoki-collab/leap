@@ -1734,8 +1734,15 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
     if (!ok) return false;
     const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', currentUser.id);
     if (error) {
-      setNotice(toJapaneseError(error.message));
-      return false;
+      const { error: hideError } = await supabase.from('progress_posts').update({ is_hidden: true }).eq('id', post.id).eq('user_id', currentUser.id);
+      if (hideError) {
+        setNotice(toJapaneseError(error.message));
+        return false;
+      }
+      setRemovedPostIds((ids) => [...ids, post.id]);
+      setNotice('投稿を一覧から削除しました。');
+      await refresh();
+      return true;
     }
     setRemovedPostIds((ids) => [...ids, post.id]);
     setNotice('投稿を削除しました。');
@@ -1956,6 +1963,18 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
     await supabase!.from('admin_actions').insert({ target_type: table, target_id: id, action });
     await refresh();
   }
+  async function approveTicketPayment(row: EntrepreneurProfile) {
+    const requestedCount = row.meeting_ticket_requested_count ?? 0;
+    if (requestedCount <= 0) return;
+    await update('entrepreneur_profiles', row.id, {
+      meeting_ticket_balance: (row.meeting_ticket_balance ?? 0) + requestedCount,
+      meeting_ticket_payment_status: 'paid',
+      meeting_ticket_plan: null,
+      meeting_ticket_requested_count: 0,
+      meeting_ticket_requested_amount: null,
+      meeting_ticket_transfer_name: null,
+    }, '面談チケット着金確認・専用画面から付与');
+  }
   const reports = adminData.reports ?? [];
   const entrepreneurs = adminData.entrepreneurs ?? [];
   const investors = adminData.investors ?? [];
@@ -1968,8 +1987,18 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
         <Metric label="起業家一覧" value={`${adminData.entrepreneurs?.length ?? 0}`} icon={Building2} />
         <Metric label="投稿一覧" value={`${adminData.posts?.length ?? 0}`} icon={FileText} />
         <Metric label="運営相談" value={`${adminData.inquiries?.length ?? 0}`} icon={MessageCircle} />
+        <Metric label="チケット申請" value={`${ticketPaymentPending.length}`} icon={CircleDollarSign} />
       </div>
       {reports.length === 0 && <EmptyState title="現在確認が必要な通報はありません。" />}
+      <AdminTable title="面談チケット入金確認申請" rows={ticketPaymentPending} render={(row) => (
+        <AdminRow
+          key={row.id}
+          title={row.company_name || row.user_id}
+          meta={`申請: ${row.meeting_ticket_plan ?? `${row.meeting_ticket_requested_count ?? 0}枚`} / 金額: ${row.meeting_ticket_requested_amount ? yen(row.meeting_ticket_requested_amount) : '未入力'} / 振込名義: ${row.meeting_ticket_transfer_name ?? '未入力'} / 現在の保有: ${row.meeting_ticket_balance ?? 0}枚`}
+        >
+          <button className="btn-primary" onClick={() => approveTicketPayment(row)}>入金確認してチケット付与</button>
+        </AdminRow>
+      )} />
       <AdminTable title="運営相談・お問い合わせ" rows={adminData.inquiries ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.category ?? '問い合わせ'} meta={`${row.email ?? 'メール未登録'} / ${new Date(row.created_at).toLocaleString('ja-JP')} / ${row.body ?? ''}`}>
           <span className="pill"><MessageCircle size={13} /> 未対応</span>
@@ -2001,7 +2030,6 @@ function AdminHome({ adminData, refresh }: { adminData: Record<string, any[]>; r
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_revenue: !row.verified_revenue }, '売上確認済みバッジ付与')}>売上確認</button>
-          <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { meeting_ticket_balance: (row.meeting_ticket_balance ?? 0) + (row.meeting_ticket_requested_count ?? 0), meeting_ticket_payment_status: 'paid' }, '面談チケット着金確認')}>チケット付与</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
         </AdminRow>
       )} />
@@ -2702,7 +2730,14 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
     if (!window.confirm('この投稿を削除します。元に戻せません。よろしいですか？')) return;
     const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', currentUser.id);
     if (error) {
-      setNotice(toJapaneseError(error.message));
+      const { error: hideError } = await supabase.from('progress_posts').update({ is_hidden: true }).eq('id', post.id).eq('user_id', currentUser.id);
+      if (hideError) {
+        setNotice(toJapaneseError(error.message));
+        return;
+      }
+      setRemoved(true);
+      setNotice('投稿を一覧から削除しました。');
+      await refresh?.();
       return;
     }
     setRemoved(true);
