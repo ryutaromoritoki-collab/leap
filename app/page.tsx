@@ -2012,8 +2012,10 @@ function TimelineDetail({ title, body }: { title: string; body?: string | null }
 }
 
 function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<string, any[]>; refresh: () => Promise<void>; openProfile: (profile: EntrepreneurProfile) => void }) {
-  const [adminSection, setAdminSection] = useState<'dashboard' | 'members' | 'messages'>('dashboard');
+  const [adminSection, setAdminSection] = useState<'dashboard' | 'members' | 'messages' | 'approvals' | 'badges'>('dashboard');
   const [messageSearch, setMessageSearch] = useState('');
+  const [approvalSearch, setApprovalSearch] = useState('');
+  const [badgeSearch, setBadgeSearch] = useState('');
   async function update(table: string, id: string, patch: Record<string, any>, action: string) {
     await supabase!.from(table).update(patch).eq('id', id);
     await supabase!.from('admin_actions').insert({ target_type: table, target_id: id, action });
@@ -2061,6 +2063,12 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
     entrepreneur: entrepreneurs.find((profile) => profile.user_id === row.id),
     investor: investors.find((profile) => profile.user_id === row.id),
   }));
+  function memberDisplayName(row: any) {
+    return row.entrepreneur?.account_name || row.investor?.account_name || row.entrepreneur?.company_name || row.investor?.company_name || row.investor?.full_name || row.email || row.id;
+  }
+  function memberSearchText(row: any) {
+    return `${row.email ?? ''} ${row.role ?? ''} ${row.entrepreneur?.account_name ?? ''} ${row.investor?.account_name ?? ''} ${row.entrepreneur?.company_name ?? ''} ${row.investor?.company_name ?? ''} ${row.investor?.full_name ?? ''}`.toLowerCase();
+  }
   const userById = new Map(users.map((row) => [row.id, row]));
   const entrepreneurById = new Map(entrepreneurs.map((row) => [row.id, row]));
   const investorByUserId = new Map(investors.map((row) => [row.user_id, row]));
@@ -2081,6 +2089,12 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(term));
   });
+  const approvalRows = memberRows.filter((row) => !approvalSearch.trim() || memberSearchText(row).includes(approvalSearch.trim().toLowerCase()));
+  const badgeRows = entrepreneurs.filter((row) => {
+    if (!badgeSearch.trim()) return true;
+    const term = badgeSearch.trim().toLowerCase();
+    return `${row.account_name ?? ''} ${row.company_name ?? ''} ${row.founder_name ?? ''} ${row.industry ?? ''} ${row.location ?? ''}`.toLowerCase().includes(term);
+  });
   if (adminSection === 'members') {
     return (
       <section className="grid gap-4">
@@ -2088,11 +2102,48 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
         <AdminTable title="メンバー一覧" rows={memberRows} render={(row) => (
           <AdminRow
             key={row.id}
-            title={row.email ?? row.id}
+            title={memberDisplayName(row)}
             meta={`起業家: ${row.entrepreneur?.company_name ?? 'なし'} / 投資家: ${row.investor?.company_name ?? row.investor?.full_name ?? 'なし'}`}
           >
             {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>起業家プロフィール</button>}
             {row.investor && <span className="pill"><CircleDollarSign size={13} /> 投資家</span>}
+          </AdminRow>
+        )} />
+      </section>
+    );
+  }
+  if (adminSection === 'approvals') {
+    return (
+      <section className="grid gap-4">
+        <button className="btn-secondary w-fit" onClick={() => setAdminSection('dashboard')}>管理者画面へ戻る</button>
+        <input className="field" value={approvalSearch} onChange={(e) => setApprovalSearch(e.target.value)} placeholder="アカウント名、会社名、メールアドレスで検索" />
+        <AdminTable title="ユーザー承認・停止 一覧" rows={approvalRows} render={(row) => (
+          <AdminRow
+            key={row.id}
+            title={memberDisplayName(row)}
+            meta={`メール: ${row.email ?? '未登録'} / ${roleLabels[row.role as UserRole] ?? row.role} / プロフィール: ${row.profile_completed ? '完了' : '未完了'} / 状態: ${row.is_suspended ? '停止中' : '利用中'}`}
+          >
+            {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>プロフィール</button>}
+            {row.investor && <span className="pill"><CircleDollarSign size={13} /> 投資家</span>}
+            <button className="btn-secondary" onClick={() => update('users', row.id, { is_suspended: !row.is_suspended }, row.is_suspended ? 'ユーザー停止解除' : 'ユーザー停止')}>{row.is_suspended ? '停止解除' : '停止'}</button>
+          </AdminRow>
+        )} />
+      </section>
+    );
+  }
+  if (adminSection === 'badges') {
+    return (
+      <section className="grid gap-4">
+        <button className="btn-secondary w-fit" onClick={() => setAdminSection('dashboard')}>管理者画面へ戻る</button>
+        <input className="field" value={badgeSearch} onChange={(e) => setBadgeSearch(e.target.value)} placeholder="アカウント名、会社名、代表者名で検索" />
+        <AdminTable title="起業家審査・バッジ付与 一覧" rows={badgeRows} render={(row) => (
+          <AdminRow key={row.id} title={row.account_name ? `@${row.account_name} / ${row.company_name}` : row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)}`}>
+            <button className="btn-secondary" onClick={() => openProfile(row)}>プロフィール</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_revenue: !row.verified_revenue }, '売上確認済みバッジ付与')}>売上確認</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
           </AdminRow>
         )} />
       </section>
@@ -2130,6 +2181,8 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
       <div className="flex flex-wrap gap-2">
         <button className="btn-secondary" onClick={() => setAdminSection('members')}><UsersRound size={16} /> メンバー一覧を開く</button>
         <button className="btn-secondary" onClick={() => setAdminSection('messages')}><Mail size={16} /> メッセージ確認を開く</button>
+        <button className="btn-secondary" onClick={() => setAdminSection('approvals')}><ShieldCheck size={16} /> ユーザー承認を開く</button>
+        <button className="btn-secondary" onClick={() => setAdminSection('badges')}><BadgeCheck size={16} /> バッジ付与を開く</button>
       </div>
       {reports.length === 0 && <EmptyState title="現在確認が必要な通報はありません。" />}
       <AdminTable title="面談チケット入金確認申請" rows={ticketPaymentPending} render={(row) => (
@@ -2159,13 +2212,16 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
           <span className="pill">確認待ち</span>
         </AdminRow>
       )} />
-      <AdminTable title="ユーザー承認・停止" rows={adminData.users ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.email ?? row.id} meta={`${roleLabels[row.role as UserRole] ?? row.role} / プロフィール: ${row.profile_completed ? '完了' : '未完了'}`}>
+      <AdminTable title="ユーザー承認・停止" rows={memberRows.slice(0, 5)} render={(row) => (
+        <AdminRow key={row.id} title={memberDisplayName(row)} meta={`メール: ${row.email ?? '未登録'} / ${roleLabels[row.role as UserRole] ?? row.role} / プロフィール: ${row.profile_completed ? '完了' : '未完了'}`}>
+          {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>プロフィール</button>}
           <button className="btn-secondary" onClick={() => update('users', row.id, { is_suspended: !row.is_suspended }, row.is_suspended ? 'ユーザー停止解除' : 'ユーザー停止')}>{row.is_suspended ? '停止解除' : '停止'}</button>
         </AdminRow>
       )} />
-      <AdminTable title="起業家審査・バッジ付与" rows={adminData.entrepreneurs ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)} / チケット: ${row.meeting_ticket_plan ?? '未申請'} ${row.meeting_ticket_requested_amount ? yen(row.meeting_ticket_requested_amount) : ''}`}>
+      <button className="btn-secondary w-fit" onClick={() => setAdminSection('approvals')}>ユーザー承認をもっと見る</button>
+      <AdminTable title="起業家審査・バッジ付与" rows={entrepreneurs.slice(0, 5)} render={(row) => (
+        <AdminRow key={row.id} title={row.account_name ? `@${row.account_name} / ${row.company_name}` : row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)} / チケット: ${row.meeting_ticket_plan ?? '未申請'} ${row.meeting_ticket_requested_amount ? yen(row.meeting_ticket_requested_amount) : ''}`}>
+          <button className="btn-secondary" onClick={() => openProfile(row)}>プロフィール</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
@@ -2173,17 +2229,12 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
         </AdminRow>
       )} />
+      <button className="btn-secondary w-fit" onClick={() => setAdminSection('badges')}>バッジ付与をもっと見る</button>
       <AdminTable title="連絡先交換の疑い" rows={adminData.contactSuspicions ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.reason} meta={row.body}>
           <span className="pill">送信ブロック済み</span>
         </AdminRow>
       )} />
-      <AdminTable title="ユーザーメッセージ確認" rows={(adminData.allMessages ?? []).slice(0, 3)} render={(row) => (
-        <AdminRow key={row.id} title={row.body} meta={`送信者: ${row.sender_id} / 受信者: ${row.receiver_id} / ${new Date(row.created_at).toLocaleString('ja-JP')}`}>
-          <span className="pill">管理確認</span>
-        </AdminRow>
-      )} />
-      <button className="btn-secondary w-fit" onClick={() => setAdminSection('messages')}>もっと見る</button>
       <AdminTable title="投稿非表示" rows={adminData.posts ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.did_today} meta={new Date(row.created_at).toLocaleString('ja-JP')}>
           <button className="btn-secondary" onClick={() => update('progress_posts', row.id, { is_hidden: !row.is_hidden }, '投稿非表示')}>{row.is_hidden ? '再表示' : '非表示'}</button>
