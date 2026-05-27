@@ -975,7 +975,6 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
       </section>
       <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} viewer={currentUser} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
-      <EntrepreneurMeetingManager profile={profile} meetings={meetings} refresh={refresh} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
         <PostComposer profile={profile} refresh={refresh} />
         <KpiComposer profile={profile} refresh={refresh} />
@@ -2464,6 +2463,11 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   }
   async function reportFinalMeeting(meeting: any) {
     if (!supabase || !entrepreneurProfile) return;
+    const finalDate = finalDateById[meeting.id] || meeting.final_meeting_at || '';
+    if (!finalDate) {
+      setMeetingNotice('面談日程申請には日付と時間を指定してください。');
+      return;
+    }
     if ((entrepreneurProfile.meeting_ticket_balance ?? 0) <= 0) {
       window.alert('面談チケットが不足しています');
       setView('home');
@@ -2471,16 +2475,17 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     }
     await supabase.from('meeting_requests').update({
       status: 'reported_to_admin',
-      final_meeting_at: finalDateById[meeting.id] || null,
+      final_meeting_at: finalDate,
       meeting_admin_report: adminReportById[meeting.id] || '面談日時が決まったため、運営へ申請しました。',
       ticket_payment_status: 'used',
     }).eq('id', meeting.id);
     await supabase.from('contact_inquiries').insert({
       user_id: currentUser.id,
       category: 'meeting_date_report',
-      body: `${entrepreneurProfile.company_name} が面談日時を申請しました。面談ID: ${meeting.id} / 日時: ${finalDateById[meeting.id] || '未入力'}`,
+      body: `${entrepreneurProfile.company_name} が面談日時を申請しました。面談ID: ${meeting.id} / 日時: ${finalDate}`,
     });
     await processTriggeredEmailNotifications();
+    setMeetingNotice('面談日程を運営へ申請しました。運営確認待ちです。');
     await refresh();
   }
   async function sendSupportMessage() {
@@ -2730,7 +2735,15 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
                     <textarea className="field mt-2 min-h-20" value={adminReportById[selectedMeeting.id] ?? ''} onChange={(e) => setAdminReportById({ ...adminReportById, [selectedMeeting.id]: e.target.value })} placeholder="運営への補足（任意）" />
                   </div>
                 )}
-                {selectedMeeting.status === 'reported_to_admin' && <p className="mt-3 rounded-2xl bg-emerald-300/10 p-3 text-sm text-emerald-100">運営へ面談日程申請済みです。</p>}
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && selectedMeeting.status === 'reported_to_admin' && (
+                  <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3">
+                    <p className="text-sm leading-6 text-cyan-100">運営へ面談日程を申請済みです。確認が完了するまでお待ちください。</p>
+                    <button className="btn-secondary mt-3 w-full" disabled>申請中</button>
+                  </div>
+                )}
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && selectedMeeting.status === 'meeting_date_approved' && (
+                  <button className="btn-primary mt-3 w-full" disabled><CheckCircle2 size={17} /> 承認</button>
+                )}
               </div>
             )}
           </div>
