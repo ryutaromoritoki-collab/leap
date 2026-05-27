@@ -166,6 +166,24 @@ function toJapaneseError(message: string) {
   return message || '処理に失敗しました。';
 }
 
+async function processEmailNotifications() {
+  try {
+    await fetch('/api/send-email-notifications', { method: 'POST' });
+  } catch {
+    // メール送信は通知本体の保存を妨げないようにする。
+  }
+}
+
+async function createNotification(row: { user_id: string; type: string; body: string }) {
+  if (!supabase) return;
+  const { error } = await supabase.from('notifications').insert(row);
+  if (!error) void processEmailNotifications();
+}
+
+async function processTriggeredEmailNotifications() {
+  void processEmailNotifications();
+}
+
 export default function LeapApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
@@ -957,7 +975,6 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
       </section>
       <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} viewer={currentUser} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
-      <EntrepreneurMeetingManager profile={profile} meetings={meetings} refresh={refresh} />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
         <PostComposer profile={profile} refresh={refresh} />
         <KpiComposer profile={profile} refresh={refresh} />
@@ -1105,6 +1122,7 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
       category: 'meeting_ticket_payment',
       body: `${profile.company_name} が面談チケット ${selectedPlan.label}（${yen(selectedPlan.amount)}）の入金確認を希望しています。振込名義: ${transferName}`,
     });
+    await processTriggeredEmailNotifications();
     await supabase.from('entrepreneur_profiles').update({
       meeting_ticket_plan: selectedPlan.label,
       meeting_ticket_requested_count: selectedPlan.count,
@@ -1219,13 +1237,17 @@ function HiddenPostsPanel({ posts, refresh }: { posts: ProgressPost[]; refresh: 
 function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: EntrepreneurProfile; meetings: any[]; refresh: () => Promise<void> }) {
   const [dateById, setDateById] = useState<Record<string, string>>({});
   const [messageById, setMessageById] = useState<Record<string, string>>({});
+  const [removedMeetingIds, setRemovedMeetingIds] = useState<string[]>([]);
+  const visibleMeetings = meetings.filter((meeting) => !removedMeetingIds.includes(meeting.id) && !['rejected_by_entrepreneur', 'cancelled'].includes(meeting.status));
 
   async function updateMeeting(id: string, patch: Record<string, any>) {
     await supabase!.from('meeting_requests').update(patch).eq('id', id);
     await refresh();
   }
   async function rejectMeeting(id: string) {
-    await supabase!.from('meeting_requests').delete().eq('id', id);
+    const { error } = await supabase!.from('meeting_requests').delete().eq('id', id);
+    if (error) await supabase!.from('meeting_requests').update({ status: 'rejected_by_entrepreneur' }).eq('id', id);
+    setRemovedMeetingIds((ids) => [...ids, id]);
     await refresh();
   }
 
@@ -1237,7 +1259,6 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
       meeting_admin_report: messageById[meeting.id] || '面談日時を運営へ報告しました。',
       ticket_payment_status: 'used',
     }).eq('id', meeting.id);
-    await supabase!.from('entrepreneur_profiles').update({ meeting_ticket_balance: Math.max(0, (profile.meeting_ticket_balance ?? 0) - 1) }).eq('id', profile.id);
     await refresh();
   }
 
@@ -1246,7 +1267,7 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
       <h3 className="text-xl font-black">面談希望・面談用メッセージ</h3>
       <p className="mt-2 text-sm leading-6 text-amber-100">面談申請前にLeap外で面談を実行したことが発覚した場合、双方強制退会となります。</p>
       <div className="mt-4 grid gap-3">
-        {meetings.length === 0 ? <p className="text-slate-400">面談希望はまだありません。</p> : meetings.map((meeting) => (
+        {visibleMeetings.length === 0 ? <p className="text-slate-400">面談希望はまだありません。</p> : visibleMeetings.map((meeting) => (
           <article key={meeting.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <p className="font-bold">{meeting.message || '面談希望が届いています'}</p>
             <p className="mt-1 text-xs text-slate-500">状態: {meeting.status} / 希望日時: {meeting.proposed_at ? new Date(meeting.proposed_at).toLocaleString('ja-JP') : '未指定'}</p>
@@ -1265,8 +1286,8 @@ function EntrepreneurMeetingManager({ profile, meetings, refresh }: { profile: E
             {(meeting.status === 'candidate_sent' || meeting.status === 'mutual_agreed') && (
               <div className="mt-3 grid gap-3">
                 <textarea className="field min-h-24" value={messageById[meeting.id] ?? ''} onChange={(e) => setMessageById({ ...messageById, [meeting.id]: e.target.value })} placeholder="面談用メッセージ・運営への報告内容" />
-                <button className="btn-primary" disabled={(profile.meeting_ticket_balance ?? 0) <= 0} onClick={() => reportMeeting(meeting)}>
-                  面談チケット1枚を消費して運営へ面談日程を報告する
+                <button className="btn-primary" disabled={(profile.meeting_ticket_balance ?? 0) <= 0 || !dateById[meeting.id]} onClick={() => reportMeeting(meeting)}>
+                  面談日程申込申請
                 </button>
               </div>
             )}
@@ -1404,7 +1425,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       setActionMessage(`${profile.company_name}のフォローを解除しました。`);
     } else {
       await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
-      await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
+      await createNotification({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
       setActionMessage(`${profile.company_name}をフォローしました。`);
     }
     await refresh();
@@ -1435,7 +1456,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       message: meetingMessage,
       proposed_at: meetingDate || null,
     });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'meeting_request', body: '面談リクエストが届きました。' });
+    await createNotification({ user_id: profile.user_id, type: 'meeting_request', body: '面談リクエストが届きました。' });
     setMeetingMessage('');
     setMeetingDate('');
     setActionMessage('面談申込をしました');
@@ -1463,7 +1484,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       return;
     }
     await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body: comment });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    await createNotification({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setComment('');
     setActionMessage('メッセージを送信しました。');
     await refresh();
@@ -1672,6 +1693,7 @@ function PitchUpload({ profile, refresh }: { profile: EntrepreneurProfile; refre
       setMessage(toJapaneseError(error.message));
       return;
     }
+    await processTriggeredEmailNotifications();
     setMessage('ピッチ資料の相談申請を運営へ送信しました。');
   }
   return (
@@ -1723,7 +1745,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
   async function quickFollow(profile?: EntrepreneurProfile) {
     if (!supabase || !profile) return;
     await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
+    await createNotification({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
     setNotice(`${profile.company_name}をフォローしました。`);
     await refresh();
   }
@@ -1743,7 +1765,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
       return;
     }
     await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    await createNotification({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setMessageByPost({ ...messageByPost, [post.id]: '' });
     setNotice('メッセージを送信しました。');
   }
@@ -2009,8 +2031,10 @@ function TimelineDetail({ title, body }: { title: string; body?: string | null }
 }
 
 function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<string, any[]>; refresh: () => Promise<void>; openProfile: (profile: EntrepreneurProfile) => void }) {
-  const [adminSection, setAdminSection] = useState<'dashboard' | 'members' | 'messages'>('dashboard');
+  const [adminSection, setAdminSection] = useState<'dashboard' | 'members' | 'messages' | 'approvals' | 'badges'>('dashboard');
   const [messageSearch, setMessageSearch] = useState('');
+  const [approvalSearch, setApprovalSearch] = useState('');
+  const [badgeSearch, setBadgeSearch] = useState('');
   async function update(table: string, id: string, patch: Record<string, any>, action: string) {
     await supabase!.from(table).update(patch).eq('id', id);
     await supabase!.from('admin_actions').insert({ target_type: table, target_id: id, action });
@@ -2058,6 +2082,12 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
     entrepreneur: entrepreneurs.find((profile) => profile.user_id === row.id),
     investor: investors.find((profile) => profile.user_id === row.id),
   }));
+  function memberDisplayName(row: any) {
+    return row.entrepreneur?.account_name || row.investor?.account_name || row.entrepreneur?.company_name || row.investor?.company_name || row.investor?.full_name || row.email || row.id;
+  }
+  function memberSearchText(row: any) {
+    return `${row.email ?? ''} ${row.role ?? ''} ${row.entrepreneur?.account_name ?? ''} ${row.investor?.account_name ?? ''} ${row.entrepreneur?.company_name ?? ''} ${row.investor?.company_name ?? ''} ${row.investor?.full_name ?? ''}`.toLowerCase();
+  }
   const userById = new Map(users.map((row) => [row.id, row]));
   const entrepreneurById = new Map(entrepreneurs.map((row) => [row.id, row]));
   const investorByUserId = new Map(investors.map((row) => [row.user_id, row]));
@@ -2078,6 +2108,12 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(term));
   });
+  const approvalRows = memberRows.filter((row) => !approvalSearch.trim() || memberSearchText(row).includes(approvalSearch.trim().toLowerCase()));
+  const badgeRows = entrepreneurs.filter((row) => {
+    if (!badgeSearch.trim()) return true;
+    const term = badgeSearch.trim().toLowerCase();
+    return `${row.account_name ?? ''} ${row.company_name ?? ''} ${row.founder_name ?? ''} ${row.industry ?? ''} ${row.location ?? ''}`.toLowerCase().includes(term);
+  });
   if (adminSection === 'members') {
     return (
       <section className="grid gap-4">
@@ -2085,11 +2121,48 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
         <AdminTable title="メンバー一覧" rows={memberRows} render={(row) => (
           <AdminRow
             key={row.id}
-            title={row.email ?? row.id}
+            title={memberDisplayName(row)}
             meta={`起業家: ${row.entrepreneur?.company_name ?? 'なし'} / 投資家: ${row.investor?.company_name ?? row.investor?.full_name ?? 'なし'}`}
           >
             {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>起業家プロフィール</button>}
             {row.investor && <span className="pill"><CircleDollarSign size={13} /> 投資家</span>}
+          </AdminRow>
+        )} />
+      </section>
+    );
+  }
+  if (adminSection === 'approvals') {
+    return (
+      <section className="grid gap-4">
+        <button className="btn-secondary w-fit" onClick={() => setAdminSection('dashboard')}>管理者画面へ戻る</button>
+        <input className="field" value={approvalSearch} onChange={(e) => setApprovalSearch(e.target.value)} placeholder="アカウント名、会社名、メールアドレスで検索" />
+        <AdminTable title="ユーザー承認・停止 一覧" rows={approvalRows} render={(row) => (
+          <AdminRow
+            key={row.id}
+            title={memberDisplayName(row)}
+            meta={`メール: ${row.email ?? '未登録'} / ${roleLabels[row.role as UserRole] ?? row.role} / プロフィール: ${row.profile_completed ? '完了' : '未完了'} / 状態: ${row.is_suspended ? '停止中' : '利用中'}`}
+          >
+            {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>プロフィール</button>}
+            {row.investor && <span className="pill"><CircleDollarSign size={13} /> 投資家</span>}
+            <button className="btn-secondary" onClick={() => update('users', row.id, { is_suspended: !row.is_suspended }, row.is_suspended ? 'ユーザー停止解除' : 'ユーザー停止')}>{row.is_suspended ? '停止解除' : '停止'}</button>
+          </AdminRow>
+        )} />
+      </section>
+    );
+  }
+  if (adminSection === 'badges') {
+    return (
+      <section className="grid gap-4">
+        <button className="btn-secondary w-fit" onClick={() => setAdminSection('dashboard')}>管理者画面へ戻る</button>
+        <input className="field" value={badgeSearch} onChange={(e) => setBadgeSearch(e.target.value)} placeholder="アカウント名、会社名、代表者名で検索" />
+        <AdminTable title="起業家審査・バッジ付与 一覧" rows={badgeRows} render={(row) => (
+          <AdminRow key={row.id} title={row.account_name ? `@${row.account_name} / ${row.company_name}` : row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)}`}>
+            <button className="btn-secondary" onClick={() => openProfile(row)}>プロフィール</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_revenue: !row.verified_revenue }, '売上確認済みバッジ付与')}>売上確認</button>
+            <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
           </AdminRow>
         )} />
       </section>
@@ -2127,6 +2200,8 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
       <div className="flex flex-wrap gap-2">
         <button className="btn-secondary" onClick={() => setAdminSection('members')}><UsersRound size={16} /> メンバー一覧を開く</button>
         <button className="btn-secondary" onClick={() => setAdminSection('messages')}><Mail size={16} /> メッセージ確認を開く</button>
+        <button className="btn-secondary" onClick={() => setAdminSection('approvals')}><ShieldCheck size={16} /> ユーザー承認を開く</button>
+        <button className="btn-secondary" onClick={() => setAdminSection('badges')}><BadgeCheck size={16} /> バッジ付与を開く</button>
       </div>
       {reports.length === 0 && <EmptyState title="現在確認が必要な通報はありません。" />}
       <AdminTable title="面談チケット入金確認申請" rows={ticketPaymentPending} render={(row) => (
@@ -2156,13 +2231,16 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
           <span className="pill">確認待ち</span>
         </AdminRow>
       )} />
-      <AdminTable title="ユーザー承認・停止" rows={adminData.users ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.email ?? row.id} meta={`${roleLabels[row.role as UserRole] ?? row.role} / プロフィール: ${row.profile_completed ? '完了' : '未完了'}`}>
+      <AdminTable title="ユーザー承認・停止" rows={memberRows.slice(0, 5)} render={(row) => (
+        <AdminRow key={row.id} title={memberDisplayName(row)} meta={`メール: ${row.email ?? '未登録'} / ${roleLabels[row.role as UserRole] ?? row.role} / プロフィール: ${row.profile_completed ? '完了' : '未完了'}`}>
+          {row.entrepreneur && <button className="btn-secondary" onClick={() => openProfile(row.entrepreneur)}>プロフィール</button>}
           <button className="btn-secondary" onClick={() => update('users', row.id, { is_suspended: !row.is_suspended }, row.is_suspended ? 'ユーザー停止解除' : 'ユーザー停止')}>{row.is_suspended ? '停止解除' : '停止'}</button>
         </AdminRow>
       )} />
-      <AdminTable title="起業家審査・バッジ付与" rows={adminData.entrepreneurs ?? []} render={(row) => (
-        <AdminRow key={row.id} title={row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)} / チケット: ${row.meeting_ticket_plan ?? '未申請'} ${row.meeting_ticket_requested_amount ? yen(row.meeting_ticket_requested_amount) : ''}`}>
+      <button className="btn-secondary w-fit" onClick={() => setAdminSection('approvals')}>ユーザー承認をもっと見る</button>
+      <AdminTable title="起業家審査・バッジ付与" rows={entrepreneurs.slice(0, 5)} render={(row) => (
+        <AdminRow key={row.id} title={row.account_name ? `@${row.account_name} / ${row.company_name}` : row.company_name} meta={`${row.industry ?? '業界未入力'} / 公開: ${row.is_hidden ? '非公開' : '公開中'} / 累計投資金額: ${yen(row.total_investment_amount)} / チケット: ${row.meeting_ticket_plan ?? '未申請'} ${row.meeting_ticket_requested_amount ? yen(row.meeting_ticket_requested_amount) : ''}`}>
+          <button className="btn-secondary" onClick={() => openProfile(row)}>プロフィール</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_identity: !row.verified_identity }, '本人確認ステータス変更')}>本人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_corporate: !row.verified_corporate }, '法人確認ステータス変更')}>法人確認</button>
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { verified_interview: !row.verified_interview }, '運営面談済みバッジ付与')}>面談済み</button>
@@ -2170,17 +2248,12 @@ function AdminHome({ adminData, refresh, openProfile }: { adminData: Record<stri
           <button className="btn-secondary" onClick={() => update('entrepreneur_profiles', row.id, { is_hidden: !row.is_hidden }, row.is_hidden ? '起業家プロフィール再公開' : '起業家プロフィール非公開')}>{row.is_hidden ? '公開' : '非公開'}</button>
         </AdminRow>
       )} />
+      <button className="btn-secondary w-fit" onClick={() => setAdminSection('badges')}>バッジ付与をもっと見る</button>
       <AdminTable title="連絡先交換の疑い" rows={adminData.contactSuspicions ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.reason} meta={row.body}>
           <span className="pill">送信ブロック済み</span>
         </AdminRow>
       )} />
-      <AdminTable title="ユーザーメッセージ確認" rows={(adminData.allMessages ?? []).slice(0, 3)} render={(row) => (
-        <AdminRow key={row.id} title={row.body} meta={`送信者: ${row.sender_id} / 受信者: ${row.receiver_id} / ${new Date(row.created_at).toLocaleString('ja-JP')}`}>
-          <span className="pill">管理確認</span>
-        </AdminRow>
-      )} />
-      <button className="btn-secondary w-fit" onClick={() => setAdminSection('messages')}>もっと見る</button>
       <AdminTable title="投稿非表示" rows={adminData.posts ?? []} render={(row) => (
         <AdminRow key={row.id} title={row.did_today} meta={new Date(row.created_at).toLocaleString('ja-JP')}>
           <button className="btn-secondary" onClick={() => update('progress_posts', row.id, { is_hidden: !row.is_hidden }, '投稿非表示')}>{row.is_hidden ? '再表示' : '非表示'}</button>
@@ -2250,6 +2323,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const [candidateDateById, setCandidateDateById] = useState<Record<string, string>>({});
   const [finalDateById, setFinalDateById] = useState<Record<string, string>>({});
   const [adminReportById, setAdminReportById] = useState<Record<string, string>>({});
+  const [removedMeetingIds, setRemovedMeetingIds] = useState<string[]>([]);
   const participantByUserId = useMemo(() => {
     const map = new Map<string, DirectMessageTarget>();
     profiles.forEach((profile) => map.set(profile.user_id, { userId: profile.user_id, name: profile.company_name, accountName: profile.account_name, entrepreneurId: profile.id }));
@@ -2279,7 +2353,8 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const selectedSupportMessages = supportInquiries
     .filter((row) => (currentUser.role === 'admin' ? (row.user_id || row.email || 'anonymous') === currentSupportKey : row.user_id === currentUser.id))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  const selectedMeeting = meetings.find((meeting) => meeting.id === selectedMeetingId) ?? meetings[0];
+  const visibleMeetings = meetings.filter((meeting) => !removedMeetingIds.includes(meeting.id) && !['rejected_by_entrepreneur', 'cancelled'].includes(meeting.status));
+  const selectedMeeting = visibleMeetings.find((meeting) => meeting.id === selectedMeetingId) ?? visibleMeetings[0];
   const selectedMeetingPartner = selectedMeeting ? meetingPartner(selectedMeeting, currentUser, entrepreneurProfile, profiles, investors) : null;
   const selectedMeetingApproved = selectedMeeting?.status === 'meeting_date_approved';
   const contactExchangeAllowed = selectedPartnerId
@@ -2293,8 +2368,9 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     : false;
 
   useEffect(() => {
-    if (!selectedMeetingId && meetings[0]) setSelectedMeetingId(meetings[0].id);
-  }, [meetings, selectedMeetingId]);
+    if (!selectedMeetingId && visibleMeetings[0]) setSelectedMeetingId(visibleMeetings[0].id);
+    if (selectedMeetingId && !visibleMeetings.some((meeting) => meeting.id === selectedMeetingId)) setSelectedMeetingId(visibleMeetings[0]?.id ?? '');
+  }, [visibleMeetings, selectedMeetingId]);
 
   useEffect(() => {
     if (target?.userId) {
@@ -2321,7 +2397,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       setDirectMessage(toJapaneseError(error.message));
       return;
     }
-    await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
+    await createNotification({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
     setMessageBody('');
     setDirectMessage('メッセージを送信しました。');
     await refresh();
@@ -2355,7 +2431,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       setMeetingNotice(toJapaneseError(error.message));
       return;
     }
-    await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'meeting_request', body: '面談申込が届きました。' });
+    await createNotification({ user_id: selectedPartnerId, type: 'meeting_request', body: '面談申込が届きました。' });
     setMeetingNotice('面談申込をしました。下の面談用メッセージで日程調整できます。');
     setMeetingToast('面談申込をしました');
     setTimeout(() => setMeetingToast(''), 2200);
@@ -2368,9 +2444,11 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   }
   async function rejectMeeting(id: string) {
     if (!supabase) return;
-    await supabase.from('meeting_requests').delete().eq('id', id);
+    const { error } = await supabase.from('meeting_requests').delete().eq('id', id);
+    if (error) await supabase.from('meeting_requests').update({ status: 'rejected_by_entrepreneur' }).eq('id', id);
     setMeetingNotice('面談申込を非承認にして削除しました。');
-    setSelectedMeetingId('');
+    setRemovedMeetingIds((ids) => [...ids, id]);
+    setSelectedMeetingId(visibleMeetings.find((meeting) => meeting.id !== id)?.id ?? '');
     await refresh();
   }
   async function updateMeetingMessage(meeting: any) {
@@ -2385,6 +2463,11 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   }
   async function reportFinalMeeting(meeting: any) {
     if (!supabase || !entrepreneurProfile) return;
+    const finalDate = finalDateById[meeting.id] || meeting.final_meeting_at || '';
+    if (!finalDate) {
+      setMeetingNotice('面談日程申請には日付と時間を指定してください。');
+      return;
+    }
     if ((entrepreneurProfile.meeting_ticket_balance ?? 0) <= 0) {
       window.alert('面談チケットが不足しています');
       setView('home');
@@ -2392,15 +2475,17 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     }
     await supabase.from('meeting_requests').update({
       status: 'reported_to_admin',
-      final_meeting_at: finalDateById[meeting.id] || null,
+      final_meeting_at: finalDate,
       meeting_admin_report: adminReportById[meeting.id] || '面談日時が決まったため、運営へ申請しました。',
       ticket_payment_status: 'used',
     }).eq('id', meeting.id);
     await supabase.from('contact_inquiries').insert({
       user_id: currentUser.id,
       category: 'meeting_date_report',
-      body: `${entrepreneurProfile.company_name} が面談日時を申請しました。面談ID: ${meeting.id} / 日時: ${finalDateById[meeting.id] || '未入力'}`,
+      body: `${entrepreneurProfile.company_name} が面談日時を申請しました。面談ID: ${meeting.id} / 日時: ${finalDate}`,
     });
+    await processTriggeredEmailNotifications();
+    setMeetingNotice('面談日程を運営へ申請しました。運営確認待ちです。');
     await refresh();
   }
   async function sendSupportMessage() {
@@ -2418,6 +2503,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     }
     setSupportBody('');
     setSupportMessage(currentUser.role === 'admin' ? 'ユーザーへ返信を保存しました。' : '運営サポートへメッセージを送信しました。');
+    await processTriggeredEmailNotifications();
     await refresh();
   }
   async function resolveSupportThread(status: 'hold' | 'done') {
@@ -2574,12 +2660,12 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
             <span className="pill"><CalendarClock size={14} /> 保有チケット {entrepreneurProfile.meeting_ticket_balance ?? 0}枚</span>
           )}
         </div>
-        {meetings.length === 0 ? (
+        {visibleMeetings.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-400">面談申込が入ると、ここに相手ごとの面談メッセージが表示されます。</p>
         ) : (
           <div className="mt-4 grid gap-3 lg:grid-cols-[260px_1fr]">
             <div className="grid content-start gap-2">
-              {meetings.map((meeting) => {
+              {visibleMeetings.map((meeting) => {
                 const partner = meetingPartner(meeting, currentUser, entrepreneurProfile, profiles, investors);
                 return (
                   <button key={meeting.id} type="button" className={`rounded-2xl border p-3 text-left transition ${selectedMeeting?.id === meeting.id ? 'border-cyan-300/60 bg-cyan-300/10' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/40'}`} onClick={() => setSelectedMeetingId(meeting.id)}>
@@ -2639,17 +2725,25 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
                     <button className="btn-secondary" onClick={() => updateMeeting(selectedMeeting.id, { status: 'investor_rejected_candidate' })}>同意しない</button>
                   </div>
                 )}
-                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && ['candidate_sent', 'mutual_agreed', 'meeting_date_rejected'].includes(selectedMeeting.status) && (
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && ['accepted_by_entrepreneur', 'candidate_sent', 'investor_rejected_candidate', 'mutual_agreed', 'meeting_date_rejected'].includes(selectedMeeting.status) && (
                   <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3">
                     <p className="text-sm leading-6 text-amber-100">面談申請前にLeap外で面談を実行したことが発覚した場合、双方強制退会となります。面談日時が決まったら、チケットを1枚消費して運営へ申請してください。</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                       <input className="field" type="datetime-local" value={finalDateById[selectedMeeting.id] ?? ''} onChange={(e) => setFinalDateById({ ...finalDateById, [selectedMeeting.id]: e.target.value })} />
-                      <button className="btn-primary" onClick={() => reportFinalMeeting(selectedMeeting)}>面談日程申請</button>
+                      <button className="btn-primary" disabled={!finalDateById[selectedMeeting.id]} onClick={() => reportFinalMeeting(selectedMeeting)}>面談日程申込申請</button>
                     </div>
                     <textarea className="field mt-2 min-h-20" value={adminReportById[selectedMeeting.id] ?? ''} onChange={(e) => setAdminReportById({ ...adminReportById, [selectedMeeting.id]: e.target.value })} placeholder="運営への補足（任意）" />
                   </div>
                 )}
-                {selectedMeeting.status === 'reported_to_admin' && <p className="mt-3 rounded-2xl bg-emerald-300/10 p-3 text-sm text-emerald-100">運営へ面談日程申請済みです。</p>}
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && selectedMeeting.status === 'reported_to_admin' && (
+                  <div className="mt-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-3">
+                    <p className="text-sm leading-6 text-cyan-100">運営へ面談日程を申請済みです。確認が完了するまでお待ちください。</p>
+                    <button className="btn-secondary mt-3 w-full" disabled>申請中</button>
+                  </div>
+                )}
+                {entrepreneurProfile?.id === selectedMeeting.entrepreneur_id && selectedMeeting.status === 'meeting_date_approved' && (
+                  <button className="btn-primary mt-3 w-full" disabled><CheckCircle2 size={17} /> 承認</button>
+                )}
               </div>
             )}
           </div>
@@ -2795,6 +2889,7 @@ function LegalPage({ slug, currentUser }: { slug: LegalSlug; currentUser: AppUse
   const [email, setEmail] = useState('');
   async function submit(category: string) {
     await supabase!.from('contact_inquiries').insert({ user_id: currentUser.id, email, category, body });
+    await processTriggeredEmailNotifications();
     setBody('');
   }
   return (
@@ -2817,6 +2912,7 @@ function PublicLegalPage({ slug, onBack }: { slug: LegalSlug; onBack: () => void
   const [email, setEmail] = useState('');
   async function submit(category: string) {
     await supabase!.from('contact_inquiries').insert({ email, category, body });
+    await processTriggeredEmailNotifications();
     setBody('');
   }
   return (
@@ -3061,7 +3157,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
       setNotice(toJapaneseError(error.message));
       return;
     }
-    await supabase.from('notifications').insert({ user_id: post.user_id, type: 'comment', body: '進捗投稿にコメントがつきました。' });
+    await createNotification({ user_id: post.user_id, type: 'comment', body: '進捗投稿にコメントがつきました。' });
     setComment('');
     setCommentCount((current) => current + 1);
     setNotice('コメントしました。');
