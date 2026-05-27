@@ -579,7 +579,7 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare
   email_enabled boolean;
 begin
-  if new.type not in ('comment', 'message') then
+  if new.type not in ('comment', 'message', 'follow', 'meeting_request', 'admin_contact_inquiry') then
     return new;
   end if;
 
@@ -594,7 +594,13 @@ begin
       new.user_id,
       new.id,
       new.type,
-      case when new.type = 'comment' then 'Leapでコメントが届きました' else 'Leapでメッセージが届きました' end,
+      case
+        when new.type = 'comment' then 'Leapでコメントが届きました'
+        when new.type = 'message' then 'Leapでメッセージが届きました'
+        when new.type = 'follow' then 'Leapでフォローされました'
+        when new.type = 'meeting_request' then 'Leapで面談申込が届きました'
+        else 'Leapで運営確認が必要な通知があります'
+      end,
       new.body
     );
   end if;

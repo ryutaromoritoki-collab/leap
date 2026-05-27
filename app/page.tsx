@@ -166,6 +166,24 @@ function toJapaneseError(message: string) {
   return message || '処理に失敗しました。';
 }
 
+async function processEmailNotifications() {
+  try {
+    await fetch('/api/send-email-notifications', { method: 'POST' });
+  } catch {
+    // メール送信は通知本体の保存を妨げないようにする。
+  }
+}
+
+async function createNotification(row: { user_id: string; type: string; body: string }) {
+  if (!supabase) return;
+  const { error } = await supabase.from('notifications').insert(row);
+  if (!error) void processEmailNotifications();
+}
+
+async function processTriggeredEmailNotifications() {
+  void processEmailNotifications();
+}
+
 export default function LeapApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
@@ -1105,6 +1123,7 @@ function MeetingTicketPanel({ profile, meetings, refresh }: { profile: Entrepren
       category: 'meeting_ticket_payment',
       body: `${profile.company_name} が面談チケット ${selectedPlan.label}（${yen(selectedPlan.amount)}）の入金確認を希望しています。振込名義: ${transferName}`,
     });
+    await processTriggeredEmailNotifications();
     await supabase.from('entrepreneur_profiles').update({
       meeting_ticket_plan: selectedPlan.label,
       meeting_ticket_requested_count: selectedPlan.count,
@@ -1407,7 +1426,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       setActionMessage(`${profile.company_name}のフォローを解除しました。`);
     } else {
       await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
-      await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
+      await createNotification({ user_id: profile.user_id, type: 'follow', body: 'あなたのプロフィールがフォローされました。' });
       setActionMessage(`${profile.company_name}をフォローしました。`);
     }
     await refresh();
@@ -1438,7 +1457,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       message: meetingMessage,
       proposed_at: meetingDate || null,
     });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'meeting_request', body: '面談リクエストが届きました。' });
+    await createNotification({ user_id: profile.user_id, type: 'meeting_request', body: '面談リクエストが届きました。' });
     setMeetingMessage('');
     setMeetingDate('');
     setActionMessage('面談申込をしました');
@@ -1466,7 +1485,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
       return;
     }
     await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body: comment });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    await createNotification({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setComment('');
     setActionMessage('メッセージを送信しました。');
     await refresh();
@@ -1675,6 +1694,7 @@ function PitchUpload({ profile, refresh }: { profile: EntrepreneurProfile; refre
       setMessage(toJapaneseError(error.message));
       return;
     }
+    await processTriggeredEmailNotifications();
     setMessage('ピッチ資料の相談申請を運営へ送信しました。');
   }
   return (
@@ -1726,7 +1746,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
   async function quickFollow(profile?: EntrepreneurProfile) {
     if (!supabase || !profile) return;
     await supabase.from('follows').upsert({ entrepreneur_id: profile.id, investor_id: currentUser.id });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
+    await createNotification({ user_id: profile.user_id, type: 'follow', body: '投資家があなたをフォローしました。' });
     setNotice(`${profile.company_name}をフォローしました。`);
     await refresh();
   }
@@ -1746,7 +1766,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
       return;
     }
     await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: profile.user_id, body });
-    await supabase.from('notifications').insert({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
+    await createNotification({ user_id: profile.user_id, type: 'message', body: '新しいメッセージが届きました。' });
     setMessageByPost({ ...messageByPost, [post.id]: '' });
     setNotice('メッセージを送信しました。');
   }
@@ -2378,7 +2398,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       setDirectMessage(toJapaneseError(error.message));
       return;
     }
-    await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
+    await createNotification({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
     setMessageBody('');
     setDirectMessage('メッセージを送信しました。');
     await refresh();
@@ -2412,7 +2432,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       setMeetingNotice(toJapaneseError(error.message));
       return;
     }
-    await supabase.from('notifications').insert({ user_id: selectedPartnerId, type: 'meeting_request', body: '面談申込が届きました。' });
+    await createNotification({ user_id: selectedPartnerId, type: 'meeting_request', body: '面談申込が届きました。' });
     setMeetingNotice('面談申込をしました。下の面談用メッセージで日程調整できます。');
     setMeetingToast('面談申込をしました');
     setTimeout(() => setMeetingToast(''), 2200);
@@ -2460,6 +2480,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
       category: 'meeting_date_report',
       body: `${entrepreneurProfile.company_name} が面談日時を申請しました。面談ID: ${meeting.id} / 日時: ${finalDateById[meeting.id] || '未入力'}`,
     });
+    await processTriggeredEmailNotifications();
     await refresh();
   }
   async function sendSupportMessage() {
@@ -2477,6 +2498,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     }
     setSupportBody('');
     setSupportMessage(currentUser.role === 'admin' ? 'ユーザーへ返信を保存しました。' : '運営サポートへメッセージを送信しました。');
+    await processTriggeredEmailNotifications();
     await refresh();
   }
   async function resolveSupportThread(status: 'hold' | 'done') {
@@ -2854,6 +2876,7 @@ function LegalPage({ slug, currentUser }: { slug: LegalSlug; currentUser: AppUse
   const [email, setEmail] = useState('');
   async function submit(category: string) {
     await supabase!.from('contact_inquiries').insert({ user_id: currentUser.id, email, category, body });
+    await processTriggeredEmailNotifications();
     setBody('');
   }
   return (
@@ -2876,6 +2899,7 @@ function PublicLegalPage({ slug, onBack }: { slug: LegalSlug; onBack: () => void
   const [email, setEmail] = useState('');
   async function submit(category: string) {
     await supabase!.from('contact_inquiries').insert({ email, category, body });
+    await processTriggeredEmailNotifications();
     setBody('');
   }
   return (
@@ -3120,7 +3144,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
       setNotice(toJapaneseError(error.message));
       return;
     }
-    await supabase.from('notifications').insert({ user_id: post.user_id, type: 'comment', body: '進捗投稿にコメントがつきました。' });
+    await createNotification({ user_id: post.user_id, type: 'comment', body: '進捗投稿にコメントがつきました。' });
     setComment('');
     setCommentCount((current) => current + 1);
     setNotice('コメントしました。');
