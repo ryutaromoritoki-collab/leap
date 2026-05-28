@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -24,11 +24,8 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   touch-action: manipulation;
-  background:
-    radial-gradient(circle at 18% 0%, rgba(22, 217, 255, 0.18), transparent 34rem),
-    radial-gradient(circle at 90% 10%, rgba(147, 91, 255, 0.18), transparent 34rem),
-    linear-gradient(135deg, #03050a 0%, #080c16 54%, #04060c 100%);
-  color: #eef5ff;
+  background: #f7f8fa;
+  color: #1f2937;
   font-family: Inter, "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -63,14 +60,13 @@ button {
 }
 
 .glass {
-  border: 1px solid rgba(137, 159, 205, 0.18);
-  background: linear-gradient(145deg, rgba(13, 20, 35, 0.92), rgba(9, 13, 23, 0.75));
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(18px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
 }
 
 .neon-text {
-  background: linear-gradient(135deg, #16d9ff, #a979ff 58%, #22e58b);
+  background: linear-gradient(135deg, #00a4bb, #5b6ee1 58%, #21a67a);
   -webkit-background-clip: text;
   color: transparent;
 }
@@ -78,16 +74,16 @@ button {
 .field {
   width: 100%;
   border-radius: 14px;
-  border: 1px solid rgba(137, 159, 205, 0.22);
-  background: rgba(4, 8, 16, 0.88);
-  color: #eef5ff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: #1f2937;
   outline: none;
   padding: 13px 14px;
 }
 
 .field:focus {
-  border-color: rgba(22, 217, 255, 0.72);
-  box-shadow: 0 0 0 3px rgba(22, 217, 255, 0.12);
+  border-color: rgba(0, 164, 187, 0.72);
+  box-shadow: 0 0 0 3px rgba(0, 164, 187, 0.12);
 }
 
 .btn-primary {
@@ -98,11 +94,11 @@ button {
   justify-content: center;
   gap: 8px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #16d9ff, #8d5cff 62%, #22e58b);
-  color: #031018;
+  background: #00a4bb;
+  color: #ffffff;
   font-weight: 800;
   padding: 0 16px;
-  box-shadow: 0 18px 48px rgba(22, 217, 255, 0.2);
+  box-shadow: 0 12px 26px rgba(0, 164, 187, 0.22);
   text-align: center;
   white-space: normal;
 }
@@ -115,9 +111,9 @@ button {
   justify-content: center;
   gap: 8px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #eef5ff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: #1f2937;
   padding: 0 16px;
   text-align: center;
   white-space: normal;
@@ -129,9 +125,9 @@ button {
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd7f1;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f2f4f7;
+  color: #475569;
   padding: 6px 10px;
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -141,8 +137,46 @@ button {
 .label {
   display: grid;
   gap: 8px;
-  color: #c5cee2;
+  color: #475569;
   font-size: 13px;
+}
+
+body .text-slate-50,
+body .text-white {
+  color: #111827;
+}
+
+body .text-slate-100,
+body .text-slate-200,
+body .text-slate-300 {
+  color: #334155;
+}
+
+body .text-slate-400,
+body .text-slate-500 {
+  color: #64748b;
+}
+
+body .text-cyan-100,
+body .text-cyan-200,
+body .text-cyan-300,
+body .text-emerald-100,
+body .text-emerald-300 {
+  color: #00a4bb;
+}
+
+body .bg-black\/20,
+body .bg-black\/30,
+body .bg-white\/5,
+body .bg-white\/\[0\.04\],
+body .bg-white\/10,
+body .bg-white\/8 {
+  background: #f7f8fa;
+}
+
+body .border-white\/10,
+body .border-white\/12 {
+  border-color: rgba(15, 23, 42, 0.08);
 }
 
 @media (max-width: 640px) {
