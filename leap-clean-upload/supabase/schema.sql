@@ -181,6 +181,9 @@ create table public.progress_posts (
   tags text[],
   visibility text not null default 'public',
   view_count int not null default 0,
+  attachment_url text,
+  attachment_name text,
+  attachment_type text,
   is_hidden boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -190,7 +193,10 @@ alter table public.progress_posts
   add column if not exists post_type text not null default 'progress',
   add column if not exists title text,
   add column if not exists body text,
-  add column if not exists view_count int not null default 0;
+  add column if not exists view_count int not null default 0,
+  add column if not exists attachment_url text,
+  add column if not exists attachment_name text,
+  add column if not exists attachment_type text;
 
 create table public.post_views (
   post_id uuid not null references public.progress_posts(id) on delete cascade,
@@ -243,6 +249,9 @@ create table public.messages (
   sender_id uuid not null references public.users(id) on delete cascade,
   receiver_id uuid not null references public.users(id) on delete cascade,
   body text not null,
+  attachment_url text,
+  attachment_name text,
+  attachment_type text,
   read_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -333,6 +342,14 @@ on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
 values ('profile-icons', 'profile-icons', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('post-attachments', 'post-attachments', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('message-attachments', 'message-attachments', true)
 on conflict (id) do nothing;
 
 create table public.contact_inquiries (
@@ -512,6 +529,19 @@ create policy "profile icons owner update" on storage.objects for update using (
   bucket_id = 'profile-icons' and auth.uid()::text = (storage.foldername(name))[1]
 ) with check (
   bucket_id = 'profile-icons' and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+create policy "post attachments owner upload" on storage.objects for insert with check (
+  bucket_id = 'post-attachments' and auth.uid()::text = (storage.foldername(name))[1]
+);
+create policy "post attachments public read" on storage.objects for select using (
+  bucket_id = 'post-attachments'
+);
+create policy "message attachments owner upload" on storage.objects for insert with check (
+  bucket_id = 'message-attachments' and auth.uid()::text = (storage.foldername(name))[1]
+);
+create policy "message attachments participants read" on storage.objects for select using (
+  bucket_id = 'message-attachments'
 );
 
 grant usage on schema public to anon, authenticated;

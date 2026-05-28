@@ -118,6 +118,9 @@ export type ProgressPost = {
   view_count: number | null;
   like_count?: number;
   comment_count?: number;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
   is_hidden: boolean;
   created_at: string;
   entrepreneur_profiles?: EntrepreneurProfile;

@@ -37,6 +37,7 @@ import {
   LogOut,
   Mail,
   MessageCircle,
+  Paperclip,
   Plus,
   RefreshCcw,
   Rocket,
@@ -182,6 +183,24 @@ async function createNotification(row: { user_id: string; type: string; body: st
 
 async function processTriggeredEmailNotifications() {
   void processEmailNotifications();
+}
+
+async function uploadPublicAttachment(bucket: string, userId: string, file: File) {
+  if (!supabase) throw new Error('Supabaseが設定されていません。');
+  const ext = file.name.includes('.') ? file.name.split('.').pop() : 'file';
+  const safeName = file.name.replace(/[^\w.\-ぁ-んァ-ン一-龥]/g, '-').slice(0, 80);
+  const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    contentType: file.type || undefined,
+    upsert: false,
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return {
+    attachment_url: data.publicUrl,
+    attachment_name: safeName || file.name,
+    attachment_type: file.type || 'application/octet-stream',
+  };
 }
 
 export default function LeapApp() {
@@ -715,7 +734,7 @@ function AuthScreen({ onReady, setLegal, initialMessage }: { onReady: () => Prom
   }
 
   return (
-    <main className="grid min-h-screen gap-5 p-4 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+    <main className="grid min-h-screen gap-5 bg-[#f7f8fa] p-4 text-slate-900 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
       <section className="glass relative overflow-hidden rounded-[30px] p-7 lg:p-10">
         <div className="neon-text text-4xl font-black">Leap</div>
         <h1 className="mt-8 max-w-3xl text-4xl font-black leading-tight sm:text-6xl">起業家の成長を、投資家が継続的に観察できる場所へ。</h1>
@@ -727,9 +746,9 @@ function AuthScreen({ onReady, setLegal, initialMessage }: { onReady: () => Prom
         </div>
       </section>
       <section className="glass self-center rounded-[26px] p-6">
-        <div className="grid grid-cols-3 gap-2 rounded-2xl bg-black/30 p-1">
+        <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
           {(['login', 'signup', 'reset'] as const).map((item) => (
-            <button key={item} onClick={() => setMode(item)} className={`rounded-xl px-2 py-3 text-sm ${mode === item ? 'bg-white/12 text-white' : 'text-slate-400'}`}>
+            <button key={item} onClick={() => setMode(item)} className={`rounded-xl px-2 py-3 text-sm ${mode === item ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
               {item === 'login' ? 'ログイン' : item === 'signup' ? '登録' : '再設定'}
             </button>
           ))}
@@ -749,7 +768,7 @@ function AuthScreen({ onReady, setLegal, initialMessage }: { onReady: () => Prom
             </label>
           )}
           {mode === 'signup' && (
-            <p className="rounded-2xl bg-cyan-400/10 p-3 text-xs leading-6 text-cyan-100">
+            <p className="rounded-2xl bg-cyan-50 p-3 text-xs leading-6 text-cyan-700">
               開発中に確認メールの制限が出る場合は、Supabaseの認証設定でメール確認を一時的にオフにすると、すぐ登録テストできます。本番公開時はメール確認をオンに戻してください。
             </p>
           )}
@@ -777,7 +796,7 @@ function AuthScreen({ onReady, setLegal, initialMessage }: { onReady: () => Prom
               <KeyRound size={17} /> パスワードを忘れていますか？
             </button>
           )}
-          {message && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{message}</p>}
+          {message && <p className="rounded-2xl bg-slate-100 p-3 text-sm text-slate-700">{message}</p>}
         </div>
         <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-400">
           {Object.keys(legalCopy).map((slug) => <button key={slug} onClick={() => setLegal(slug as LegalSlug)}>{legalCopy[slug as LegalSlug].title}</button>)}
@@ -1376,6 +1395,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   const [actionMessage, setActionMessage] = useState('');
   const [profileFollowers, setProfileFollowers] = useState<any[]>(followers);
   const [profileFollowing, setProfileFollowing] = useState<any[]>(following);
+  const [showProfileComposer, setShowProfileComposer] = useState(false);
   const [investorGate, setInvestorGate] = useState<{ canContact: boolean; message: string }>({ canContact: currentUser.role !== 'investor', message: '' });
   const isOwnProfile = currentUser.id === profile.user_id;
   const isFollowingProfile = profileFollowers.some((row) => row.entrepreneur_id === profile.id && row.investor_id === currentUser.id);
@@ -1502,16 +1522,39 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
 
   return (
     <div className="grid gap-5">
-      <section className="glass overflow-hidden rounded-[28px] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div>
+      <section className="glass overflow-hidden rounded-[24px] p-5 sm:p-8">
+        <div className="grid gap-5 sm:grid-cols-[150px_1fr] sm:items-start">
+          <div className="grid justify-items-center gap-3">
             <ProfileAvatar name={profile.company_name} avatarUrl={profile.avatar_url} size="lg" />
-            <p className="text-sm font-bold text-emerald-300">起業家プロフィール</p>
-            <h2 className="mt-2 text-4xl font-black">{profile.company_name}</h2>
-            <p className="mt-3 max-w-2xl leading-7 text-slate-300">{profile.tagline || '一言説明は未入力です。'}</p>
+            {isOwnProfile && (
+              <button className="btn-secondary h-11 w-11 rounded-full p-0" onClick={() => setShowProfileComposer(true)} aria-label="投稿を作成">
+                <Plus size={22} />
+              </button>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-cyan-300">@{profile.account_name || 'account'}</p>
+                <h2 className="mt-1 text-2xl font-black sm:text-3xl">{profile.company_name}</h2>
+              </div>
+              {isOwnProfile && <button className="btn-primary" onClick={() => setShowProfileComposer(true)}><Plus size={17} /> 投稿する</button>}
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+              <div><b className="block text-xl">{profileFollowing.length}</b><span className="text-xs text-slate-500">フォロー</span></div>
+              <div><b className="block text-xl">{profileFollowers.length}</b><span className="text-xs text-slate-500">フォロワー</span></div>
+              <div><b className="block text-xl">{yen(profile.total_investment_amount)}</b><span className="text-xs text-slate-500">累計投資</span></div>
+            </div>
+            <p className="mt-5 font-bold">{profile.founder_name}</p>
+            <p className="mt-2 max-w-2xl whitespace-pre-line leading-7 text-slate-600">{profile.tagline || '一言説明は未入力です。'}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="pill">{profile.industry ?? '業界未入力'}</span>
+              <span className="pill">{profile.location ?? '所在地未入力'}</span>
+              <span className="pill">{profile.current_phase ?? 'フェーズ未入力'}</span>
+            </div>
           </div>
           {!isOwnProfile && (
-            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-4">
+            <div className="grid w-full gap-2 sm:col-span-2 sm:grid-cols-4">
               <button className={isFollowingProfile ? 'btn-secondary' : 'btn-primary'} onClick={follow}><Heart size={17} /> {isFollowingProfile ? 'フォロー解除' : 'フォロー'}</button>
               <button className="btn-secondary" onClick={quickMessage}><Send size={17} /> メッセージ</button>
               {currentUser.role === 'investor' && <button className="btn-secondary" onClick={watch}><Bookmark size={17} /> ウォッチ</button>}
@@ -1519,6 +1562,17 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
             </div>
           )}
         </div>
+        {showProfileComposer && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[24px] bg-white p-4 shadow-2xl">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-lg font-black">新しい投稿</h3>
+                <button className="btn-secondary px-3" onClick={() => setShowProfileComposer(false)}>閉じる</button>
+              </div>
+              <PostComposer profile={profile} refresh={async () => { await refresh(); setShowProfileComposer(false); }} />
+            </div>
+          </div>
+        )}
         {actionMessage && <p className="mt-4 rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{actionMessage}</p>}
         {!isOwnProfile && !investorGate.canContact && <p className="mt-4 rounded-2xl bg-amber-300/10 p-3 text-sm leading-6 text-amber-100">通常メッセージは送信できます。コメント・面談希望は、法人番号または運転免許証の提出後に利用できます。</p>}
         <BadgeRow profile={profile} />
@@ -1568,6 +1622,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
 
 function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refresh: () => Promise<void> }) {
   const [form, setForm] = useState<Record<string, string>>({ visibility: 'public', post_type: 'private' });
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [toast, setToast] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const isPrivatePost = form.post_type === 'private';
@@ -1576,6 +1631,13 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
     setErrorMessage('');
     const body = form.body?.trim() ?? '';
     const didToday = (form.did_today?.trim() || body.slice(0, 80) || '今日の投稿').trim();
+    let attachment: Awaited<ReturnType<typeof uploadPublicAttachment>> | null = null;
+    try {
+      if (attachmentFile) attachment = await uploadPublicAttachment('post-attachments', profile.user_id, attachmentFile);
+    } catch (error: any) {
+      setErrorMessage(toJapaneseError(error.message));
+      return;
+    }
     const { error } = await supabase!.from('progress_posts').insert({
       entrepreneur_id: profile.id,
       user_id: profile.user_id,
@@ -1590,12 +1652,16 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
       tags: splitTags(form.tags),
       visibility: form.visibility,
       is_hidden: false,
+      attachment_url: attachment?.attachment_url ?? null,
+      attachment_name: attachment?.attachment_name ?? null,
+      attachment_type: attachment?.attachment_type ?? null,
     });
     if (error) {
       setErrorMessage(toJapaneseError(error.message));
       return;
     }
     setForm({ visibility: 'public', post_type: 'private' });
+    setAttachmentFile(null);
     setToast('投稿しました');
     setTimeout(() => setToast(''), 2200);
     await refresh();
@@ -1627,6 +1693,10 @@ function PostComposer({ profile, refresh }: { profile: EntrepreneurProfile; refr
         <FieldGrid textarea fields={['did_today:今日やったこと', 'metric_change:数値の変化', 'issue:課題', 'next_action:次にやること', 'related_kpi:関連KPI', 'tags:タグ（カンマ区切り）']} form={form} set={(n, v) => setForm({ ...form, [n]: v })} />
       )}
       <label className="label mt-4">公開範囲<select className="field" value={form.visibility} onChange={(e) => setForm({ ...form, visibility: e.target.value })}>{visibilityOptions.map((v) => <option key={v} value={v}>{visibilityLabels[v]}</option>)}</select></label>
+      <label className="label mt-4">画像・ファイル（任意）
+        <input className="field" type="file" accept="image/*,.pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx" onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)} />
+      </label>
+      {attachmentFile && <p className="mt-2 text-sm text-slate-400"><Paperclip size={14} className="inline" /> {attachmentFile.name}</p>}
       <button className="btn-primary mt-4 w-full" onClick={submit} disabled={isPrivatePost ? !form.body?.trim() : !form.did_today?.trim()}><Plus size={17} /> 投稿する</button>
       {errorMessage && <p className="mt-3 rounded-2xl bg-rose-400/10 p-3 text-sm text-rose-100">{errorMessage}</p>}
     </section>
@@ -1987,6 +2057,7 @@ function FeedPost({
               {post.tags.map((tag) => <span className="text-sm font-bold text-cyan-300" key={tag}>#{tag}</span>)}
             </div>
           ) : null}
+          <AttachmentPreview url={post.attachment_url} name={post.attachment_name} type={post.attachment_type} />
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-400">
             <span className="pill"><Gauge size={13} /> 閲覧 {viewCount.toLocaleString()}回</span>
             <span className="pill"><Heart size={13} /> いいね {likeCount.toLocaleString()}</span>
@@ -2027,6 +2098,22 @@ function TimelineDetail({ title, body }: { title: string; body?: string | null }
       <span className="text-xs font-bold text-cyan-300">{title}</span>
       <p className="mt-1 whitespace-pre-line break-words text-sm leading-6 text-slate-300">{body || '未入力'}</p>
     </div>
+  );
+}
+
+function AttachmentPreview({ url, name, type }: { url?: string | null; name?: string | null; type?: string | null }) {
+  if (!url) return null;
+  const isImage = type?.startsWith('image/');
+  return (
+    <a className="mt-3 block overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" href={url} target="_blank" rel="noreferrer">
+      {isImage ? (
+        <img src={url} alt={name || '添付画像'} className="max-h-[420px] w-full object-cover" />
+      ) : (
+        <div className="flex items-center gap-2 p-4 text-sm font-bold text-slate-700">
+          <Paperclip size={18} /> {name || '添付ファイルを開く'}
+        </div>
+      )}
+    </a>
   );
 }
 
@@ -2315,6 +2402,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
   const [selectedSupportKey, setSelectedSupportKey] = useState('');
   const [selectedPartnerId, setSelectedPartnerId] = useState(target?.userId ?? '');
   const [messageBody, setMessageBody] = useState('');
+  const [messageFile, setMessageFile] = useState<File | null>(null);
   const [directMessage, setDirectMessage] = useState('');
   const [meetingNotice, setMeetingNotice] = useState('');
   const [meetingToast, setMeetingToast] = useState('');
@@ -2385,20 +2473,35 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
     await refresh();
   }
   async function sendDirectMessage() {
-    if (!supabase || !selectedPartnerId || !messageBody.trim()) return;
-    const body = messageBody.trim();
+    if (!supabase || !selectedPartnerId || (!messageBody.trim() && !messageFile)) return;
+    const body = messageBody.trim() || '添付ファイルを送信しました。';
     if (!contactExchangeAllowed && containsContactInfo(body)) {
       await supabase.from('contact_suspicions').insert({ sender_id: currentUser.id, receiver_id: selectedPartnerId, body, reason: 'メッセージ内に連絡先交換の疑いがあります。' });
       setDirectMessage('連絡先交換につながる可能性がある内容は送信できません。');
       return;
     }
-    const { error } = await supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: selectedPartnerId, body });
+    let attachment: Awaited<ReturnType<typeof uploadPublicAttachment>> | null = null;
+    try {
+      if (messageFile) attachment = await uploadPublicAttachment('message-attachments', currentUser.id, messageFile);
+    } catch (error: any) {
+      setDirectMessage(toJapaneseError(error.message));
+      return;
+    }
+    const { error } = await supabase.from('messages').insert({
+      sender_id: currentUser.id,
+      receiver_id: selectedPartnerId,
+      body,
+      attachment_url: attachment?.attachment_url ?? null,
+      attachment_name: attachment?.attachment_name ?? null,
+      attachment_type: attachment?.attachment_type ?? null,
+    });
     if (error) {
       setDirectMessage(toJapaneseError(error.message));
       return;
     }
     await createNotification({ user_id: selectedPartnerId, type: 'message', body: '新しいメッセージが届きました。' });
     setMessageBody('');
+    setMessageFile(null);
     setDirectMessage('メッセージを送信しました。');
     await refresh();
   }
@@ -2577,6 +2680,7 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
                       <div key={message.id} className={`grid gap-1 ${isMine ? 'justify-items-end' : 'justify-items-start'}`}>
                         <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-6 ${isMine ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-slate-100'}`}>
                           {message.body}
+                          <AttachmentPreview url={message.attachment_url} name={message.attachment_name} type={message.attachment_type} />
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-slate-500">
                           <span>{new Date(message.created_at).toLocaleString('ja-JP')}</span>
@@ -2587,7 +2691,14 @@ function Messages({ currentUser, entrepreneurProfile, messages, supportInquiries
                   })}
                 </div>
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <textarea className="field min-h-20" value={messageBody} onChange={(e) => setMessageBody(e.target.value)} placeholder="メッセージを書く" />
+                  <div className="grid gap-2">
+                    <textarea className="field min-h-20" value={messageBody} onChange={(e) => setMessageBody(e.target.value)} placeholder="メッセージを書く" />
+                    <label className="btn-secondary justify-start">
+                      <Paperclip size={16} /> 画像・ファイルを添付
+                      <input className="hidden" type="file" accept="image/*,.pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx" onChange={(e) => setMessageFile(e.target.files?.[0] ?? null)} />
+                    </label>
+                    {messageFile && <p className="text-xs text-slate-500">{messageFile.name}</p>}
+                  </div>
                   <button className="btn-primary self-stretch" onClick={sendDirectMessage}><Send size={17} /> 送信</button>
                 </div>
                 {directMessage && <p className="text-sm text-slate-300">{directMessage}</p>}
@@ -3180,6 +3291,7 @@ function PostCard({ post, currentUser, investor, refresh }: { post: ProgressPost
         <Detail title="次にやること" body={post.next_action} />
       </div>}
       <div className="mt-4 flex flex-wrap gap-2">{post.tags?.map((tag) => <span className="pill" key={tag}>#{tag}</span>)}</div>
+      <AttachmentPreview url={post.attachment_url} name={post.attachment_name} type={post.attachment_type} />
       {currentUser?.id === post.user_id && (
         <div className="mt-4 flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={hideOwnPost}><EyeOff size={16} /> 非公開</button>
