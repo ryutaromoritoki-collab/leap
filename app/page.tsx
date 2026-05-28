@@ -36,6 +36,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  Menu,
   MessageCircle,
   Paperclip,
   Plus,
@@ -516,6 +517,8 @@ export default function LeapApp() {
     return <FullScreenMessage title="Leapを起動しています" body="最新のプロフィールと投稿を確認しています。" />;
   }
 
+  const showShellHeader = !(view === 'home' && user.role === 'entrepreneur');
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="glass fixed inset-y-0 left-0 z-20 hidden w-[260px] border-y-0 border-l-0 p-5 lg:block">
@@ -537,27 +540,29 @@ export default function LeapApp() {
       </aside>
 
       <main className="min-w-0 px-4 pb-28 pt-5 sm:px-6 lg:col-start-2 lg:px-8">
-        <header className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-emerald-300">資本提携プラットフォーム</p>
-            <h1 className="text-2xl font-black sm:text-3xl">{titleFor(view, user.role)}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="btn-secondary hidden h-11 px-3 text-xs sm:inline-flex"><Bell size={16} /> {notifications.length}</span>
-            {user.role !== 'admin' && (
-              <button className="btn-secondary h-11 px-3 text-xs" onClick={() => switchRole(user.role === 'entrepreneur' ? 'investor' : 'entrepreneur')}>
-                {user.role === 'entrepreneur' ? '投資家画面へ' : '起業家画面へ'}
-              </button>
-            )}
-            <button className="btn-secondary h-11 px-3" onClick={() => setView('settings')} aria-label="設定"><Settings size={17} /></button>
-            <button className="btn-secondary h-11 px-3" onClick={signOut}><LogOut size={17} /></button>
-          </div>
-        </header>
+        {showShellHeader && (
+          <header className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-emerald-300">資本提携プラットフォーム</p>
+              <h1 className="text-2xl font-black sm:text-3xl">{titleFor(view, user.role)}</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="btn-secondary hidden h-11 px-3 text-xs sm:inline-flex"><Bell size={16} /> {notifications.length}</span>
+              {user.role !== 'admin' && (
+                <button className="btn-secondary h-11 px-3 text-xs" onClick={() => switchRole(user.role === 'entrepreneur' ? 'investor' : 'entrepreneur')}>
+                  {user.role === 'entrepreneur' ? '投資家画面へ' : '起業家画面へ'}
+                </button>
+              )}
+              <button className="btn-secondary h-11 px-3" onClick={() => setView('settings')} aria-label="設定"><Settings size={17} /></button>
+              <button className="btn-secondary h-11 px-3" onClick={signOut}><LogOut size={17} /></button>
+            </div>
+          </header>
+        )}
 
         {toast && <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{toast}</div>}
 
         {view === 'home' && user.role === 'entrepreneur' && (
-          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} hiddenPosts={hiddenPosts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} openProfile={openStartupProfile} refresh={loadWorkspace} />
+          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} hiddenPosts={hiddenPosts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'investor' && (
           <InvestorHome currentUser={user} investor={investor} profiles={profiles} investorProfiles={investorProfiles} posts={posts} follows={follows} following={following} followers={followers} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
@@ -973,36 +978,101 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
   );
 }
 
-function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, openProfile, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; refresh: () => Promise<void> }) {
+function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, openProfile, setView, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (view: View) => void; refresh: () => Promise<void> }) {
+  const [showComposer, setShowComposer] = useState(false);
+  const [activeTab, setActiveTab] = useState<'threads' | 'replies' | 'media' | 'reposts'>('threads');
   if (!profile) return <Onboarding user={currentUser} onDone={refresh} />;
   const completeness = calcCompleteness(profile);
-  const scrollToComposer = () => document.getElementById('quick-post-composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const displayName = profile.company_name || profile.founder_name || 'Leapユーザー';
+  const accountName = profile.account_name || 'account';
+  const mediaPosts = posts.filter((post) => post.attachment_url);
+  const tabPosts = activeTab === 'media' ? mediaPosts : posts;
   return (
-    <div className="grid gap-5">
-      <section className="glass rounded-[28px] p-6">
-        <p className="text-sm font-bold text-emerald-300">今日やるべきこと</p>
-        <h2 className="mt-2 text-3xl font-black">{profile.company_name}</h2>
-        <p className="mt-3 max-w-3xl leading-7 text-slate-300">投資家に評価される投稿は、実行内容、数値変化、課題、次の検証が揃っています。小さな進捗でも、継続して残すことで信頼の材料になります。</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <Metric label="プロフィール完成度" value={`${completeness}%`} icon={CheckCircle2} />
-          <Metric label="フォロー数" value={`${following.length}`} icon={Heart} />
-          <Metric label="フォロワー数" value={`${followers.length}`} icon={UsersRound} />
-          <Metric label="面談リクエスト" value={`${meetings.length}`} icon={CalendarClock} />
-          <Metric label="面談チケット" value={`${profile.meeting_ticket_balance ?? 0}枚`} icon={CircleDollarSign} />
-          <Metric label="進捗投稿" value={`${posts.length}`} icon={FileText} />
+    <div className="mx-auto grid w-full max-w-3xl gap-5">
+      <section className="glass overflow-hidden rounded-[28px]">
+        <div className="flex items-center justify-between p-5">
+          <button className="btn-secondary h-11 w-11 rounded-full p-0" aria-label="分析"><ChartNoAxesCombined size={20} /></button>
+          <div className="flex items-center gap-2">
+            <button className="btn-secondary h-11 w-11 rounded-full p-0" onClick={() => setView('search')} aria-label="検索"><Search size={21} /></button>
+            <button className="btn-secondary h-11 w-11 rounded-full p-0" onClick={() => setView('settings')} aria-label="メニュー"><Menu size={21} /></button>
+          </div>
         </div>
+        <div className="grid gap-4 px-5 pb-5">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="break-words text-3xl font-black sm:text-4xl">{displayName}</h2>
+              <p className="mt-1 text-base font-bold text-slate-500">@{accountName}</p>
+            </div>
+            <div className="relative shrink-0">
+              <ProfileAvatar name={displayName} avatarUrl={profile.avatar_url} size="lg" />
+              <button className="absolute -left-4 bottom-0 grid h-11 w-11 place-items-center rounded-full border-4 border-white bg-slate-900 text-white shadow-lg" onClick={() => setShowComposer(true)} aria-label="投稿を作成">
+                <Plus size={22} />
+              </button>
+            </div>
+          </div>
+          <p className="whitespace-pre-line break-words text-base leading-8 text-slate-700">
+            {profile.tagline || `${profile.company_name}の最新情報を発信しています。`}
+          </p>
+          <p className="text-sm leading-7 text-slate-500">
+            投資家に評価される投稿は、実行内容、数値変化、課題、次の検証が揃っています。小さな進捗も継続して残しましょう。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[profile.industry, profile.current_phase, profile.location, profile.employee_size, `${completeness}%完了`].filter(Boolean).map((item) => (
+              <span className="pill" key={String(item)}>{String(item)}</span>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 text-sm text-slate-500">
+            <div className="flex -space-x-2">
+              {[...followers.slice(0, 3), ...following.slice(0, Math.max(0, 3 - followers.length))].slice(0, 3).map((row, index) => (
+                <span key={`${row.investor_id ?? row.entrepreneur_id ?? index}`} className="grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-slate-200 text-xs font-black">{index + 1}</span>
+              ))}
+            </div>
+            <span>フォロワー {followers.length.toLocaleString()}人</span>
+            <span>フォロー {following.length.toLocaleString()}人</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="btn-secondary" onClick={() => setView('settings')}>プロフィールを編集</button>
+            <button className="btn-secondary" onClick={() => navigator.share?.({ title: displayName, text: profile.tagline || displayName }).catch(() => undefined)}>プロフィールをシェア</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 border-t border-slate-200 text-sm font-black text-slate-500">
+          {[
+            ['threads', 'スレッド'],
+            ['replies', '返信'],
+            ['media', 'メディア'],
+            ['reposts', '再投稿'],
+          ].map(([key, label]) => (
+            <button key={key} className={`py-4 ${activeTab === key ? 'border-b-2 border-slate-900 text-slate-950' : ''}`} onClick={() => setActiveTab(key as typeof activeTab)}>{label}</button>
+          ))}
+        </div>
+        <div>
+          {activeTab === 'replies' || activeTab === 'reposts' ? (
+            <div className="p-5"><EmptyState title={activeTab === 'replies' ? '返信はまだありません' : '再投稿はまだありません'} body="投稿や会話が増えるとここに表示されます。" /></div>
+          ) : tabPosts.length === 0 ? (
+            <div className="p-5"><EmptyState title={activeTab === 'media' ? 'メディア付き投稿はまだありません' : 'まだ投稿がありません。まずは短い近況から投稿しましょう。'} cta="投稿する" onClick={() => setShowComposer(true)} /></div>
+          ) : (
+            tabPosts.map((post) => <HomeThreadPost key={post.id} post={post} name={displayName} accountName={accountName} avatarUrl={profile.avatar_url} currentUser={currentUser} refresh={refresh} />)
+          )}
+        </div>
+      </section>
+      {showComposer && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[24px] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-black">新しい投稿</h3>
+              <button className="btn-secondary px-3" onClick={() => setShowComposer(false)}>閉じる</button>
+            </div>
+            <PostComposer profile={profile} refresh={async () => { await refresh(); setShowComposer(false); }} />
+          </div>
+        </div>
+      )}
+      <section id="quick-post-composer" className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
+        <PostComposer profile={profile} refresh={refresh} />
+        <KpiComposer profile={profile} refresh={refresh} />
       </section>
       <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} viewer={currentUser} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
-      <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-        <PostComposer profile={profile} refresh={refresh} />
-        <KpiComposer profile={profile} refresh={refresh} />
-      </div>
       <PitchUpload profile={profile} refresh={refresh} />
-      <section className="grid gap-3">
-        <h3 className="text-xl font-black">進捗ログ</h3>
-        {posts.length === 0 ? <EmptyState title="まだ投稿がありません。まずは短い近況から投稿しましょう。" cta="投稿する" onClick={scrollToComposer} /> : posts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} refresh={refresh} />)}
-      </section>
       <HiddenPostsPanel posts={hiddenPosts} refresh={refresh} />
       <KpiDashboard profile={profile} kpis={kpis} compact />
     </div>
@@ -1062,6 +1132,75 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
         {recommendedPosts.length === 0 ? <EmptyState title="おすすめ投稿はまだありません" body="フォローしていない起業家の投稿がここに表示されます。" /> : recommendedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} refresh={refresh} />)}
       </section>
     </div>
+  );
+}
+
+function HomeThreadPost({ post, name, accountName, avatarUrl, currentUser, refresh }: { post: ProgressPost; name: string; accountName: string; avatarUrl?: string | null; currentUser: AppUser; refresh: () => Promise<void> }) {
+  const [removed, setRemoved] = useState(false);
+  const [notice, setNotice] = useState('');
+  const isPrivatePost = post.post_type === 'private';
+  const body = isPrivatePost ? post.body : post.did_today;
+  const postedAt = new Date(post.created_at).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+
+  async function deleteOwnPost() {
+    if (!supabase || currentUser.id !== post.user_id) return;
+    if (!window.confirm('この投稿を削除します。元に戻せません。よろしいですか？')) return;
+    const { error } = await supabase.from('progress_posts').delete().eq('id', post.id).eq('user_id', currentUser.id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setRemoved(true);
+    await refresh();
+  }
+
+  async function hideOwnPost() {
+    if (!supabase || currentUser.id !== post.user_id) return;
+    const { error } = await supabase.from('progress_posts').update({ is_hidden: true }).eq('id', post.id).eq('user_id', currentUser.id);
+    if (error) {
+      setNotice(toJapaneseError(error.message));
+      return;
+    }
+    setRemoved(true);
+    await refresh();
+  }
+
+  if (removed) return null;
+  return (
+    <article className="border-t border-slate-200 p-5">
+      <div className="grid grid-cols-[52px_1fr] gap-3">
+        <ProfileAvatar name={name} avatarUrl={avatarUrl} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <b className="truncate">{accountName}</b>
+            <span className="text-sm text-slate-500">{postedAt}</span>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{isPrivatePost ? '最新情報' : '進捗ログ'}</p>
+          <p className="mt-3 whitespace-pre-line break-words text-base leading-8 text-slate-800">{body || '本文はありません。'}</p>
+          {!isPrivatePost && (
+            <div className="mt-3 grid gap-2 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+              {post.metric_change && <p><b>数値:</b> {post.metric_change}</p>}
+              {post.issue && <p><b>課題:</b> {post.issue}</p>}
+              {post.next_action && <p><b>次:</b> {post.next_action}</p>}
+            </div>
+          )}
+          <AttachmentPreview url={post.attachment_url} name={post.attachment_name} type={post.attachment_type} />
+          <div className="mt-4 flex flex-wrap items-center gap-6 text-slate-500">
+            <button className="inline-flex items-center gap-2"><Heart size={22} /> {post.like_count ?? 0}</button>
+            <button className="inline-flex items-center gap-2"><MessageCircle size={22} /> {post.comment_count ?? 0}</button>
+            <button className="inline-flex items-center gap-2"><RefreshCcw size={22} /></button>
+            <button className="inline-flex items-center gap-2"><Send size={22} /></button>
+          </div>
+          {currentUser.id === post.user_id && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button className="btn-secondary min-h-10 px-3 text-sm" onClick={hideOwnPost}><EyeOff size={15} /> 非公開</button>
+              <button className="btn-secondary min-h-10 px-3 text-sm" onClick={deleteOwnPost}><Trash2 size={15} /> 削除</button>
+            </div>
+          )}
+          {notice && <p className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm text-slate-700">{notice}</p>}
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -1225,7 +1364,7 @@ function HiddenPostsPanel({ posts, refresh }: { posts: ProgressPost[]; refresh: 
     await refresh();
   }
   return (
-    <section id="quick-post-composer" className="glass scroll-mt-24 rounded-[24px] p-5">
+    <section className="glass scroll-mt-24 rounded-[24px] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-emerald-300">非表示投稿</p>
