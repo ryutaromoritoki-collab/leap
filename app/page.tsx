@@ -102,10 +102,10 @@ const legalCopy: Record<LegalSlug, { title: string; body: string }> = {
 
 const nav = [
   { view: 'home' as View, label: 'ホーム', icon: Home },
-  { view: 'post' as View, label: '投稿', icon: FileText },
   { view: 'search' as View, label: '検索', icon: Search },
-  { view: 'kpi' as View, label: 'KPI', icon: LayoutDashboard },
+  { view: 'post' as View, label: '投稿', icon: Plus },
   { view: 'messages' as View, label: 'メッセージ', icon: Mail },
+  { view: 'settings' as View, label: 'マイページ', icon: UserRound },
   { view: 'admin' as View, label: '管理', icon: ShieldCheck },
 ];
 
@@ -590,9 +590,9 @@ export default function LeapApp() {
         {view === 'launch' && <LaunchChecklist />}
       </main>
 
-      <nav className="bottom-phone-nav fixed bottom-3 left-3 right-3 z-30 mx-auto grid max-w-[430px] grid-cols-6 gap-1 rounded-3xl p-2 lg:hidden">
+      <nav className="bottom-phone-nav fixed bottom-3 left-3 right-3 z-30 mx-auto grid max-w-[430px] grid-cols-5 gap-1 rounded-3xl p-2 lg:hidden">
         {nav.filter((item) => item.view !== 'admin' || user.role === 'admin').map((item) => (
-          <button key={item.view} onClick={() => setView(item.view)} className={`grid min-h-12 place-items-center rounded-2xl ${view === item.view ? 'bg-slate-950 text-white' : 'text-slate-500'}`} aria-label={item.label}>
+          <button key={item.view} onClick={() => setView(item.view)} className={`grid min-h-12 place-items-center rounded-2xl ${item.view === 'post' ? 'bg-slate-950 text-white shadow-lg' : view === item.view ? 'bg-slate-100 text-slate-950' : 'text-slate-500'}`} aria-label={item.label}>
             <item.icon size={21} />
           </button>
         ))}
@@ -990,6 +990,7 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
   return (
     <div className="mobile-screen grid gap-5">
       <section className="app-card overflow-hidden">
+        <PhoneHeader title="SNSフィード（Threads型）" />
         <div className="flex items-center justify-between px-4 py-3">
           <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white" aria-label="分析"><ChartNoAxesCombined size={20} /></button>
           <div className="flex items-center gap-2">
@@ -1030,7 +1031,9 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
           )}
         </div>
       </section>
-      <section className="app-card p-4">
+      <section className="app-card overflow-hidden">
+        <PhoneHeader title="プロフィール（X型）" />
+        <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="app-section-title">マイプロフィール</p>
@@ -1059,6 +1062,7 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button className="btn-secondary" onClick={() => setView('settings')}>プロフィールを編集</button>
           <button className="btn-primary" onClick={() => setShowComposer(true)}>投稿する</button>
+        </div>
         </div>
       </section>
       {showComposer && (
@@ -1091,17 +1095,19 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
   const recommendedPosts = posts.filter((post) => !followedIds.has(post.entrepreneur_id));
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <section className="app-card p-5 lg:col-span-2">
-        <p className="app-section-title">投資家ホーム</p>
-        <h2 className="mt-3 text-2xl font-black">成長投稿とKPIから有望な起業家を発見</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">毎週の進捗、課題への向き合い方、数値の改善速度、返信の丁寧さを見て判断できます。</p>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="app-card overflow-hidden lg:col-span-2">
+        <PhoneHeader title="投資家プロフィール" />
+        <div className="p-5">
+          <h2 className="text-2xl font-black">成長投稿とKPIから有望な起業家を発見</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">毎週の進捗、課題への向き合い方、数値の改善速度、返信の丁寧さを見て判断できます。</p>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Metric label="フォロー数" value={`${following.length}`} icon={Heart} />
           <Metric label="フォロワー数" value={`${followers.length}`} icon={UsersRound} />
           <Metric label="新着進捗" value={`${posts.length}`} icon={TrendingUp} />
           <Metric label="面談状況" value={`${meetings.length}`} icon={CalendarClock} />
           <Metric label="未返信メッセージ" value={`${messages.filter((m) => !m.read_at).length}`} icon={Mail} />
           <Metric label="累計投資金額" value={yen(investor?.total_investment_amount)} icon={CircleDollarSign} />
+          </div>
         </div>
       </section>
       <InvestorDocumentPanel investor={investor} refresh={refresh} />
@@ -1490,9 +1496,10 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
   const newEntrants = profiles.filter((p: any) => Date.now() - new Date(p.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000);
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-      <section className="app-card p-5">
-        <p className="app-section-title">検索・発見</p>
-        <h2 className="mt-3 text-2xl font-black">アカウントを探す</h2>
+      <section className="app-card overflow-hidden">
+        <PhoneHeader title="検索・発見" />
+        <div className="p-5">
+        <h2 className="text-2xl font-black">アカウントを探す</h2>
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4">
           <Search size={18} />
           <input className="field border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="アカウント名、会社名、名前、業界、地域で検索" />
@@ -1505,6 +1512,7 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
           <label className="pill"><input type="checkbox" onChange={(e) => setFilters({ ...filters, interviewed: e.target.checked })} /> 運営面談済み</label>
         </div>
         <button className="btn-primary mt-4 w-full" onClick={() => setApplied({ ...filters, query })}><Search size={17} /> この条件で検索する</button>
+        </div>
       </section>
       <section className="grid gap-4">
         {newEntrants.length > 0 && (
@@ -1672,6 +1680,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
       <section className="app-card overflow-hidden lg:col-span-2">
+        <PhoneHeader title="起業家プロフィール（Wantedly型）" />
         <div className="h-28 bg-gradient-to-br from-blue-50 via-indigo-50 to-emerald-50" />
         <div className="grid gap-5 p-5 sm:grid-cols-[140px_1fr] sm:items-start">
           <div className="-mt-16 grid justify-items-center gap-3">
@@ -2060,17 +2069,19 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-2xl gap-4">
-      <div className="px-1">
-        <p className="text-sm font-bold text-emerald-300">投稿</p>
-        <h2 className="mt-1 text-3xl font-black">タイムライン</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">起業家の近況や進捗を時系列で確認できます。気になる投稿からすぐにプロフィール確認、フォロー、メッセージができます。</p>
+    <section className="mobile-screen grid gap-4">
+      <div className="app-card overflow-hidden">
+        <PhoneHeader title="SNSフィード（Threads型）" />
+        <div className="p-4">
+          <h2 className="text-2xl font-black">タイムライン</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">起業家の近況や進捗を時系列で確認できます。</p>
+        </div>
       </div>
       {notice && <p className="rounded-2xl bg-white/8 p-3 text-sm text-slate-200">{notice}</p>}
       {visiblePosts.length === 0 ? (
         <EmptyState title="表示できる投稿はまだありません" body="起業家が投稿すると、この一覧に表示されます。" />
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-white/10 bg-black/25">
+        <div className="app-card overflow-hidden">
           {visiblePosts.map((post) => (
             <FeedPost
               key={post.id}
@@ -3201,6 +3212,20 @@ function LaunchChecklist() {
 
 function InfoTile({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
   return <div className="rounded-2xl border border-white/10 bg-white/6 p-4"><Icon className="text-cyan-300" size={20} /><b className="mt-3 block">{title}</b><p className="mt-1 text-sm leading-6 text-slate-400">{body}</p></div>;
+}
+
+function PhoneHeader({ title }: { title: string }) {
+  return (
+    <div className="border-b border-slate-100 bg-white px-4 pt-3">
+      <div className="flex items-center justify-between text-xs font-black text-slate-950">
+        <span>9:41</span>
+        <span className="tracking-[2px]">••• ▰</span>
+      </div>
+      <div className="grid place-items-center pb-3 pt-1">
+        <span className="app-section-title">{title}</span>
+      </div>
+    </div>
+  );
 }
 
 function Metric({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
