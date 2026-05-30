@@ -423,11 +423,21 @@ export default function LeapApp() {
     setPage('tickets');
   }
 
+  async function logout() {
+    const supabase = createSupabaseBrowserClient();
+    if (supabase) await supabase.auth.signOut();
+    setCurrentAccountId('');
+    setSelectedAccountId('');
+    setMenuOpen(false);
+    setPage('auth');
+    flash('ログアウトしました');
+  }
+
   return (
     <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
       <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:overflow-hidden lg:rounded-[28px]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} logout={logout} />
 
         <section className="min-h-0 overflow-y-auto pb-24 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
@@ -479,7 +489,7 @@ export default function LeapApp() {
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null }) {
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, logout }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; logout: () => void | Promise<void> }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -514,6 +524,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             ['admin', '管理者画面'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
+          {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
         </div>
       )}
     </header>
@@ -608,18 +619,27 @@ function SearchPage({ query, setQuery, results, openProfile }: { query: string; 
 }
 
 function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNotices: (notices: Notice[]) => void }) {
+  const [tab, setTab] = useState<'all' | 'unread'>('all');
+  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
+  const visibleNotices = tab === 'unread' ? notices.filter((notice) => notice.unread) : notices;
+  function openNotice(notice: Notice) {
+    const readNotice = { ...notice, unread: false };
+    setNotices(notices.map((item) => item.id === notice.id ? readNotice : item));
+    setSelectedNotice(readNotice);
+  }
+
   return (
     <div>
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className="border-b-2 border-blue-600 py-3">すべて</button>
-        <button className="py-3 text-slate-500">未読</button>
+        <button className={`py-3 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
+        <button className={`py-3 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
-      {notices.length === 0 ? (
-        <EmptyState icon={<Bell size={28} />} title="通知はまだありません" body="フォロー、コメント、面談申込、メッセージが届くと表示されます。" />
+      {visibleNotices.length === 0 ? (
+        <EmptyState icon={<Bell size={28} />} title={tab === 'unread' ? '未読通知はありません' : '通知はまだありません'} body="フォロー、コメント、面談申込、メッセージが届くと表示されます。" />
       ) : (
         <div className="divide-y divide-slate-100">
-          {notices.map((notice) => (
-            <button key={notice.id} className="flex w-full gap-3 px-4 py-4 text-left" onClick={() => setNotices(notices.map((item) => item.id === notice.id ? { ...item, unread: false } : item))}>
+          {visibleNotices.map((notice) => (
+            <button key={notice.id} className="flex w-full gap-3 px-4 py-4 text-left" onClick={() => openNotice(notice)}>
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><Bell size={18} /></span>
               <span className="min-w-0 flex-1">
                 <b className="block text-sm">{notice.body}</b>
@@ -629,6 +649,15 @@ function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNoti
             </button>
           ))}
         </div>
+      )}
+      {selectedNotice && (
+        <Modal title="通知詳細" onClose={() => setSelectedNotice(null)}>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-black leading-7">{selectedNotice.body}</p>
+            <p className="mt-2 text-xs font-bold text-slate-500">{formatDate(selectedNotice.createdAt)}</p>
+          </div>
+          <button className="primary mt-4 w-full" onClick={() => setSelectedNotice(null)}>閉じる</button>
+        </Modal>
       )}
     </div>
   );
@@ -1028,7 +1057,6 @@ function ProfileHero({ account, isMine, posts, setPage }: { account: Account; is
       <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
       <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
       <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>0</b> フォロー</span><span><b>0</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
-      {isMine && <button className="secondary mt-4 w-full" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>}
     </section>
   );
 }
