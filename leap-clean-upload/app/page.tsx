@@ -10,855 +10,709 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
-  Download,
   FileText,
   Heart,
   Home,
+  Image as ImageIcon,
   Mail,
-  Menu,
   MessageCircle,
   MoreHorizontal,
+  Paperclip,
   Plus,
   Search,
   Send,
+  Settings,
   ShieldCheck,
-  Star,
   UserRound,
   UsersRound,
 } from 'lucide-react';
 
-type Screen = 'feed' | 'search' | 'matching' | 'messages' | 'notifications' | 'my';
+type Page = 'feed' | 'search' | 'notifications' | 'messages' | 'mypage' | 'profile' | 'deal' | 'matching';
+type Role = 'entrepreneur' | 'investor';
 type FeedTab = 'following' | 'recommended' | 'investors' | 'entrepreneurs';
 
-type Entrepreneur = {
+type Account = {
   id: string;
+  role: Role;
+  accountName: string;
   name: string;
-  account: string;
   company: string;
   title: string;
-  avatar: string;
-  status: string;
+  industry: string;
   location: string;
-  founded: string;
-  round: string;
-  category: string;
-  tags: string[];
-  description: string;
-  project: string;
-  fundingGoal: string;
-  fundingNow: string;
-  ownership: string;
-  monthlyRevenue: string;
-  growth: string;
-  team: string;
-  match: number;
-  followers: string;
-};
-
-type Investor = {
-  id: string;
-  name: string;
-  account: string;
-  company: string;
-  avatar: string;
-  verified: boolean;
-  range: string;
-  domains: string;
   stage: string;
+  foundedMonth: string;
+  employeeSize: string;
+  revenueScale: string;
   bio: string;
+  avatarLabel: string;
+  fundingGoal: string;
+  monthlyRevenue: string;
+  growthRate: string;
+  customerCount: string;
+  investmentRange: string;
+  supportAreas: string;
+  verified: boolean;
 };
 
 type Post = {
   id: string;
   authorId: string;
-  authorType: 'entrepreneur' | 'investor';
   body: string;
   tags: string[];
-  minutesAgo: string;
-  image?: boolean;
-  cheers: number;
-  invests: number;
+  attachmentName: string;
+  createdAt: string;
+  likes: number;
+  saves: number;
   meetings: number;
+  views: number;
 };
 
-const entrepreneurs: Entrepreneur[] = [
-  {
-    id: 'next-create',
-    name: '山田 太郎',
-    account: 'next_create',
-    company: '株式会社Next Create',
-    title: 'CEO',
-    avatar: '山',
-    status: '資金調達中',
-    location: '東京都',
-    founded: '創業2年',
-    round: 'シード',
-    category: 'AI業務自動化SaaS',
-    tags: ['SaaS', 'AI', 'BtoB'],
-    description: 'テクノロジーの力で、働く人々の生産性を最大化するSaaSプロダクトを開発しています。',
-    project: 'AIを活用した業務自動化SaaSを開発・提供しています。ノーコードで業務フローを自動化し、企業の生産性向上に貢献します。',
-    fundingGoal: '3,000万円',
-    fundingNow: '1,200万円（40%）',
-    ownership: '10%以下',
-    monthlyRevenue: '320万円',
-    growth: '+25%',
-    team: '4人',
-    match: 92,
-    followers: '1,250社',
-  },
-  {
-    id: 'greentech',
-    name: '鈴木 健一',
-    account: 'green_tech',
-    company: '株式会社GreenTech',
-    title: 'CEO',
-    avatar: '鈴',
-    status: '資金調達中',
-    location: '福岡県',
-    founded: '創業1年',
-    round: 'プレシード',
-    category: '環境テックSaaS',
-    tags: ['Climate', 'AI', 'SaaS'],
-    description: '環境データの可視化で、中小企業の脱炭素経営を支援しています。',
-    project: 'CO2排出量の自動計測と削減施策のレコメンドを提供するクラウドサービスを開発しています。',
-    fundingGoal: '2,000万円',
-    fundingNow: '800万円（40%）',
-    ownership: '12%以下',
-    monthlyRevenue: '180万円',
-    growth: '+18%',
-    team: '3人',
-    match: 89,
-    followers: '820社',
-  },
-  {
-    id: 'ed-connect',
-    name: '伊藤 明',
-    account: 'ed_connect',
-    company: '株式会社EdConnect',
-    title: 'CEO',
-    avatar: '伊',
-    status: '資金調達中',
-    location: '大阪府',
-    founded: '創業3年',
-    round: 'シリーズA',
-    category: '教育プラットフォーム',
-    tags: ['EdTech', 'DX', 'HR'],
-    description: '学習データと企業研修をつなぎ、リスキリングを加速させるサービスを提供しています。',
-    project: '企業向け研修管理、学習履歴分析、人材配置支援を一体化した教育プラットフォームです。',
-    fundingGoal: '1,500万円',
-    fundingNow: '900万円（60%）',
-    ownership: '8%以下',
-    monthlyRevenue: '120万円',
-    growth: '+14%',
-    team: '7人',
-    match: 85,
-    followers: '610社',
-  },
-];
+type DirectMessage = {
+  id: string;
+  partnerId: string;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+};
 
-const investors: Investor[] = [
-  {
-    id: 'hana',
-    name: '佐藤 花子',
-    account: 'Future Ventures',
-    company: 'Future Ventures',
-    avatar: '佐',
-    verified: true,
-    range: '1〜3億円',
-    domains: 'AI / SaaS / DX / Fintech',
-    stage: 'シード〜シリーズA',
-    bio: 'シード・アーリーステージのスタートアップに投資を行っています。特にAI・SaaS領域を中心に、事業成長をハンズオンで支援します。',
-  },
-  {
-    id: 'tanaka',
-    name: '田中 剛',
-    account: 'Growth Capital',
-    company: 'Growth Capital',
-    avatar: '田',
-    verified: false,
-    range: '3,000万〜1億円',
-    domains: 'BtoB SaaS / HR / EC',
-    stage: 'プレシード〜シード',
-    bio: '事業提携や営業戦略づくりを得意とし、初期の仮説検証から支援します。',
-  },
-];
+type Notice = {
+  id: string;
+  body: string;
+  createdAt: string;
+  unread: boolean;
+};
 
-const initialPosts: Post[] = [
-  {
-    id: 'p1',
-    authorId: 'next-create',
-    authorType: 'entrepreneur',
-    body: '新しいSaaSプロダクトのβ版をリリースしました！初日で100社以上にご登録いただき、手応えを感じています。引き続き、プロダクトの改善とグロースに集中していきます！',
-    tags: ['SaaS', 'BtoB', 'AI'],
-    minutesAgo: '23時間前',
-    image: true,
-    cheers: 128,
-    invests: 32,
-    meetings: 15,
-  },
-  {
-    id: 'p2',
-    authorId: 'hana',
-    authorType: 'investor',
-    body: 'AI×SaaS領域で面白いスタートアップを探しています！特に、業務効率化やデータ活用系のプロダクトに興味があります。',
-    tags: ['投資家募集', 'AI', 'SaaS'],
-    minutesAgo: '3時間前',
-    cheers: 42,
-    invests: 9,
-    meetings: 5,
-  },
-];
+const industries = ['AI / SaaS', 'Fintech', 'HR', 'EdTech', 'ヘルスケア', '環境・脱炭素', '小売DX', '製造DX', 'その他'];
+const locations = ['北海道', '東京都', '神奈川県', '愛知県', '大阪府', '福岡県', '沖縄県', '海外'];
+const stages = ['アイデア', 'プレシード', 'シード', 'シリーズA', 'シリーズB以降'];
+const employeeSizes = ['1人', '5人未満', '20人未満', '50人未満', '100人未満', '100-500人', '501-1000人', '1001-5000人', '5001人以上'];
+const revenueScales = ['1,000万円未満', '1,000万円〜5,000万円', '5,000万円〜1億円', '1億円〜5億円', '5億円以上', '未回答'];
+
+const emptyAccount: Account = {
+  id: '',
+  role: 'entrepreneur',
+  accountName: '',
+  name: '',
+  company: '',
+  title: '',
+  industry: '',
+  location: '',
+  stage: '',
+  foundedMonth: '',
+  employeeSize: '',
+  revenueScale: '',
+  bio: '',
+  avatarLabel: '',
+  fundingGoal: '',
+  monthlyRevenue: '',
+  growthRate: '',
+  customerCount: '',
+  investmentRange: '',
+  supportAreas: '',
+  verified: false,
+};
 
 export default function LeapApp() {
-  const [screen, setScreen] = useState<Screen>('feed');
+  const [page, setPage] = useState<Page>('feed');
   const [feedTab, setFeedTab] = useState<FeedTab>('recommended');
-  const [posts, setPosts] = useState<Post[]>(initialPosts);
-  const [selectedEntrepreneur, setSelectedEntrepreneur] = useState(entrepreneurs[0]);
-  const [selectedInvestor, setSelectedInvestor] = useState(investors[0]);
-  const [showComposer, setShowComposer] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [currentAccountId, setCurrentAccountId] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [following, setFollowing] = useState<string[]>([]);
+  const [savedPosts, setSavedPosts] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
+  const [showComposer, setShowComposer] = useState(false);
+  const [postDraft, setPostDraft] = useState('');
+  const [postTags, setPostTags] = useState('');
+  const [postAttachment, setPostAttachment] = useState('');
   const [messageDraft, setMessageDraft] = useState('');
-  const [messages, setMessages] = useState([
-    { id: 'm1', name: '山田 太郎', body: '画面の件について、ご確認させてください。', time: '10:30' },
-    { id: 'm2', name: '鈴木 健一', body: 'ピッチ資料をお送りしました。ご確認お願いします。', time: '昨日' },
-    { id: 'm3', name: '佐藤 花子', body: '来週の火曜日はいかがでしょうか？', time: '2日前' },
-  ]);
 
-  const filteredEntrepreneurs = useMemo(() => {
+  const currentAccount = accounts.find((account) => account.id === currentAccountId) ?? null;
+  const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? currentAccount;
+
+  const feedPosts = useMemo(() => {
+    if (feedTab === 'following') return posts.filter((post) => following.includes(post.authorId));
+    if (feedTab === 'investors') return posts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'investor');
+    if (feedTab === 'entrepreneurs') return posts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'entrepreneur');
+    return posts;
+  }, [accounts, feedTab, following, posts]);
+
+  const searchResults = useMemo(() => {
     const text = query.trim().toLowerCase();
-    if (!text) return entrepreneurs;
-    return entrepreneurs.filter((item) => `${item.name} ${item.account} ${item.company} ${item.category} ${item.tags.join(' ')}`.toLowerCase().includes(text));
-  }, [query]);
+    if (!text) return accounts;
+    return accounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
+  }, [accounts, query]);
+
+  function flash(body: string) {
+    setToast(body);
+    window.setTimeout(() => setToast(''), 1800);
+  }
+
+  function openProfile(account: Account) {
+    setSelectedAccountId(account.id);
+    setPage(account.role === 'entrepreneur' ? 'profile' : 'profile');
+  }
 
   function submitPost() {
-    if (!draft.trim()) return;
-    setPosts((current) => [
+    if (!currentAccount) {
+      setPage('mypage');
+      flash('先にプロフィールを作成してください');
+      return;
+    }
+    if (!postDraft.trim()) return;
+    setPosts((list) => [
       {
-        id: `post-${Date.now()}`,
-        authorId: 'next-create',
-        authorType: 'entrepreneur',
-        body: draft.trim(),
-        tags: ['最新情報'],
-        minutesAgo: 'たった今',
-        cheers: 0,
-        invests: 0,
+        id: crypto.randomUUID(),
+        authorId: currentAccount.id,
+        body: postDraft.trim(),
+        tags: postTags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        attachmentName: postAttachment.trim(),
+        createdAt: new Date().toISOString(),
+        likes: 0,
+        saves: 0,
         meetings: 0,
+        views: 0,
       },
-      ...current,
+      ...list,
     ]);
-    setDraft('');
+    setPostDraft('');
+    setPostTags('');
+    setPostAttachment('');
     setShowComposer(false);
-    showToast('投稿しました');
+    flash('投稿しました');
   }
 
-  function sendMessage() {
-    if (!messageDraft.trim()) return;
-    setMessages((current) => [{ id: `m-${Date.now()}`, name: 'あなた', body: messageDraft.trim(), time: '今' }, ...current]);
+  function reactToPost(postId: string, type: 'like' | 'save' | 'meeting') {
+    setPosts((list) => list.map((post) => {
+      if (post.id !== postId) return post;
+      if (type === 'like') return { ...post, likes: post.likes + 1 };
+      if (type === 'meeting') return { ...post, meetings: post.meetings + 1 };
+      return { ...post, saves: post.saves + 1 };
+    }));
+    if (type === 'save') setSavedPosts((list) => list.includes(postId) ? list : [...list, postId]);
+    flash(type === 'like' ? '応援しました' : type === 'save' ? '保存しました' : '面談申込をしました');
+  }
+
+  function requestMeeting(account: Account) {
+    setNotices((list) => [{ id: crypto.randomUUID(), body: `${account.accountName || account.name}へ面談申込を送信しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+    flash('面談申込をしました');
+  }
+
+  function follow(account: Account) {
+    if (!currentAccount) {
+      setPage('mypage');
+      flash('先にプロフィールを作成してください');
+      return;
+    }
+    setFollowing((list) => list.includes(account.id) ? list.filter((id) => id !== account.id) : [...list, account.id]);
+    flash(following.includes(account.id) ? 'フォロー解除しました' : 'フォローしました');
+  }
+
+  function sendMessage(partner: Account | null) {
+    if (!partner || !messageDraft.trim()) return;
+    setMessages((list) => [{ id: crypto.randomUUID(), partnerId: partner.id, body: messageDraft.trim(), createdAt: new Date().toISOString(), mine: true }, ...list]);
     setMessageDraft('');
-    showToast('メッセージを送信しました');
-  }
-
-  function showToast(text: string) {
-    setToast(text);
-    window.setTimeout(() => setToast(''), 1800);
+    flash('メッセージを送信しました');
   }
 
   return (
     <main className="min-h-screen bg-[#eef5ff] text-[#101828]">
-      <div className="mx-auto max-w-[1180px] px-3 py-4 sm:px-5">
-        <HeroBoard
-          posts={posts}
-          feedTab={feedTab}
-          setFeedTab={setFeedTab}
-          openComposer={() => setShowComposer(true)}
-          openEntrepreneur={(item) => {
-            setSelectedEntrepreneur(item);
-            setScreen('my');
-          }}
-          openInvestor={(item) => {
-            setSelectedInvestor(item);
-            setScreen('my');
-          }}
-          selectedEntrepreneur={selectedEntrepreneur}
-          selectedInvestor={selectedInvestor}
-          requestMeeting={() => showToast('面談申込をしました')}
-        />
+      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl">
+        <AppHeader page={page} goBack={() => setPage('feed')} />
 
-        <FeatureAndPlan />
-
-        <section className="mt-5 grid gap-4 lg:grid-cols-5">
-          <DiscoveryPanel query={query} setQuery={setQuery} results={filteredEntrepreneurs} open={(item) => setSelectedEntrepreneur(item)} />
-          <AdvancedSearchPanel />
-          <MatchingPanel results={filteredEntrepreneurs} open={(item) => setSelectedEntrepreneur(item)} requestMeeting={() => showToast('面談申込をしました')} />
-          <MessagesPanel messages={messages} draft={messageDraft} setDraft={setMessageDraft} send={sendMessage} />
-          <NotificationsPanel />
+        <section className="min-h-0 overflow-y-auto pb-24">
+          {page === 'feed' && (
+            <FeedPage
+              posts={feedPosts}
+              accounts={accounts}
+              feedTab={feedTab}
+              setFeedTab={setFeedTab}
+              openComposer={() => setShowComposer(true)}
+              openProfile={openProfile}
+              reactToPost={reactToPost}
+            />
+          )}
+          {page === 'search' && (
+            <SearchPage
+              query={query}
+              setQuery={setQuery}
+              results={searchResults}
+              openProfile={openProfile}
+            />
+          )}
+          {page === 'notifications' && <NotificationsPage notices={notices} setNotices={setNotices} />}
+          {page === 'messages' && (
+            <MessagesPage
+              accounts={accounts}
+              currentAccount={currentAccount}
+              selectedAccount={selectedAccount}
+              messages={messages}
+              draft={messageDraft}
+              setDraft={setMessageDraft}
+              sendMessage={sendMessage}
+              openProfile={openProfile}
+              setSelectedAccountId={setSelectedAccountId}
+            />
+          )}
+          {page === 'mypage' && (
+            <MyPage
+              accounts={accounts}
+              currentAccount={currentAccount}
+              setAccounts={setAccounts}
+              setCurrentAccountId={setCurrentAccountId}
+              posts={posts.filter((post) => post.authorId === currentAccount?.id)}
+              openComposer={() => setShowComposer(true)}
+            />
+          )}
+          {(page === 'profile' || page === 'deal') && selectedAccount && (
+            <ProfilePage
+              account={selectedAccount}
+              posts={posts.filter((post) => post.authorId === selectedAccount.id)}
+              isFollowing={following.includes(selectedAccount.id)}
+              isMine={currentAccount?.id === selectedAccount.id}
+              follow={() => follow(selectedAccount)}
+              message={() => {
+                setSelectedAccountId(selectedAccount.id);
+                setPage('messages');
+              }}
+              requestMeeting={() => requestMeeting(selectedAccount)}
+              openDeal={() => setPage('deal')}
+              dealMode={page === 'deal'}
+            />
+          )}
+          {page === 'matching' && <MatchingPage accounts={accounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
 
-        <section className="mx-auto mt-6 max-w-[430px] rounded-[34px] border border-blue-100 bg-white shadow-xl lg:hidden">
-          {screen === 'feed' && <FeedScreen posts={posts} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} />}
-          {screen === 'search' && <DiscoveryPanel query={query} setQuery={setQuery} results={filteredEntrepreneurs} open={(item) => setSelectedEntrepreneur(item)} compact />}
-          {screen === 'matching' && <MatchingPanel results={filteredEntrepreneurs} open={(item) => setSelectedEntrepreneur(item)} requestMeeting={() => showToast('面談申込をしました')} compact />}
-          {screen === 'messages' && <MessagesPanel messages={messages} draft={messageDraft} setDraft={setMessageDraft} send={sendMessage} compact />}
-          {screen === 'notifications' && <NotificationsPanel compact />}
-          {screen === 'my' && <EntrepreneurProfile profile={selectedEntrepreneur} requestMeeting={() => showToast('面談申込をしました')} />}
-          <BottomNav screen={screen} setScreen={setScreen} openComposer={() => setShowComposer(true)} />
-        </section>
+        <BottomTabs page={page} setPage={setPage} openComposer={() => setShowComposer(true)} />
       </div>
 
       {showComposer && (
-        <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-3 sm:place-items-center">
-          <div className="w-full max-w-[430px] rounded-[26px] bg-white p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-black">投稿する</h2>
-              <button className="grid h-9 w-9 place-items-center rounded-full bg-slate-100" onClick={() => setShowComposer(false)}><MoreHorizontal size={18} /></button>
-            </div>
-            <textarea
-              className="mt-4 min-h-36 w-full resize-none rounded-2xl border border-slate-200 p-4 text-sm outline-none focus:border-blue-400"
-              placeholder="今日の進捗、資金調達の状況、相談したいことを書いてください"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <div className="mt-3 flex items-center justify-between">
-              <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-xs font-bold"><FileText size={16} /> 画像・資料</button>
-              <button className="rounded-xl bg-[#050816] px-5 py-3 text-sm font-black text-white" onClick={submitPost}>投稿する</button>
-            </div>
-          </div>
-        </div>
+        <Modal onClose={() => setShowComposer(false)} title="投稿する">
+          <textarea className="field min-h-40 resize-none" placeholder="今の進捗、相談したいこと、投資家に知ってほしいことを書いてください" value={postDraft} onChange={(event) => setPostDraft(event.target.value)} />
+          <input className="field mt-3" placeholder="タグ。例：SaaS, AI, 資金調達" value={postTags} onChange={(event) => setPostTags(event.target.value)} />
+          <input className="field mt-3" placeholder="添付ファイル名または画像名" value={postAttachment} onChange={(event) => setPostAttachment(event.target.value)} />
+          <button className="primary mt-4 w-full" onClick={submitPost}>投稿する</button>
+        </Modal>
       )}
 
-      {toast && <div className="fixed left-1/2 top-5 z-[60] -translate-x-1/2 rounded-full bg-[#050816] px-5 py-3 text-sm font-black text-white shadow-2xl">{toast}</div>}
+      {toast && <div className="fixed left-1/2 top-5 z-[70] -translate-x-1/2 rounded-full bg-[#050816] px-5 py-3 text-xs font-black text-white shadow-xl">{toast}</div>}
     </main>
   );
 }
 
-function HeroBoard({
-  posts,
-  feedTab,
-  setFeedTab,
-  openComposer,
-  openEntrepreneur,
-  openInvestor,
-  selectedEntrepreneur,
-  selectedInvestor,
-  requestMeeting,
-}: {
-  posts: Post[];
-  feedTab: FeedTab;
-  setFeedTab: (tab: FeedTab) => void;
-  openComposer: () => void;
-  openEntrepreneur: (item: Entrepreneur) => void;
-  openInvestor: (item: Investor) => void;
-  selectedEntrepreneur: Entrepreneur;
-  selectedInvestor: Investor;
-  requestMeeting: () => void;
-}) {
+function AppHeader({ page, goBack }: { page: Page; goBack: () => void }) {
+  const title: Record<Page, string> = {
+    feed: 'フィード',
+    search: '検索',
+    notifications: '通知',
+    messages: 'メッセージ',
+    mypage: 'マイページ',
+    profile: 'プロフィール',
+    deal: '案件詳細',
+    matching: 'マッチング',
+  };
+  const canBack = page === 'profile' || page === 'deal' || page === 'matching';
   return (
-    <section className="grid gap-3 lg:grid-cols-4">
-      <PhoneFrame title="SNSフィード（Threads型）">
-        <FeedScreen posts={posts} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={openComposer} openEntrepreneur={openEntrepreneur} openInvestor={openInvestor} />
-      </PhoneFrame>
-      <PhoneFrame title="起業家プロフィール（Wantedly型）">
-        <EntrepreneurProfile profile={selectedEntrepreneur} requestMeeting={requestMeeting} />
-      </PhoneFrame>
-      <PhoneFrame title="案件詳細ページ（ダッシュボード型）">
-        <DealDetail profile={selectedEntrepreneur} requestMeeting={requestMeeting} />
-      </PhoneFrame>
-      <PhoneFrame title="投資家プロフィール">
-        <InvestorProfile investor={selectedInvestor} requestMeeting={requestMeeting} />
-      </PhoneFrame>
-    </section>
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-100 bg-white/95 px-4 backdrop-blur">
+      <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : undefined} aria-label="戻る">
+        {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
+      </button>
+      <h1 className="text-sm font-black">{title[page]}</h1>
+      <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="設定"><MoreHorizontal size={20} /></button>
+    </header>
   );
 }
 
-function FeedScreen({
-  posts,
-  feedTab,
-  setFeedTab,
-  openComposer,
-  openEntrepreneur,
-  openInvestor,
-}: {
-  posts: Post[];
-  feedTab: FeedTab;
-  setFeedTab: (tab: FeedTab) => void;
-  openComposer: () => void;
-  openEntrepreneur?: (item: Entrepreneur) => void;
-  openInvestor?: (item: Investor) => void;
-}) {
+function FeedPage({ posts, accounts, feedTab, setFeedTab, openComposer, openProfile, reactToPost }: { posts: Post[]; accounts: Account[]; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void }) {
   return (
     <div>
-      <TopBar />
       <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
         {[
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
           ['investors', '投資家'],
           ['entrepreneurs', '起業家'],
-        ].map(([key, label]) => (
-          <button key={key} className={`py-3 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>
-        ))}
+        ].map(([key, label]) => <button key={key} className={`py-3 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
       </div>
-      <div className="flex gap-3 overflow-x-auto px-4 py-3">
+      <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-4 py-3">
         <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
           <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
           投稿する
         </button>
-        {entrepreneurs.concat(entrepreneurs.slice(0, 1)).map((item, index) => (
-          <button key={`${item.id}-${index}`} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openEntrepreneur?.(item)}>
-            <Avatar label={item.avatar} active={index % 2 === 0} />
-            <span className="w-full truncate">{item.name.replace(' ', '')}</span>
-          </button>
-        ))}
+        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{account.accountName || account.name}</span></button>)}
       </div>
-      <div className="divide-y divide-slate-100">
-        {posts.map((post) => (
-          <FeedPost key={post.id} post={post} openEntrepreneur={openEntrepreneur} openInvestor={openInvestor} />
-        ))}
-      </div>
+      {posts.length === 0 ? (
+        <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="プロフィールを作成して、最初の投稿をしてみましょう。" action="投稿する" onAction={openComposer} />
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {posts.map((post) => {
+            const author = accounts.find((account) => account.id === post.authorId);
+            return <PostCard key={post.id} post={post} author={author} openProfile={openProfile} reactToPost={reactToPost} />;
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function FeedPost({ post, openEntrepreneur, openInvestor }: { post: Post; openEntrepreneur?: (item: Entrepreneur) => void; openInvestor?: (item: Investor) => void }) {
-  const entrepreneur = entrepreneurs.find((item) => item.id === post.authorId);
-  const investor = investors.find((item) => item.id === post.authorId);
-  const name = entrepreneur?.name || investor?.name || 'Leapユーザー';
-  const company = entrepreneur ? `${entrepreneur.company} ${entrepreneur.title}` : investor?.company || '';
+function SearchPage({ query, setQuery, results, openProfile }: { query: string; setQuery: (value: string) => void; results: Account[]; openProfile: (account: Account) => void }) {
   return (
-    <article className="px-4 py-4">
-      <button className="flex w-full items-start gap-3 text-left" onClick={() => entrepreneur ? openEntrepreneur?.(entrepreneur) : investor && openInvestor?.(investor)}>
-        <Avatar label={entrepreneur?.avatar || investor?.avatar || 'L'} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-[13px] font-black">{name} <span className="font-medium text-slate-500">{company}</span></p>
-            {entrepreneur && <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700">{entrepreneur.status}</span>}
-          </div>
-          <p className="mt-1 text-[10px] text-slate-500">{post.minutesAgo}</p>
+    <div className="p-4">
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3">
+        <Search size={17} className="text-slate-400" />
+        <input className="min-w-0 flex-1 text-sm outline-none" placeholder="アカウント名、会社名、業界で検索" value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] font-bold">
+        {['起業家', '投資家', '案件', '投稿'].map((item) => <button className="rounded-full bg-slate-50 px-2 py-2" key={item}>{item}</button>)}
+      </div>
+      <FilterBlock />
+      <h2 className="mt-6 text-sm font-black">検索結果</h2>
+      {results.length === 0 ? (
+        <EmptyState icon={<Search size={28} />} title="表示できるアカウントがありません" body="登録されたアカウントだけがここに表示されます。" />
+      ) : (
+        <div className="mt-3 grid gap-3">
+          {results.map((account) => <AccountRow key={account.id} account={account} onClick={() => openProfile(account)} />)}
         </div>
-      </button>
-      <p className="mt-3 whitespace-pre-line text-[12px] leading-6 text-slate-900">{post.body}</p>
-      <div className="mt-3 flex flex-wrap gap-1">
-        {post.tags.map((tag) => <span key={tag} className="text-[10px] font-bold text-blue-600">#{tag}</span>)}
-      </div>
-      {post.image && <DashboardImage />}
-      <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] font-black">
-        <button className="rounded-xl border border-slate-100 px-2 py-2 text-rose-600"><Heart className="mx-auto mb-1" size={15} />応援する<br />{post.cheers}</button>
-        <button className="rounded-xl border border-slate-100 px-2 py-2 text-emerald-600"><Bookmark className="mx-auto mb-1" size={15} />投資したい<br />{post.invests}</button>
-        <button className="rounded-xl border border-slate-100 px-2 py-2 text-blue-600"><UsersRound className="mx-auto mb-1" size={15} />面談したい<br />{post.meetings}</button>
-      </div>
-    </article>
+      )}
+    </div>
   );
 }
 
-function EntrepreneurProfile({ profile, requestMeeting }: { profile: Entrepreneur; requestMeeting: () => void }) {
+function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNotices: (notices: Notice[]) => void }) {
   return (
     <div>
-      <TopBar back />
-      <div className="px-4 pb-4">
-        <div className="flex items-start gap-4">
-          <Avatar label={profile.avatar} size="lg" />
-          <div className="min-w-0 flex-1">
-            <span className="rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-black text-white">{profile.status}</span>
-            <h2 className="mt-2 text-lg font-black">{profile.name} <CheckCircle2 className="inline text-blue-600" size={14} /></h2>
-            <p className="text-[11px] text-slate-600">{profile.company} {profile.title}</p>
-            <p className="mt-2 text-[10px] text-slate-500">{profile.location}　{profile.founded}　{profile.round}</p>
-          </div>
-        </div>
-        <ProfileTabs tabs={['概要', '事業', '実績', 'チーム', '投稿']} />
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <MiniStat label="調達希望額" value={profile.fundingGoal} />
-          <MiniStat label="現在の調達状況" value={profile.fundingNow} />
-          <MiniStat label="株式放出割合" value={profile.ownership} />
-          <MiniStat label="月次売上" value={profile.monthlyRevenue} />
-          <MiniStat label="成長率（MoM）" value={profile.growth} green />
-          <MiniStat label="チーム人数" value={profile.team} />
-        </div>
-        <TextBlock title="自己紹介" body={profile.description} />
-        <TextBlock title="事業概要" body={profile.project} more />
-        <div className="sticky bottom-0 mt-4 grid grid-cols-2 gap-2 bg-white py-2">
-          <button className="rounded-xl border border-slate-200 py-3 text-[12px] font-black" onClick={requestMeeting}>面談を申し込む</button>
-          <button className="rounded-xl bg-[#050816] py-3 text-[12px] font-black text-white">投資に関心がある</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DealDetail({ profile, requestMeeting }: { profile: Entrepreneur; requestMeeting: () => void }) {
-  return (
-    <div>
-      <TopBar back />
-      <div className="px-4 pb-4">
-        <h2 className="text-base font-black">AI業務自動化SaaS「NextFlow」</h2>
-        <div className="mt-2 flex flex-wrap gap-1">{profile.tags.concat(['資金調達中']).map((tag) => <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600" key={tag}>{tag}</span>)}</div>
-        <DashboardImage large />
-        <h3 className="mt-4 text-sm font-black">ハイライト</h3>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <MiniStat label="月次売上" value={profile.monthlyRevenue} />
-          <MiniStat label="成長率（MoM）" value={profile.growth} green />
-          <MiniStat label="累計ユーザー数" value={profile.followers} />
-          <MiniStat label="解約率" value="2.1%" />
-          <MiniStat label="MRR" value="350万円" />
-          <MiniStat label="SNSフォロワー" value="3.2倍" />
-        </div>
-        <h3 className="mt-4 text-sm font-black">関連情報</h3>
-        <InfoRows rows={[
-          ['調達希望額', profile.fundingGoal],
-          ['現在の調達状況', profile.fundingNow],
-          ['株式放出割合', profile.ownership],
-          ['資金使途', 'プロダクト開発 / マーケティング / 人材採用'],
-          ['ラウンド', profile.round],
-          ['調達完了予定', '2024年8月'],
-        ]} />
-        <div className="mt-4 rounded-2xl border border-slate-100 p-3">
-          <p className="text-[12px] font-black">ピッチ資料</p>
-          <div className="mt-2 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-[11px]">
-            <FileText className="text-red-500" size={18} />
-            <span className="flex-1">NextFlow_PitchDeck.pdf<br /><span className="text-slate-500">PDF・3.2MB</span></span>
-            <Download size={16} />
-          </div>
-        </div>
-        <div className="sticky bottom-0 mt-4 grid grid-cols-2 gap-2 bg-white py-2">
-          <button className="rounded-xl border border-slate-200 py-3 text-[12px] font-black" onClick={requestMeeting}>面談を申し込む</button>
-          <button className="rounded-xl bg-[#050816] py-3 text-[12px] font-black text-white">投資に関心がある</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InvestorProfile({ investor, requestMeeting }: { investor: Investor; requestMeeting: () => void }) {
-  return (
-    <div>
-      <TopBar back />
-      <div className="px-4 pb-4">
-        <div className="flex items-start gap-4">
-          <Avatar label={investor.avatar} size="lg" />
-          <div>
-            <h2 className="text-lg font-black">{investor.name} {investor.verified && <CheckCircle2 className="inline text-blue-600" size={14} />}</h2>
-            <p className="text-[11px] text-slate-600">Investment Partner<br />@{investor.account}</p>
-            <span className="mt-2 inline-flex rounded-full bg-violet-50 px-3 py-1 text-[10px] font-black text-violet-700">投資家認証済み</span>
-          </div>
-        </div>
-        <ProfileTabs tabs={['概要', '投資方針', '投資実績', '投稿']} />
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <MiniStat label="投資可能額" value={investor.range} />
-          <MiniStat label="主な投資領域" value={investor.domains} />
-          <MiniStat label="投資ステージ" value={investor.stage} />
-        </div>
-        <TextBlock title="自己紹介" body={investor.bio} />
-        <h3 className="mt-4 text-sm font-black">支援できること</h3>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-bold">
-          {['資金調達', '事業戦略', '営業支援', '組織構築', 'ネットワーク提供', 'プロダクト改善'].map((item) => <span className="rounded-xl bg-slate-50 p-3" key={item}><ShieldCheck className="mr-1 inline text-blue-500" size={13} />{item}</span>)}
-        </div>
-        <h3 className="mt-4 text-sm font-black">投資実績（一部）</h3>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] font-bold">
-          {['TechNova', 'Cloudship', 'Paylight'].map((item) => <span className="rounded-xl bg-slate-50 p-3 text-center" key={item}><Star className="mx-auto mb-1 text-blue-500" size={15} />{item}</span>)}
-        </div>
-        <button className="mx-auto mt-3 block text-[11px] font-black text-blue-600">もっと見る ＞</button>
-        <div className="sticky bottom-0 mt-4 grid grid-cols-2 gap-2 bg-white py-2">
-          <button className="rounded-xl border border-slate-200 py-3 text-[12px] font-black">メッセージ</button>
-          <button className="rounded-xl bg-[#050816] py-3 text-[12px] font-black text-white" onClick={requestMeeting}>面談を申し込む</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeatureAndPlan() {
-  const features = [
-    ['SNSフィード', '日々の活動や成果をリアルタイムで発信', MessageCircle],
-    ['マッチング', '投資家と起業家を最適にマッチング', UsersRound],
-    ['面談設定', 'カレンダーから簡単に日程調整', CalendarCheck],
-    ['ピッチ資料共有', '安全に資料を共有してフィードバック', FileText],
-    ['実績バッジ', '信頼性を可視化する各種認証・バッジ', ShieldCheck],
-  ] as const;
-  const plans = [
-    ['起業家Pro', '¥9,800/月', '調達案件の掲載、ピッチ資料掲載、AI案件診断、優先表示など'],
-    ['投資家Pro', '¥29,800/月', '詳細検索・DM制限、案件アラート通知、面談設定など'],
-    ['スポンサープラン', '¥50,000〜/月', 'トップページ掲載、おすすめ表示、イベント告知など'],
-    ['その他の収益', '個別見積', '面談オプション課金、レポート提供、ファンド運用など'],
-  ];
-  return (
-    <section className="mt-5 grid gap-4 rounded-[28px] bg-white p-5 shadow-sm lg:grid-cols-2">
-      <div>
-        <h2 className="text-sm font-black">主な機能</h2>
-        <div className="mt-4 grid grid-cols-5 gap-3">
-          {features.map(([title, body, Icon]) => <div className="text-center" key={title}><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-blue-600"><Icon size={24} /></span><b className="mt-3 block text-[12px]">{title}</b><p className="mt-1 text-[10px] leading-4 text-slate-500">{body}</p></div>)}
-        </div>
-      </div>
-      <div>
-        <h2 className="text-sm font-black">マネタイズモデル</h2>
-        <div className="mt-4 grid grid-cols-4 gap-3">
-          {plans.map(([name, price, body], index) => <div className="rounded-2xl border border-slate-100 p-3" key={name}><b className={`text-[12px] ${index === 0 ? 'text-emerald-600' : index === 1 ? 'text-violet-600' : index === 2 ? 'text-amber-600' : 'text-slate-700'}`}>{name}</b><p className="mt-1 text-[13px] font-black">{price}</p><p className="mt-2 text-[10px] leading-4 text-slate-500">{body}</p></div>)}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function DiscoveryPanel({ query, setQuery, results, open, compact }: { query: string; setQuery: (value: string) => void; results: Entrepreneur[]; open: (item: Entrepreneur) => void; compact?: boolean }) {
-  return (
-    <Panel title="検索・発見" compact={compact}>
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-        <Search size={15} className="text-slate-400" />
-        <input className="min-w-0 flex-1 text-[11px] outline-none" placeholder="キーワードで検索" value={query} onChange={(event) => setQuery(event.target.value)} />
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {['起業家', '投資家', '案件', '投稿'].map((item) => <button className="rounded-full bg-slate-50 px-3 py-2 text-[10px] font-bold" key={item}>{item}</button>)}
-      </div>
-      <h3 className="mt-4 text-[12px] font-black">人気のタグ</h3>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {['SaaS', 'AI', 'BtoB', 'FinTech', 'D2C', 'HR', 'EdTech', '医療'].map((tag) => <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] text-slate-500" key={tag}>#{tag}</span>)}
-      </div>
-      <h3 className="mt-4 text-[12px] font-black">注目の起業家</h3>
-      <div className="mt-2 grid gap-3">
-        {results.map((item) => <PersonRow key={item.id} name={item.name} sub={`${item.company} CEO`} meta={`月額：${item.monthlyRevenue}`} badge={item.status} avatar={item.avatar} onClick={() => open(item)} />)}
-      </div>
-      <button className="mx-auto mt-3 block text-[11px] font-black text-blue-600">もっと見る ＞</button>
-    </Panel>
-  );
-}
-
-function AdvancedSearchPanel() {
-  return (
-    <Panel title="高度な検索（起業家）">
-      {['カテゴリー', '事業ステージ', '調達希望額', '月次売上', '地域'].map((label) => (
-        <label className="mt-3 block text-[11px] font-bold text-slate-600" key={label}>
-          {label}
-          <button className="mt-1 flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-left text-[11px] text-slate-500">
-            すべての{label}<ChevronDown size={14} />
-          </button>
-        </label>
-      ))}
-      <Switch label="資金調達中の案件のみ" active />
-      <Switch label="認証済みユーザーのみ" />
-      <button className="mt-4 w-full rounded-xl bg-[#050816] py-3 text-[12px] font-black text-white">この条件で検索する</button>
-      <p className="mt-3 text-center text-[10px] text-slate-500">検索結果：128件</p>
-    </Panel>
-  );
-}
-
-function MatchingPanel({ results, open, requestMeeting, compact }: { results: Entrepreneur[]; open: (item: Entrepreneur) => void; requestMeeting: () => void; compact?: boolean }) {
-  return (
-    <Panel title="マッチング候補" compact={compact}>
-      <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className="border-b-2 border-blue-600 py-3">あなたへのおすすめ</button>
-        <button className="py-3 text-slate-500">面談リクエスト</button>
-      </div>
-      <div className="mt-3 grid gap-3">
-        {results.map((item) => (
-          <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3">
-            <Avatar label={item.avatar} />
-            <button className="min-w-0 flex-1 text-left" onClick={() => open(item)}>
-              <p className="truncate text-[12px] font-black">{item.company}</p>
-              <p className="truncate text-[10px] text-slate-500">{item.name} CEO</p>
-              <p className="mt-1 text-[10px] text-slate-500">月額：{item.monthlyRevenue}</p>
-            </button>
-            <div className="grid justify-items-end gap-2">
-              <span className="text-[10px] font-black text-emerald-600">マッチ度 {item.match}%</span>
-              <button className="rounded-lg bg-[#050816] px-3 py-2 text-[10px] font-black text-white" onClick={requestMeeting}>面談する</button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <button className="mx-auto mt-3 block text-[11px] font-black text-blue-600">もっと見る ＞</button>
-    </Panel>
-  );
-}
-
-function MessagesPanel({ messages, draft, setDraft, send, compact }: { messages: { id: string; name: string; body: string; time: string }[]; draft: string; setDraft: (value: string) => void; send: () => void; compact?: boolean }) {
-  return (
-    <Panel title="メッセージ" compact={compact}>
-      <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold">
-        {['すべて', '未読', '起業家', '投資家'].map((tab, index) => <button className={`py-3 ${index === 0 ? 'border-b-2 border-blue-600' : 'text-slate-500'}`} key={tab}>{tab}</button>)}
-      </div>
-      <div className="mt-3 grid gap-3">
-        {messages.map((message, index) => <PersonRow key={message.id} name={message.name} sub={message.body} meta={message.time} avatar={message.name.slice(0, 1)} unread={index === 0} />)}
-      </div>
-      <div className="mt-4 flex gap-2 rounded-2xl border border-slate-200 p-2">
-        <input className="min-w-0 flex-1 px-2 text-[11px] outline-none" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} />
-        <button className="grid h-9 w-9 place-items-center rounded-xl bg-[#050816] text-white" onClick={send}><Send size={15} /></button>
-      </div>
-    </Panel>
-  );
-}
-
-function NotificationsPanel({ compact }: { compact?: boolean }) {
-  const notifications = [
-    ['佐藤 花子さんがあなたの投稿に「投資したい」を送りました', '55分前'],
-    ['株式会社Next Createの面談が確定しました', '15分前'],
-    ['新しい投資家があなたに興味を持っています', '1時間前'],
-    ['あなたのプロフィールが閲覧されました（23回）', '29分前'],
-    ['ピッチ資料へのフィードバックが届いています', '33時間前'],
-  ];
-  return (
-    <Panel title="通知" compact={compact}>
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
         <button className="border-b-2 border-blue-600 py-3">すべて</button>
         <button className="py-3 text-slate-500">未読</button>
       </div>
-      <div className="mt-3 grid gap-3">
-        {notifications.map(([body, time], index) => <PersonRow key={body} name={body} sub="" meta={time} avatar={index === 0 ? '佐' : index === 1 ? 'N' : 'L'} />)}
+      {notices.length === 0 ? (
+        <EmptyState icon={<Bell size={28} />} title="通知はまだありません" body="フォロー、コメント、面談申込、メッセージが届くと表示されます。" />
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {notices.map((notice) => (
+            <button key={notice.id} className="flex w-full gap-3 px-4 py-4 text-left" onClick={() => setNotices(notices.map((item) => item.id === notice.id ? { ...item, unread: false } : item))}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><Bell size={18} /></span>
+              <span className="min-w-0 flex-1">
+                <b className="block text-sm">{notice.body}</b>
+                <span className="mt-1 block text-[11px] text-slate-500">{formatDate(notice.createdAt)}</span>
+              </span>
+              {notice.unread && <span className="mt-2 h-2 w-2 rounded-full bg-blue-600" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MessagesPage({ accounts, currentAccount, selectedAccount, messages, draft, setDraft, sendMessage, openProfile, setSelectedAccountId }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void }) {
+  const partners = accounts.filter((account) => account.id !== currentAccount?.id);
+  const activePartner = selectedAccount && selectedAccount.id !== currentAccount?.id ? selectedAccount : partners[0] ?? null;
+  const thread = activePartner ? messages.filter((message) => message.partnerId === activePartner.id) : [];
+  return (
+    <div className="grid min-h-[calc(100vh-7rem)] grid-rows-[auto_1fr_auto]">
+      <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-4 py-3">
+        {partners.length === 0 ? <span className="text-xs text-slate-500">メッセージ相手はまだいません。</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><Avatar account={partner} active={activePartner?.id === partner.id} /><span className="w-full truncate">{partner.accountName || partner.name}</span></button>)}
       </div>
-    </Panel>
+      {!activePartner ? (
+        <EmptyState icon={<Mail size={28} />} title="メッセージはまだありません" body="検索やプロフィールから相手にメッセージできます。" />
+      ) : (
+        <div className="overflow-y-auto px-4 py-4">
+          <button className="mb-4 flex items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="text-left"><b className="block text-sm">{activePartner.accountName || activePartner.name}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
+          {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => <div key={message.id} className={`mb-3 flex ${message.mine ? 'justify-end' : 'justify-start'}`}><p className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${message.mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body}</p></div>)}
+        </div>
+      )}
+      <div className="flex gap-2 border-t border-slate-100 bg-white p-3">
+        <input className="field" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activePartner} />
+        <button className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#050816] text-white disabled:opacity-30" disabled={!activePartner} onClick={() => sendMessage(activePartner)}><Send size={18} /></button>
+      </div>
+    </div>
   );
 }
 
-function PhoneFrame({ title, children }: { title: string; children: ReactNode }) {
+function MyPage({ accounts, currentAccount, setAccounts, setCurrentAccountId, posts, openComposer }: { accounts: Account[]; currentAccount: Account | null; setAccounts: (accounts: Account[]) => void; setCurrentAccountId: (id: string) => void; posts: Post[]; openComposer: () => void }) {
+  const [form, setForm] = useState<Account>(currentAccount ?? emptyAccount);
+  function update(key: keyof Account, value: string | boolean) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+  function save() {
+    const next: Account = {
+      ...form,
+      id: form.id || crypto.randomUUID(),
+      avatarLabel: form.avatarLabel || (form.accountName || form.name || 'L').slice(0, 1),
+    };
+    const exists = accounts.some((account) => account.id === next.id);
+    setAccounts(exists ? accounts.map((account) => account.id === next.id ? next : account) : [...accounts, next]);
+    setCurrentAccountId(next.id);
+  }
   return (
-    <article className="overflow-hidden rounded-[30px] border-[3px] border-[#050816] bg-white shadow-xl">
-      <div className="grid place-items-center bg-[#245cf4] py-1 text-[12px] font-black text-white">{title}</div>
-      {children}
+    <div className="p-4">
+      {currentAccount && (
+        <ProfileHero account={currentAccount} isMine posts={posts} />
+      )}
+      <div className="mt-4 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">{currentAccount ? 'プロフィールを編集' : 'プロフィールを作成'}</h2>
+        <div className="mt-4 grid gap-3">
+          <Segmented value={form.role} onChange={(role) => update('role', role)} />
+          <Input label="アカウント名" value={form.accountName} onChange={(value) => update('accountName', value)} />
+          <Input label="名前" value={form.name} onChange={(value) => update('name', value)} />
+          <Input label="会社名" value={form.company} onChange={(value) => update('company', value)} />
+          <Input label="肩書き" value={form.title} onChange={(value) => update('title', value)} />
+          <Select label="業界" value={form.industry} options={industries} onChange={(value) => update('industry', value)} />
+          <Select label="地域" value={form.location} options={locations} onChange={(value) => update('location', value)} />
+          <Select label="フェーズ" value={form.stage} options={stages} onChange={(value) => update('stage', value)} />
+          <Input label="設立年月" value={form.foundedMonth} onChange={(value) => update('foundedMonth', value)} placeholder="例：2026年5月" />
+          <Select label="従業員数" value={form.employeeSize} options={employeeSizes} onChange={(value) => update('employeeSize', value)} />
+          <Select label="年商規模" value={form.revenueScale} options={revenueScales} onChange={(value) => update('revenueScale', value)} />
+          {form.role === 'entrepreneur' ? (
+            <>
+              <Input label="調達希望額" value={form.fundingGoal} onChange={(value) => update('fundingGoal', value)} />
+              <Input label="月次売上" value={form.monthlyRevenue} onChange={(value) => update('monthlyRevenue', value)} />
+              <Input label="成長率" value={form.growthRate} onChange={(value) => update('growthRate', value)} />
+              <Input label="導入社数" value={form.customerCount} onChange={(value) => update('customerCount', value)} />
+            </>
+          ) : (
+            <>
+              <Input label="投資可能額" value={form.investmentRange} onChange={(value) => update('investmentRange', value)} />
+              <Input label="支援できること" value={form.supportAreas} onChange={(value) => update('supportAreas', value)} />
+            </>
+          )}
+          <label className="grid gap-1 text-[11px] font-bold text-slate-600">自己紹介<textarea className="field min-h-24 resize-none" value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
+        </div>
+        <button className="primary mt-4 w-full" onClick={save}>保存する</button>
+      </div>
+      <button className="primary mt-4 w-full" onClick={openComposer}><Plus size={17} />投稿する</button>
+    </div>
+  );
+}
+
+function ProfilePage({ account, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode }: { account: Account; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean }) {
+  if (dealMode && account.role === 'entrepreneur') {
+    return <DealPage account={account} requestMeeting={requestMeeting} />;
+  }
+  return (
+    <div>
+      <ProfileHero account={account} isMine={isMine} posts={posts} />
+      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
+        <button className="border-b-2 border-blue-600 py-3">概要</button>
+        <button className="py-3 text-slate-500">実績</button>
+        <button className="py-3 text-slate-500">投稿</button>
+      </div>
+      <div className="p-4">
+        <KpiGrid account={account} />
+        <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
+        {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
+        {!isMine && (
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <button className="secondary" onClick={follow}>{isFollowing ? '解除' : 'フォロー'}</button>
+            <button className="secondary" onClick={message}>メッセージ</button>
+            <button className="primary" onClick={requestMeeting}>面談</button>
+          </div>
+        )}
+      </div>
+      <div className="divide-y divide-slate-100">
+        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} openProfile={() => undefined} reactToPost={() => undefined} />)}
+      </div>
+    </div>
+  );
+}
+
+function DealPage({ account, requestMeeting }: { account: Account; requestMeeting: () => void }) {
+  return (
+    <div className="p-4">
+      <h2 className="text-lg font-black">{account.company || account.accountName || '案件詳細'}</h2>
+      <div className="mt-2 flex flex-wrap gap-2">{[account.industry, account.stage, account.location].filter(Boolean).map((tag) => <span className="pill" key={tag}>{tag}</span>)}</div>
+      <DashboardCard />
+      <h3 className="mt-5 text-sm font-black">ハイライト</h3>
+      <KpiGrid account={account} />
+      <h3 className="mt-5 text-sm font-black">関連情報</h3>
+      <InfoRows rows={[
+        ['調達希望額', account.fundingGoal || '未入力'],
+        ['月次売上', account.monthlyRevenue || '未入力'],
+        ['成長率', account.growthRate || '未入力'],
+        ['導入社数', account.customerCount || '未入力'],
+        ['地域', account.location || '未入力'],
+        ['フェーズ', account.stage || '未入力'],
+      ]} />
+      <div className="mt-4 rounded-2xl border border-slate-100 p-4">
+        <p className="text-sm font-black">ピッチ資料</p>
+        <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>
+      </div>
+      <button className="primary mt-4 w-full" onClick={requestMeeting}>面談を申し込む</button>
+    </div>
+  );
+}
+
+function MatchingPage({ accounts, openProfile, requestMeeting }: { accounts: Account[]; openProfile: (account: Account) => void; requestMeeting: (account: Account) => void }) {
+  return (
+    <div className="p-4">
+      <h2 className="text-sm font-black">マッチング候補</h2>
+      {accounts.length === 0 ? <EmptyState icon={<UsersRound size={28} />} title="候補はまだありません" body="起業家アカウントが登録されると表示されます。" /> : (
+        <div className="mt-3 grid gap-3">
+          {accounts.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3"><Avatar account={account} /><button className="min-w-0 flex-1 text-left" onClick={() => openProfile(account)}><b className="block truncate text-sm">{account.company || account.accountName}</b><span className="text-xs text-slate-500">{account.industry || '業界未入力'} / {account.stage || 'フェーズ未入力'}</span></button><button className="rounded-xl bg-[#050816] px-3 py-2 text-xs font-black text-white" onClick={() => requestMeeting(account)}>面談</button></div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostCard({ post, author, openProfile, reactToPost }: { post: Post; author?: Account; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void }) {
+  return (
+    <article className="px-4 py-4">
+      <button className="flex w-full gap-3 text-left" onClick={() => author && openProfile(author)}>
+        {author ? <Avatar account={author} /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
+        <span className="min-w-0 flex-1">
+          <b className="block truncate text-sm">{author?.accountName || author?.name || 'アカウント未設定'}</b>
+          <span className="text-[11px] text-slate-500">{author?.company || 'プロフィール未設定'}・{formatDate(post.createdAt)}</span>
+        </span>
+        <MoreHorizontal size={18} className="text-slate-400" />
+      </button>
+      <p className="mt-3 whitespace-pre-line text-sm leading-7">{post.body}</p>
+      {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+      {post.attachmentName && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black">
+        <button className="rounded-xl border border-slate-100 py-2 text-rose-600" onClick={() => reactToPost(post.id, 'like')}><Heart className="mx-auto mb-1" size={16} />応援 {post.likes}</button>
+        <button className="rounded-xl border border-slate-100 py-2 text-emerald-600" onClick={() => reactToPost(post.id, 'save')}><Bookmark className="mx-auto mb-1" size={16} />保存 {post.saves}</button>
+        <button className="rounded-xl border border-slate-100 py-2 text-blue-600" onClick={() => reactToPost(post.id, 'meeting')}><UsersRound className="mx-auto mb-1" size={16} />面談 {post.meetings}</button>
+      </div>
+      <p className="mt-2 text-right text-[10px] text-slate-400">閲覧 {post.views} 回</p>
     </article>
   );
 }
 
-function Panel({ title, children, compact }: { title: string; children: ReactNode; compact?: boolean }) {
-  return (
-    <article className={`${compact ? 'rounded-none shadow-none' : 'rounded-[22px] shadow-sm'} bg-white p-4`}>
-      <h2 className="text-center text-sm font-black">{title}</h2>
-      <div className="mt-3">{children}</div>
-      {!compact && <MiniBottomNav />}
-    </article>
-  );
-}
-
-function TopBar({ back }: { back?: boolean }) {
+function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (page: Page) => void; openComposer: () => void }) {
+  const tabs = [
+    ['feed', 'フィード', Home],
+    ['search', '検索', Search],
+    ['notifications', '通知', Bell],
+    ['messages', 'メッセージ', Mail],
+    ['mypage', 'マイページ', UserRound],
+  ] as const;
   return (
     <>
-      <div className="flex items-center justify-between px-4 pt-3 text-[11px] font-black">
-        <span>9:41</span>
-        <span>••• ▰</span>
-      </div>
-      <div className="flex items-center justify-between px-4 py-3">
-        <button className="grid h-8 w-8 place-items-center rounded-full">{back ? <ChevronLeft size={18} /> : <BriefcaseBusiness size={18} />}</button>
-        <button className="grid h-8 w-8 place-items-center rounded-full"><MoreHorizontal size={18} /></button>
-      </div>
+      <button className="fixed bottom-20 left-1/2 z-40 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-2xl bg-[#050816] text-white shadow-xl" onClick={openComposer} aria-label="投稿する">
+        <Plus size={24} />
+      </button>
+      <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)]">
+        {tabs.map(([key, label, Icon]) => (
+          <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
+            <Icon size={18} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
     </>
   );
 }
 
-function BottomNav({ screen, setScreen, openComposer }: { screen: Screen; setScreen: (screen: Screen) => void; openComposer: () => void }) {
-  const items = [
-    ['feed', Home],
-    ['search', Search],
-    ['compose', Plus],
-    ['notifications', Heart],
-    ['my', UserRound],
-  ] as const;
+function ProfileHero({ account, isMine, posts }: { account: Account; isMine: boolean; posts: Post[] }) {
   return (
-    <nav className="sticky bottom-0 grid grid-cols-5 border-t border-slate-100 bg-white px-3 py-2">
-      {items.map(([key, Icon]) => (
-        <button key={key} className={`mx-auto grid h-11 w-11 place-items-center rounded-2xl ${screen === key ? 'bg-slate-100 text-blue-600' : 'text-slate-500'} ${key === 'compose' ? 'bg-[#050816] text-white' : ''}`} onClick={() => key === 'compose' ? openComposer() : setScreen(key as Screen)}>
-          <Icon size={20} />
-        </button>
-      ))}
-    </nav>
-  );
-}
-
-function MiniBottomNav() {
-  return (
-    <div className="mt-5 grid grid-cols-5 text-center text-[9px] text-slate-500">
-      {[
-        [Home, 'フィード'],
-        [Search, '検索'],
-        [Bell, '通知'],
-        [Mail, 'メッセージ'],
-        [UserRound, 'マイページ'],
-      ].map(([Icon, label]) => <span key={String(label)}><Icon className="mx-auto mb-1" size={16} />{String(label)}</span>)}
-    </div>
-  );
-}
-
-function Avatar({ label, size = 'md', active }: { label: string; size?: 'md' | 'lg'; active?: boolean }) {
-  const dimensions = size === 'lg' ? 'h-20 w-20 text-xl' : 'h-11 w-11 text-sm';
-  return (
-    <span className={`relative grid ${dimensions} shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-100 via-white to-amber-100 font-black text-slate-950 ring-1 ring-slate-200`}>
-      {label}
-      {active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}
-    </span>
-  );
-}
-
-function MiniStat({ label, value, green }: { label: string; value: string; green?: boolean }) {
-  return (
-    <div className="min-h-20 rounded-2xl border border-slate-100 p-3">
-      <p className="text-[9px] font-bold leading-4 text-slate-500">{label}</p>
-      <b className={`mt-2 block text-[12px] leading-5 ${green ? 'text-emerald-600' : ''}`}>{value}</b>
-    </div>
-  );
-}
-
-function ProfileTabs({ tabs }: { tabs: string[] }) {
-  return (
-    <div className="mt-5 grid border-b border-slate-100 text-center text-[11px] font-bold text-slate-500" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
-      {tabs.map((tab, index) => <button className={`py-3 ${index === 0 ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} key={tab}>{tab}</button>)}
-    </div>
-  );
-}
-
-function TextBlock({ title, body, more }: { title: string; body: string; more?: boolean }) {
-  return (
-    <section className="mt-4">
-      <h3 className="text-sm font-black">{title}</h3>
-      <p className="mt-2 text-[12px] leading-6 text-slate-700">{body}</p>
-      {more && <button className="mx-auto mt-2 block text-[11px] font-black text-blue-600">もっと見る ＞</button>}
+    <section className="p-4">
+      <div className="flex items-start gap-4">
+        <Avatar account={account} size="lg" />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-xl font-black">{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={16} />}</h2>
+          <p className="mt-1 text-xs text-slate-500">@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
+          <p className="mt-2 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedMonth || '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
+        </div>
+      </div>
+      <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
+      <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
+      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>0</b> フォロー</span><span><b>0</b> フォロワー</span></div>
+      {isMine && <button className="secondary mt-4 w-full"><Settings size={16} />プロフィールを編集</button>}
     </section>
   );
 }
 
-function DashboardImage({ large }: { large?: boolean }) {
+function KpiGrid({ account }: { account: Account }) {
+  const items = account.role === 'entrepreneur'
+    ? [['調達希望額', account.fundingGoal], ['月次売上', account.monthlyRevenue], ['成長率', account.growthRate], ['導入社数', account.customerCount], ['フェーズ', account.stage], ['累計投資金額', '未入力']]
+    : [['投資可能額', account.investmentRange], ['投資領域', account.industry], ['投資ステージ', account.stage], ['支援内容', account.supportAreas], ['地域', account.location], ['累計投資金額', '未入力']];
+  return <div className="mt-3 grid grid-cols-3 gap-2">{items.map(([label, value]) => <div className="rounded-2xl border border-slate-100 p-3" key={label}><span className="text-[10px] font-bold text-slate-500">{label}</span><b className="mt-2 block break-words text-xs">{value || '未入力'}</b></div>)}</div>;
+}
+
+function FilterBlock() {
   return (
-    <div className={`mt-3 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-blue-50 p-3 ${large ? 'h-36' : 'h-32'}`}>
-      <div className="grid h-full grid-cols-[1fr_56px] gap-2 rounded-xl bg-white p-3 shadow-inner">
-        <div className="grid content-end gap-2">
-          <span className="h-2 rounded-full bg-blue-100" />
-          <span className="h-2 w-3/4 rounded-full bg-slate-100" />
-          <div className="mt-2 flex h-12 items-end gap-1">
-            {[32, 46, 28, 56, 42, 64, 70].map((height) => <span key={height} className="flex-1 rounded-t bg-blue-500/70" style={{ height }} />)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-2">
-          <span className="block h-2 rounded-full bg-slate-200" />
-          <span className="mt-2 block h-12 rounded-lg bg-blue-100" />
-        </div>
+    <div className="mt-5 rounded-2xl border border-slate-100 p-4">
+      <h2 className="text-sm font-black">高度な検索</h2>
+      {['カテゴリー', '事業ステージ', '調達希望額', '地域'].map((label) => <button key={label} className="mt-3 flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-3 text-xs text-slate-500">{label}<ChevronDown size={15} /></button>)}
+      <button className="primary mt-4 w-full">この条件で検索する</button>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, body, action, onAction }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void }) {
+  return (
+    <div className="grid min-h-72 place-items-center p-8 text-center">
+      <div>
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-blue-600">{icon}</div>
+        <h2 className="mt-4 text-lg font-black">{title}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{body}</p>
+        {action && <button className="primary mt-5" onClick={onAction}>{action}</button>}
       </div>
     </div>
   );
 }
 
-function InfoRows({ rows }: { rows: string[][] }) {
+function AccountRow({ account, onClick }: { account: Account; onClick: () => void }) {
   return (
-    <div className="mt-2 divide-y divide-slate-100 text-[11px]">
-      {rows.map(([label, value]) => <div className="grid grid-cols-[96px_1fr] gap-2 py-2" key={label}><b className="text-slate-500">{label}</b><span>{value}</span></div>)}
-    </div>
-  );
-}
-
-function PersonRow({ name, sub, meta, badge, avatar, unread, onClick }: { name: string; sub: string; meta?: string; badge?: string; avatar: string; unread?: boolean; onClick?: () => void }) {
-  return (
-    <button className="flex w-full items-center gap-3 text-left" onClick={onClick}>
-      <Avatar label={avatar} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[12px] font-black">{name}</p>
-        {sub && <p className="truncate text-[10px] text-slate-500">{sub}</p>}
-        {badge && <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700">{badge}</span>}
-      </div>
-      {meta && <span className="text-[10px] text-slate-500">{meta}</span>}
-      {unread && <span className="h-2 w-2 rounded-full bg-blue-600" />}
+    <button className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3 text-left" onClick={onClick}>
+      <Avatar account={account} />
+      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.company || account.name || account.accountName}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
+      <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">{account.location || '地域未入力'}</span>
     </button>
   );
 }
 
-function Switch({ label, active }: { label: string; active?: boolean }) {
+function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'lg'; active?: boolean }) {
+  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : 'h-11 w-11 text-sm';
+  const label = account.avatarLabel || account.accountName?.slice(0, 1) || account.name?.slice(0, 1) || 'L';
+  return <span className={`relative grid ${dimension} shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
+}
+
+function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="mt-3 flex items-center justify-between text-[11px] font-bold">
-      <span>{label}</span>
-      <span className={`relative h-6 w-11 rounded-full ${active ? 'bg-blue-600' : 'bg-slate-200'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${active ? 'left-6' : 'left-1'}`} /></span>
+    <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-3">
+      <div className="w-full max-w-[430px] rounded-[26px] bg-white p-5 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-black">{title}</h2>
+          <button className="grid h-9 w-9 place-items-center rounded-full bg-slate-100" onClick={onClose}><MoreHorizontal size={18} /></button>
+        </div>
+        {children}
+      </div>
     </div>
   );
+}
+
+function Segmented({ value, onChange }: { value: Role; onChange: (value: Role) => void }) {
+  return <div className="grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-xs font-black"><button className={`rounded-lg py-3 ${value === 'entrepreneur' ? 'bg-white shadow-sm' : ''}`} onClick={() => onChange('entrepreneur')}>起業家</button><button className={`rounded-lg py-3 ${value === 'investor' ? 'bg-white shadow-sm' : ''}`} onClick={() => onChange('investor')}>投資家</button></div>;
+}
+
+function Input({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
+  return <label className="grid gap-1 text-[11px] font-bold text-slate-600">{label}<input className="field" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return <label className="grid gap-1 text-[11px] font-bold text-slate-600">{label}<select className="field" value={value} onChange={(event) => onChange(event.target.value)}><option value="">選択してください</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+}
+
+function TextBlock({ title, body }: { title: string; body: string }) {
+  return <section className="mt-5"><h3 className="text-sm font-black">{title}</h3><p className="mt-2 whitespace-pre-line text-sm leading-7 text-slate-600">{body}</p></section>;
+}
+
+function DashboardCard() {
+  return <div className="mt-4 rounded-2xl bg-gradient-to-br from-slate-100 to-blue-50 p-4"><div className="grid h-40 content-end gap-3 rounded-xl bg-white p-4 shadow-inner"><span className="h-2 rounded-full bg-slate-100" /><span className="h-2 w-2/3 rounded-full bg-slate-100" /><div className="flex h-20 items-end gap-2">{[45, 70, 38, 88, 64, 98].map((height) => <span className="flex-1 rounded-t bg-blue-500/70" style={{ height }} key={height} />)}</div></div></div>;
+}
+
+function InfoRows({ rows }: { rows: string[][] }) {
+  return <div className="mt-2 divide-y divide-slate-100 rounded-2xl border border-slate-100 text-xs">{rows.map(([label, value]) => <div className="grid grid-cols-[100px_1fr] gap-2 px-3 py-3" key={label}><b className="text-slate-500">{label}</b><span>{value}</span></div>)}</div>;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
