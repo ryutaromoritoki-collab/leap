@@ -1499,7 +1499,7 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
       <section className="app-card overflow-hidden">
         <PhoneHeader title="検索・発見" />
         <div className="p-5">
-        <h2 className="text-2xl font-black">アカウントを探す</h2>
+        <h2 className="text-2xl font-black">検索・発見</h2>
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4">
           <Search size={18} />
           <input className="field border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="アカウント名、会社名、名前、業界、地域で検索" />
@@ -2073,7 +2073,7 @@ function AllPostsPage({ posts, currentUser, investor, openProfile, refresh }: { 
       <div className="app-card overflow-hidden">
         <PhoneHeader title="SNSフィード（Threads型）" />
         <div className="p-4">
-          <h2 className="text-2xl font-black">タイムライン</h2>
+          <h2 className="text-2xl font-black">SNSフィード</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">起業家の近況や進捗を時系列で確認できます。</p>
         </div>
       </div>
