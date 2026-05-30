@@ -71,6 +71,7 @@ type Account = {
   ticketBalance: number;
   ticketRequestStatus: 'none' | 'pending';
   ticketRequestPlan: string;
+  ticketTransferName: string;
   verified: boolean;
 };
 
@@ -112,6 +113,8 @@ type MeetingApplication = {
   partnerId: string;
   scheduledAt: string;
   status: 'pending' | 'approved' | 'rejected';
+  ticketChargedAccountId: string;
+  ticketConsumed: boolean;
   createdAt: string;
 };
 
@@ -136,6 +139,7 @@ const visibilityLabels: Record<Visibility, string> = {
   entrepreneurs: '起業家限定',
   draft: '下書き',
 };
+const adminEmail = 'ryutaro.moritoki@gmail.com';
 
 const emptyAccount: Account = {
   id: '',
@@ -170,6 +174,7 @@ const emptyAccount: Account = {
   ticketBalance: 0,
   ticketRequestStatus: 'none',
   ticketRequestPlan: '',
+  ticketTransferName: '',
   verified: false,
 };
 
@@ -248,6 +253,7 @@ export default function LeapApp() {
 
   const currentAccount = accounts.find((account) => account.id === currentAccountId) ?? null;
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? currentAccount;
+  const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
 
   const visiblePosts = useMemo(() => posts.filter((post) => canSeePost(post, currentAccount, following)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, following, posts]);
   const feedPosts = useMemo(() => {
@@ -260,7 +266,7 @@ export default function LeapApp() {
   const searchResults = useMemo(() => {
     const text = query.trim().toLowerCase();
     if (!text) return accounts;
-    return accounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location} ${account.phone}`.toLowerCase().includes(text));
+    return accounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
   }, [accounts, query]);
 
   function flash(body: string) {
@@ -427,17 +433,30 @@ export default function LeapApp() {
       flash('面談日時を選択してください');
       return;
     }
+    const entrepreneur = [currentAccount, partner].find((account) => account?.role === 'entrepreneur');
+    if (!entrepreneur) {
+      flash('起業家アカウントが含まれていません');
+      return;
+    }
+    if ((entrepreneur.ticketBalance ?? 0) < 1) {
+      flash('面談チケットが不足しています');
+      if (currentAccount?.id === entrepreneur.id) setPage('tickets');
+      return;
+    }
     const existing = meetingApplications.find((item) => item.applicantId === currentAccount!.id && item.partnerId === partner.id && item.status === 'pending');
     if (existing) {
       flash('すでに管理者確認待ちです');
       return;
     }
+    setAccounts((list) => list.map((account) => account.id === entrepreneur.id ? { ...account, ticketBalance: Math.max(0, account.ticketBalance - 1) } : account));
     const application: MeetingApplication = {
       id: crypto.randomUUID(),
       applicantId: currentAccount!.id,
       partnerId: partner.id,
       scheduledAt,
       status: 'pending',
+      ticketChargedAccountId: entrepreneur.id,
+      ticketConsumed: true,
       createdAt: new Date().toISOString(),
     };
     setMeetingApplications((list) => [application, ...list]);
@@ -452,15 +471,15 @@ export default function LeapApp() {
     const currentStatus = application.status;
     setMeetingApplications((list) => list.map((item) => item.id === applicationId ? { ...item, status } : item));
     setMessages((list) => [{ id: crypto.randomUUID(), partnerId: application.partnerId, kind: 'meeting', body: status === 'approved' ? `管理者が面談を承認しました：${formatDate(application.scheduledAt)}` : '管理者が面談申請を非承認にしました。再度日程調整をしてください。', createdAt: new Date().toISOString(), mine: false, meetingStatus: status === 'approved' ? 'approved' : 'rejected' }, ...list]);
-    const entrepreneur = [accounts.find((account) => account.id === application.applicantId), accounts.find((account) => account.id === application.partnerId)].find((account) => account?.role === 'entrepreneur');
-    if (entrepreneur && currentStatus !== status) {
+    if (application.ticketChargedAccountId && currentStatus !== status) {
       setAccounts((list) => list.map((account) => {
-        if (account.id !== entrepreneur.id) return account;
-        if (status === 'approved') return { ...account, ticketBalance: Math.max(0, account.ticketBalance - 1) };
-        if (currentStatus === 'approved') return { ...account, ticketBalance: account.ticketBalance + 1 };
+        if (account.id !== application.ticketChargedAccountId) return account;
+        if (status === 'rejected' && application.ticketConsumed) return { ...account, ticketBalance: account.ticketBalance + 1 };
+        if (status === 'approved' && currentStatus === 'rejected' && !application.ticketConsumed) return { ...account, ticketBalance: Math.max(0, account.ticketBalance - 1) };
         return account;
       }));
     }
+    setMeetingApplications((list) => list.map((item) => item.id === applicationId ? { ...item, status, ticketConsumed: status === 'rejected' ? false : true } : item));
     flash(status === 'approved' ? '面談申請を承認しました' : '面談申請を非承認にしました');
   }
 
@@ -499,8 +518,8 @@ export default function LeapApp() {
   return (
     <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
       <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:overflow-hidden lg:rounded-[28px]">
-        <DesktopNav page={page} setPage={setPage} openTickets={openTickets} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} logout={logout} />
+        <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} />
 
         <section className="min-h-0 overflow-y-auto pb-24 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
@@ -517,7 +536,7 @@ export default function LeapApp() {
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
-          {page === 'admin' && <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} />}
+          {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
             <ProfilePage account={selectedAccount} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, following) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={following.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -552,7 +571,7 @@ export default function LeapApp() {
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, logout }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; logout: () => void | Promise<void> }) {
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void> }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -584,7 +603,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             ['search', '検索'],
             ['messages', 'メッセージ'],
             ['tickets', '面談チケット'],
-            ['admin', '管理者画面'],
+            ...(isAdmin ? [['admin', '管理者画面']] : []),
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
@@ -594,14 +613,14 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
   );
 }
 
-function DesktopNav({ page, setPage, openTickets }: { page: Page; setPage: (page: Page) => void; openTickets: () => void }) {
+function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPage: (page: Page) => void; openTickets: () => void; isAdmin: boolean }) {
   const items: [Page, string, ReactNode][] = [
     ['feed', 'フィード', <Home size={18} />],
     ['search', '検索', <Search size={18} />],
     ['notifications', '通知', <Bell size={18} />],
     ['messages', 'メッセージ', <Mail size={18} />],
     ['mypage', 'マイページ', <UserRound size={18} />],
-    ['admin', '管理者画面', <ShieldCheck size={18} />],
+    ...(isAdmin ? [['admin', '管理者画面', <ShieldCheck size={18} />] as [Page, string, ReactNode]] : []),
   ];
   return (
     <aside className="hidden border-r border-slate-100 bg-white p-4 lg:row-span-2 lg:block">
@@ -782,13 +801,32 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
 }
 
 function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }: { accounts: Account[]; setAccounts: (accounts: Account[]) => void; setCurrentAccountId: (id: string) => void; setPage: (page: Page) => void; flash: (message: string) => void }) {
+  const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [role, setRole] = useState<Role>('entrepreneur');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [sent, setSent] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
+  const normalizedEmail = email.trim().toLowerCase();
+  function login() {
+    const account = accounts.find((item) => item.email.trim().toLowerCase() === normalizedEmail && item.password === password);
+    if (!account) {
+      setAuthMessage('メールアドレスまたはパスワードが違います。');
+      return;
+    }
+    setCurrentAccountId(account.id);
+    setPage(account.accountName || account.name ? 'feed' : 'profileEdit');
+    flash('ログインしました');
+  }
   async function sendConfirmation() {
+    if (accounts.some((account) => account.email.trim().toLowerCase() === normalizedEmail)) {
+      setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
+      setMode('login');
+      setSent(false);
+      flash('すでに登録済みです');
+      return;
+    }
     const supabase = createSupabaseBrowserClient();
     if (supabase) {
       const { error } = await supabase.auth.signUp({
@@ -811,6 +849,11 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
     flash('確認メールを送信しました');
   }
   function complete() {
+    if (accounts.some((account) => account.email.trim().toLowerCase() === normalizedEmail)) {
+      setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
+      setMode('login');
+      return;
+    }
     const account: Account = { ...emptyAccount, id: crypto.randomUUID(), role, email, phone, password, emailVerified: true };
     setAccounts([...accounts, account]);
     setCurrentAccountId(account.id);
@@ -820,16 +863,20 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
   return (
     <div className="p-4">
       <div className="rounded-3xl border border-slate-100 p-5">
-        <h2 className="text-xl font-black">アカウント作成</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">メールアドレス、電話番号、パスワードを入力し、メール認証後にプロフィール作成へ進みます。</p>
+        <div className="grid grid-cols-2 rounded-2xl bg-slate-50 p-1 text-xs font-black">
+          <button className={`rounded-xl py-3 ${mode === 'signup' ? 'bg-white shadow-sm' : 'text-slate-500'}`} onClick={() => { setMode('signup'); setAuthMessage(''); }}>アカウント作成</button>
+          <button className={`rounded-xl py-3 ${mode === 'login' ? 'bg-white shadow-sm' : 'text-slate-500'}`} onClick={() => { setMode('login'); setAuthMessage(''); }}>すでにアカウントをお持ちの方</button>
+        </div>
+        <h2 className="mt-5 text-xl font-black">{mode === 'signup' ? 'アカウント作成' : 'ログイン'}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">{mode === 'signup' ? 'メールアドレス、電話番号、パスワードを入力し、メール認証後にプロフィール作成へ進みます。' : '登録済みのメールアドレスとパスワードでログインしてください。'}</p>
         <div className="mt-5 grid gap-3">
-          <Segmented value={role} onChange={setRole} />
+          {mode === 'signup' && <Segmented value={role} onChange={setRole} />}
           <Input label="メールアドレス" value={email} onChange={setEmail} />
-          <Input label="電話番号" value={phone} onChange={setPhone} />
+          {mode === 'signup' && <Input label="電話番号" value={phone} onChange={setPhone} />}
           <Input label="パスワード" value={password} onChange={setPassword} type="password" />
         </div>
-        {!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={sendConfirmation}>確認メールを送信する</button> : <button className="primary mt-5 w-full" onClick={complete}>認証後、プロフィール作成へ進む</button>}
-        {sent && <p className="mt-3 text-xs leading-6 text-slate-500">{authMessage || 'メールの確認URLを押してから、プロフィール作成へ進んでください。'}</p>}
+        {mode === 'signup' ? (!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={sendConfirmation}>確認メールを送信する</button> : <button className="primary mt-5 w-full" onClick={complete}>認証後、プロフィール作成へ進む</button>) : <button className="primary mt-5 w-full" disabled={!email || !password} onClick={login}>ログイン</button>}
+        {(sent || authMessage) && <p className="mt-3 text-xs leading-6 text-slate-500">{authMessage || 'メールの確認URLを押してから、プロフィール作成へ進んでください。'}</p>}
       </div>
     </div>
   );
@@ -922,10 +969,12 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
 function TicketPage({ currentAccount, setAccounts }: { currentAccount: Account | null; setAccounts: (updater: Account[] | ((accounts: Account[]) => Account[])) => void }) {
   const [agreed, setAgreed] = useState(false);
   const [plan, setPlan] = useState('1枚');
+  const [transferName, setTransferName] = useState(currentAccount?.ticketTransferName || '');
+  const [showTerms, setShowTerms] = useState(false);
   const plans = [['1枚', '11,000円'], ['3枚', '29,700円'], ['5枚', '44,000円']];
   function requestPayment() {
     if (!currentAccount) return;
-    setAccounts((accounts) => accounts.map((account) => account.id === currentAccount.id ? { ...account, ticketRequestStatus: 'pending', ticketRequestPlan: plan } : account));
+    setAccounts((accounts) => accounts.map((account) => account.id === currentAccount.id ? { ...account, ticketRequestStatus: 'pending', ticketRequestPlan: plan, ticketTransferName: transferName.trim() } : account));
   }
   return (
     <div className="p-4">
@@ -935,15 +984,29 @@ function TicketPage({ currentAccount, setAccounts }: { currentAccount: Account |
         <div className="mt-4 grid gap-2">
           {plans.map(([name, price]) => <button key={name} className={`rounded-2xl border p-4 text-left ${plan === name ? 'border-blue-600 bg-blue-50' : 'border-slate-100'}`} onClick={() => setPlan(name)}><b className="block text-sm">{name}</b><span className="text-xs text-slate-500">{price}</span></button>)}
         </div>
-        <label className="mt-4 flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs leading-6 text-slate-600"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />利用規約と、面談実施前に運営へ面談日程申請が必要であることに同意します。</label>
+        <Input label="振込名義（カタカナ）" value={transferName} onChange={setTransferName} />
+        <label className="mt-4 flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs leading-6 text-slate-600"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /><span><button type="button" className="font-black text-blue-600 underline" onClick={() => setShowTerms(true)}>利用規約</button>と、面談実施前に運営へ面談日程申請が必要であることに同意します。</span></label>
         {agreed && (
           <div className="mt-4 rounded-2xl border border-slate-100 p-4 text-sm leading-8">
             <b>振込先</b><br />近畿産業信用組合<br />本店営業部<br />普通 3170341<br />カ）エーアイインフルエンサー
             <p className="mt-2 text-xs leading-6 text-slate-500">振込名義は、登録会社名があれば会社名、なければ氏名カタカナでお願いします。運営へ振込明細の写真を送ると早く確認できる場合があります。</p>
           </div>
         )}
-        <button className="primary mt-4 w-full" disabled={!agreed || currentAccount?.ticketRequestStatus === 'pending'} onClick={requestPayment}>{currentAccount?.ticketRequestStatus === 'pending' ? '入金確認依頼中です' : `${plan}の入金確認を依頼する`}</button>
+        <button className="primary mt-4 w-full" disabled={!agreed || !transferName.trim() || currentAccount?.ticketRequestStatus === 'pending'} onClick={requestPayment}>{currentAccount?.ticketRequestStatus === 'pending' ? '入金確認依頼中です' : `${plan}の入金確認を依頼する`}</button>
       </div>
+      {showTerms && (
+        <Modal title="面談チケット利用規約" onClose={() => setShowTerms(false)}>
+          <div className="max-h-[60vh] overflow-y-auto rounded-2xl bg-slate-50 p-4 text-xs leading-6 text-slate-600">
+            <p>本規約は、Leap上で提供する面談チケットの購入および利用条件を定めるものです。利用者は本規約に同意したうえでチケットを購入・利用します。</p>
+            <p className="mt-3">チケットは、投資家等との面談日程を運営に申請するために使用します。面談実施前に必ず運営へ日程申請を行い、承認を受けてください。</p>
+            <p className="mt-3">支払い方法は銀行振込のみです。振込手数料は利用者負担とし、入金確認後にチケットを付与します。入金確認には時間がかかる場合があります。</p>
+            <p className="mt-3">購入後のキャンセル、返金、換金は原則できません。ただし、運営が必要と判断した場合は個別に対応します。</p>
+            <p className="mt-3">利用者が虚偽情報の登録、無断での連絡先交換、運営承認前の面談実施、その他不適切行為を行った場合、チケットの失効またはアカウント停止を行うことがあります。</p>
+            <p className="mt-3">Leapは投資判断を代行・推奨するサービスではありません。掲載情報をもとにした判断は各利用者の責任で行ってください。</p>
+          </div>
+          <button className="primary mt-4 w-full" onClick={() => setShowTerms(false)}>閉じる</button>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -954,7 +1017,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   const pendingMeetings = meetingApplications.filter((application) => application.status === 'pending');
   function approveTicket(account: Account) {
     const count = Number(account.ticketRequestPlan.replace('枚', '')) || 1;
-    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '' } : item));
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '', ticketTransferName: '' } : item));
   }
   return (
     <div className="p-4 lg:p-6">
@@ -997,7 +1060,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <h2 className="text-sm font-black">チケット入金確認</h2>
         {pendingTickets.length === 0 ? <p className="mt-3 text-sm text-slate-500">確認待ちはありません。</p> : (
           <div className="mt-3 grid gap-2">
-            {pendingTickets.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><Avatar account={account} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || account.email}</b><span className="text-xs text-slate-500">{account.ticketRequestPlan || '1枚'} / {account.company || '会社名未設定'}</span></div><button className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white" onClick={() => approveTicket(account)}>入金確認</button></div>)}
+            {pendingTickets.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><Avatar account={account} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || account.email}</b><span className="block text-xs text-slate-500">購入枚数：{account.ticketRequestPlan || '1枚'} / 振込名義：{account.ticketTransferName || '未入力'}</span><span className="block text-xs text-slate-500">{account.company || '会社名未設定'}</span></div><button className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white" onClick={() => approveTicket(account)}>承認</button></div>)}
           </div>
         )}
       </section>
