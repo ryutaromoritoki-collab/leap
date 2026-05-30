@@ -72,6 +72,9 @@ type Account = {
   ticketRequestStatus: 'none' | 'pending';
   ticketRequestPlan: string;
   ticketTransferName: string;
+  followingIds: string[];
+  followerIds: string[];
+  hideSocialGraph: boolean;
   verified: boolean;
 };
 
@@ -104,7 +107,18 @@ type DirectMessage = {
   body: string;
   createdAt: string;
   mine: boolean;
+  attachmentName?: string;
+  attachmentUrl?: string;
+  attachmentType?: 'image' | 'file';
   meetingStatus?: 'requested' | 'approved' | 'rejected';
+};
+
+type LeapCloudState = {
+  accounts: Account[];
+  posts: Post[];
+  messages: DirectMessage[];
+  meetingApplications: MeetingApplication[];
+  notices: Notice[];
 };
 
 type MeetingApplication = {
@@ -175,6 +189,9 @@ const emptyAccount: Account = {
   ticketRequestStatus: 'none',
   ticketRequestPlan: '',
   ticketTransferName: '',
+  followingIds: [],
+  followerIds: [],
+  hideSocialGraph: false,
   verified: false,
 };
 
@@ -197,6 +214,32 @@ function loadLocal<T>(key: string, fallback: T): T {
 
 function saveLocal<T>(key: string, value: T) {
   if (typeof window !== 'undefined') window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizeAccount(account: Account): Account {
+  return {
+    ...emptyAccount,
+    ...account,
+    followingIds: Array.isArray(account.followingIds) ? account.followingIds : [],
+    followerIds: Array.isArray(account.followerIds) ? account.followerIds : [],
+    hideSocialGraph: Boolean(account.hideSocialGraph),
+    ticketTransferName: account.ticketTransferName || '',
+  };
+}
+
+async function loadCloudState(): Promise<LeapCloudState | null> {
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('app_state').select('data').eq('key', 'leap-main').maybeSingle();
+  if (error || !data?.data) return null;
+  const cloud = data.data as LeapCloudState;
+  return { ...cloud, accounts: (cloud.accounts ?? []).map(normalizeAccount), posts: cloud.posts ?? [], messages: cloud.messages ?? [], meetingApplications: cloud.meetingApplications ?? [], notices: cloud.notices ?? [] };
+}
+
+async function saveCloudState(state: LeapCloudState) {
+  const supabase = createSupabaseBrowserClient();
+  if (!supabase) return;
+  await supabase.from('app_state').upsert({ key: 'leap-main', data: state, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 }
 
 function readFileAsDataUrl(file: File, onDone: (url: string) => void) {
@@ -230,6 +273,7 @@ export default function LeapApp() {
   const [messageDraft, setMessageDraft] = useState('');
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cloudReady, setCloudReady] = useState(false);
 
   useEffect(() => saveLocal('leap.accounts', accounts), [accounts]);
   useEffect(() => saveLocal('leap.currentAccountId', currentAccountId), [currentAccountId]);
@@ -250,18 +294,36 @@ export default function LeapApp() {
     window.addEventListener('storage', syncAcrossTabs);
     return () => window.removeEventListener('storage', syncAcrossTabs);
   }, []);
+  useEffect(() => {
+    loadCloudState().then((cloud) => {
+      if (cloud) {
+        setAccounts(cloud.accounts);
+        setPosts(cloud.posts);
+        setMessages(cloud.messages);
+        setMeetingApplications(cloud.meetingApplications);
+        setNotices(cloud.notices);
+      }
+      setCloudReady(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (!cloudReady) return;
+    const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }), 700);
+    return () => window.clearTimeout(timer);
+  }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
 
   const currentAccount = accounts.find((account) => account.id === currentAccountId) ?? null;
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? currentAccount;
   const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
+  const currentFollowing = currentAccount?.followingIds ?? following;
 
-  const visiblePosts = useMemo(() => posts.filter((post) => canSeePost(post, currentAccount, following)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, following, posts]);
+  const visiblePosts = useMemo(() => posts.filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, currentFollowing, posts]);
   const feedPosts = useMemo(() => {
-    if (feedTab === 'following') return visiblePosts.filter((post) => following.includes(post.authorId));
+    if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'investor');
     if (feedTab === 'entrepreneurs') return visiblePosts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'entrepreneur');
     return visiblePosts;
-  }, [accounts, feedTab, following, visiblePosts]);
+  }, [accounts, currentFollowing, feedTab, visiblePosts]);
 
   const searchResults = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -485,13 +547,23 @@ export default function LeapApp() {
 
   function follow(account: Account) {
     if (!requireAccount()) return;
-    setFollowing((list) => list.includes(account.id) ? list.filter((id) => id !== account.id) : [...list, account.id]);
-    flash(following.includes(account.id) ? 'フォロー解除しました' : 'フォローしました');
+    const alreadyFollowing = currentFollowing.includes(account.id);
+    const nextFollowing = alreadyFollowing ? currentFollowing.filter((id) => id !== account.id) : [...currentFollowing, account.id];
+    setAccounts((list) => list.map((item) => {
+      if (item.id === currentAccount!.id) return { ...normalizeAccount(item), followingIds: nextFollowing };
+      if (item.id === account.id) {
+        const followers = normalizeAccount(item).followerIds;
+        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]) };
+      }
+      return normalizeAccount(item);
+    }));
+    setFollowing(nextFollowing);
+    flash(alreadyFollowing ? 'フォロー解除しました' : 'フォローしました');
   }
 
-  function sendMessage(partner: Account | null, kind = messageMode) {
-    if (!partner || !messageDraft.trim()) return;
-    setMessages((list) => [{ id: crypto.randomUUID(), partnerId: partner.id, kind, body: messageDraft.trim(), createdAt: new Date().toISOString(), mine: true }, ...list]);
+  function sendMessage(partner: Account | null, kind = messageMode, attachment?: { name: string; url: string; type: 'image' | 'file' }) {
+    if (!partner || (!messageDraft.trim() && !attachment)) return;
+    setMessages((list) => [{ id: crypto.randomUUID(), partnerId: partner.id, kind, body: messageDraft.trim(), createdAt: new Date().toISOString(), mine: true, attachmentName: attachment?.name, attachmentUrl: attachment?.url, attachmentType: attachment?.type }, ...list]);
     setMessageDraft('');
     flash('メッセージを送信しました');
   }
@@ -532,13 +604,13 @@ export default function LeapApp() {
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'mypage' && (
-            <MyPage currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <MyPage currentAccount={currentAccount} accounts={accounts} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
           {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, following) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={following.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <ProfilePage account={selectedAccount} accounts={accounts} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'matching' && <MatchingPage accounts={accounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
@@ -745,9 +817,10 @@ function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNoti
   );
 }
 
-function MessagesPage({ accounts, currentAccount, selectedAccount, messages, meetingApplications, mode, setMode, draft, setDraft, sendMessage, approveMeeting, rejectMeeting, requestMeeting, submitMeetingApplication, openProfile, setSelectedAccountId }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; meetingApplications: MeetingApplication[]; mode: MessageKind; setMode: (mode: MessageKind) => void; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null, kind?: MessageKind) => void; approveMeeting: (partner: Account) => void; rejectMeeting: (partner: Account) => void; requestMeeting: (partner: Account) => void; submitMeetingApplication: (partner: Account, scheduledAt: string) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void }) {
+function MessagesPage({ accounts, currentAccount, selectedAccount, messages, meetingApplications, mode, setMode, draft, setDraft, sendMessage, approveMeeting, rejectMeeting, requestMeeting, submitMeetingApplication, openProfile, setSelectedAccountId }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; meetingApplications: MeetingApplication[]; mode: MessageKind; setMode: (mode: MessageKind) => void; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null, kind?: MessageKind, attachment?: { name: string; url: string; type: 'image' | 'file' }) => void; approveMeeting: (partner: Account) => void; rejectMeeting: (partner: Account) => void; requestMeeting: (partner: Account) => void; submitMeetingApplication: (partner: Account, scheduledAt: string) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void }) {
   const [meetingDate, setMeetingDate] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
+  const [attachment, setAttachment] = useState<{ name: string; url: string; type: 'image' | 'file' } | undefined>();
   const directPartners = accounts.filter((account) => account.id !== currentAccount?.id);
   const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.partnerId));
   const partners = mode === 'meeting' ? directPartners.filter((account) => approvedPartnerIds.has(account.id)) : directPartners;
@@ -789,12 +862,23 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
               {latestApplication?.status === 'rejected' && <p className="mt-2 text-xs font-bold text-rose-600">非承認になりました。日時を再調整して再申請してください。</p>}
             </div>
           )}
-          {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => <div key={message.id} className={`mb-3 flex ${message.mine ? 'justify-end' : 'justify-start'}`}><p className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${message.mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></p></div>)}
+          {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => <div key={message.id} className={`mb-3 flex ${message.mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${message.mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body && <p>{message.body}</p>}{message.attachmentUrl && (message.attachmentType === 'image' ? <img src={message.attachmentUrl} alt={message.attachmentName || '添付画像'} className="mt-2 max-h-52 rounded-xl object-cover" /> : <a className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-black text-blue-600" href={message.attachmentUrl} download={message.attachmentName}><Paperclip size={14} />{message.attachmentName || '添付ファイル'}</a>)}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></div></div>)}
         </div>
       )}
-      <div className="flex gap-2 border-t border-slate-100 bg-white p-3">
+      <div className="border-t border-slate-100 bg-white p-3">
+        {attachment && <div className="mb-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600"><span className="truncate">{attachment.name}</span><button onClick={() => setAttachment(undefined)}><X size={14} /></button></div>}
+        <div className="flex gap-2">
+        <label className="grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-xl border border-slate-200 text-slate-500">
+          <Paperclip size={18} />
+          <input className="hidden" type="file" onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            readFileAsDataUrl(file, (url) => setAttachment({ name: file.name, url, type: file.type.startsWith('image/') ? 'image' : 'file' }));
+          }} />
+        </label>
         <input className="field" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activePartner} />
-        <button className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#050816] text-white disabled:opacity-30" disabled={!activePartner} onClick={() => sendMessage(activePartner, mode)}><Send size={18} /></button>
+        <button className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#050816] text-white disabled:opacity-30" disabled={!activePartner || (!draft.trim() && !attachment)} onClick={() => { sendMessage(activePartner, mode, attachment); setAttachment(undefined); }}><Send size={18} /></button>
+        </div>
       </div>
     </div>
   );
@@ -882,13 +966,13 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
   );
 }
 
-function MyPage({ currentAccount, posts, setPage, openComposer, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
   }
   return (
     <div className="p-4">
-      <ProfileHero account={currentAccount} isMine posts={posts} setPage={setPage} />
+      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} />
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button className="secondary" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>
         <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
@@ -943,6 +1027,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           <div className="grid grid-cols-2 gap-2"><Select label="設立年" value={form.foundedYear} options={foundedYears} onChange={(value) => update('foundedYear', value)} /><Select label="設立月" value={form.foundedMonth} options={foundedMonths} onChange={(value) => update('foundedMonth', value)} /></div>
           <Select label="従業員数" value={form.employeeSize} options={employeeSizes} onChange={(value) => update('employeeSize', value)} />
           <Select label="年商規模" value={form.revenueScale} options={revenueScales} onChange={(value) => update('revenueScale', value)} />
+          <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.hideSocialGraph} onChange={(event) => update('hideSocialGraph', event.target.checked)} />フォロー・フォロワーリストを他のユーザーに非表示にする</label>
           <Select label="本人確認種別" value={form.businessType} options={['corporation', 'sole']} displayMap={{ corporation: '法人', sole: '個人事業主' }} onChange={(value) => update('businessType', value)} />
           {form.businessType === 'corporation' ? <Input label="法人番号" value={form.corporateNumber} onChange={(value) => update('corporateNumber', value)} /> : <label className="grid gap-1 text-[11px] font-bold text-slate-600">運転免許証の写真<input className="field" type="file" accept="image/*" onChange={(event) => update('licenseFileName', event.target.files?.[0]?.name || '')} />{form.licenseFileName && <span className="text-slate-500">{form.licenseFileName}</span>}</label>}
           {form.role === 'entrepreneur' ? (
@@ -1019,6 +1104,9 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
     const count = Number(account.ticketRequestPlan.replace('枚', '')) || 1;
     setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '', ticketTransferName: '' } : item));
   }
+  function rejectTicket(account: Account) {
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketRequestStatus: 'none', ticketRequestPlan: '', ticketTransferName: '' } : item));
+  }
   return (
     <div className="p-4 lg:p-6">
       <div className="grid gap-3 lg:grid-cols-5">
@@ -1060,7 +1148,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <h2 className="text-sm font-black">チケット入金確認</h2>
         {pendingTickets.length === 0 ? <p className="mt-3 text-sm text-slate-500">確認待ちはありません。</p> : (
           <div className="mt-3 grid gap-2">
-            {pendingTickets.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><Avatar account={account} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || account.email}</b><span className="block text-xs text-slate-500">購入枚数：{account.ticketRequestPlan || '1枚'} / 振込名義：{account.ticketTransferName || '未入力'}</span><span className="block text-xs text-slate-500">{account.company || '会社名未設定'}</span></div><button className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white" onClick={() => approveTicket(account)}>承認</button></div>)}
+            {pendingTickets.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><Avatar account={account} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || account.email}</b><span className="block text-xs text-slate-500">購入枚数：{account.ticketRequestPlan || '1枚'} / 振込名義：{account.ticketTransferName || '未入力'}</span><span className="block text-xs text-slate-500">{account.company || '会社名未設定'}</span></div><div className="grid gap-2"><button className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white" onClick={() => approveTicket(account)}>承認</button><button className="rounded-xl border border-rose-100 px-3 py-2 text-xs font-black text-rose-600" onClick={() => rejectTicket(account)}>非承認</button></div></div>)}
           </div>
         )}
       </section>
@@ -1091,11 +1179,11 @@ function AdminStat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl border border-slate-100 p-4"><span className="text-[11px] font-black text-slate-500">{label}</span><b className="mt-2 block text-xl">{value}</b></div>;
 }
 
-function ProfilePage({ account, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, startEditPost, hidePost, deletePost }: { account: Account; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, startEditPost, hidePost, deletePost }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
-      <ProfileHero account={account} isMine={isMine} posts={posts} setPage={setPage} />
+      <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} />
       <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
         <button className="border-b-2 border-blue-600 py-3">概要</button>
         <button className="py-3 text-slate-500">実績</button>
@@ -1218,7 +1306,11 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   );
 }
 
-function ProfileHero({ account, isMine, posts, setPage }: { account: Account; isMine: boolean; posts: Post[]; setPage: (page: Page) => void }) {
+function ProfileHero({ account, accounts, isMine, posts, setPage }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void }) {
+  const normalized = normalizeAccount(account);
+  const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
+  const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
+  const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
   return (
     <section className="rounded-3xl border border-slate-100 p-4">
       <div className="flex items-start gap-4">
@@ -1231,7 +1323,13 @@ function ProfileHero({ account, isMine, posts, setPage }: { account: Account; is
       </div>
       <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
       <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>0</b> フォロー</span><span><b>0</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{followings.length}</b> フォロー</span><span><b>{followers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+      {canShowSocialGraph ? (
+        <div className="mt-3 grid gap-2 text-xs text-slate-600">
+          <p><b>フォロー：</b>{followings.length ? followings.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
+          <p><b>フォロワー：</b>{followers.length ? followers.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
+        </div>
+      ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
     </section>
   );
 }
