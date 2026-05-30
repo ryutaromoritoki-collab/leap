@@ -562,10 +562,10 @@ export default function LeapApp() {
         {toast && <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">{toast}</div>}
 
         {view === 'home' && user.role === 'entrepreneur' && (
-          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} hiddenPosts={hiddenPosts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
+          <EntrepreneurHome currentUser={user} profile={profile} posts={posts} hiddenPosts={hiddenPosts} kpis={kpis} following={following} followers={followers} profiles={profiles} investors={investorProfiles} meetings={meetings} notifications={notifications} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'investor' && (
-          <InvestorHome currentUser={user} investor={investor} profiles={profiles} investorProfiles={investorProfiles} posts={posts} follows={follows} following={following} followers={followers} followedKpis={followedKpis} meetings={meetings} messages={messages} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
+          <InvestorHome currentUser={user} investor={investor} profiles={profiles} investorProfiles={investorProfiles} posts={posts} follows={follows} following={following} followers={followers} followedKpis={followedKpis} meetings={meetings} messages={messages} notifications={notifications} openProfile={openStartupProfile} setView={setView} refresh={loadWorkspace} />
         )}
         {view === 'home' && user.role === 'admin' && <AdminHome adminData={adminData} refresh={loadWorkspace} openProfile={openStartupProfile} />}
         {view === 'post' && <AllPostsPage posts={allPosts} currentUser={user} investor={investor} openProfile={openStartupProfile} refresh={loadWorkspace} />}
@@ -978,7 +978,7 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
   );
 }
 
-function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, openProfile, setView, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (view: View) => void; refresh: () => Promise<void> }) {
+function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, notifications, openProfile, setView, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; notifications: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (view: View) => void; refresh: () => Promise<void> }) {
   const [showComposer, setShowComposer] = useState(false);
   const [activeTab, setActiveTab] = useState<'following' | 'recommended' | 'investors' | 'entrepreneurs'>('recommended');
   if (!profile) return <Onboarding user={currentUser} onDone={refresh} />;
@@ -1080,6 +1080,10 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
         <PostComposer profile={profile} refresh={refresh} />
         <KpiComposer profile={profile} refresh={refresh} />
       </section>
+      <DealDetailPreview profile={profile} kpis={kpis} />
+      <ReferenceFeaturesPanel />
+      <MonetizationPanel />
+      <NotificationPreviewPanel notifications={notifications} />
       <FollowOverview following={following} followers={followers} profiles={profiles} investors={investors} openProfile={openProfile} viewer={currentUser} />
       <MeetingTicketPanel profile={profile} meetings={meetings} refresh={refresh} />
       <PitchUpload profile={profile} refresh={refresh} />
@@ -1089,7 +1093,7 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
   );
 }
 
-function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts, follows, following, followers, followedKpis, meetings, messages, openProfile, setView, refresh }: { currentUser: AppUser; investor: InvestorProfile | null; profiles: EntrepreneurProfile[]; investorProfiles: InvestorProfile[]; posts: ProgressPost[]; follows: any[]; following: any[]; followers: any[]; followedKpis: any[]; meetings: any[]; messages: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (v: View) => void; refresh: () => Promise<void> }) {
+function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts, follows, following, followers, followedKpis, meetings, messages, notifications, openProfile, setView, refresh }: { currentUser: AppUser; investor: InvestorProfile | null; profiles: EntrepreneurProfile[]; investorProfiles: InvestorProfile[]; posts: ProgressPost[]; follows: any[]; following: any[]; followers: any[]; followedKpis: any[]; meetings: any[]; messages: any[]; notifications: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (v: View) => void; refresh: () => Promise<void> }) {
   const followedIds = new Set(follows.map((row) => row.entrepreneur_id));
   const followedPosts = posts.filter((post) => followedIds.has(post.entrepreneur_id));
   const recommendedPosts = posts.filter((post) => !followedIds.has(post.entrepreneur_id));
@@ -1112,6 +1116,8 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
       </section>
       <InvestorDocumentPanel investor={investor} refresh={refresh} />
       <FollowOverview following={following} followers={followers} profiles={profiles} investors={investorProfiles} openProfile={openProfile} viewer={currentUser} />
+      <MatchingCandidatesPanel profiles={profiles} openProfile={openProfile} />
+      <NotificationPreviewPanel notifications={notifications} />
       {follows.length === 0 && <EmptyState title="まだフォロー中の起業家はいません。興味のある起業家を探しましょう。" cta="起業家を探す" onClick={() => setView('search')} />}
       <section className="app-card p-5">
         <h3 className="text-xl font-black">フォロー中のKPI更新</h3>
@@ -3212,6 +3218,179 @@ function LaunchChecklist() {
 
 function InfoTile({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
   return <div className="rounded-2xl border border-white/10 bg-white/6 p-4"><Icon className="text-cyan-300" size={20} /><b className="mt-3 block">{title}</b><p className="mt-1 text-sm leading-6 text-slate-400">{body}</p></div>;
+}
+
+function ReferenceFeaturesPanel() {
+  const features = [
+    { icon: MessageCircle, title: 'SNSフィード', body: '日々の活動や成果をリアルタイムで発信' },
+    { icon: UsersRound, title: 'マッチング', body: '投資家と起業家を最適にマッチング' },
+    { icon: CalendarClock, title: '面談設定', body: 'カレンダーから簡単に日程調整' },
+    { icon: FileText, title: 'ピッチ資料共有', body: '安全に資料を共有してフィードバック' },
+    { icon: BadgeCheck, title: '実績バッジ', body: '信頼性を可視化する各種認証・バッジ' },
+  ];
+  return (
+    <section className="app-card p-5">
+      <h3 className="text-base font-black">主な機能</h3>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {features.map(({ icon: Icon, title, body }) => (
+          <article key={title} className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-sm">
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-blue-600"><Icon size={22} /></span>
+            <b className="mt-3 block text-sm">{title}</b>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{body}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MonetizationPanel() {
+  const plans = [
+    { name: '起業家Pro', price: '¥9,800/月', body: '調達案件の掲載、ピッチ資料掲載、AI案件診断、優先表示など', accent: 'bg-emerald-50 text-emerald-700' },
+    { name: '投資家Pro', price: '¥29,800/月', body: '詳細検索、DM制限解除、面談設定、投資先管理など', accent: 'bg-violet-50 text-violet-700' },
+    { name: 'スポンサープラン', price: '¥50,000〜/月', body: 'トップページ掲載、おすすめ表示、イベント告知など', accent: 'bg-amber-50 text-amber-700' },
+    { name: 'その他の収益', price: '個別見積', body: '面談オプション課金、レポート・データ提供、ファンド運用など', accent: 'bg-slate-100 text-slate-700' },
+  ];
+  return (
+    <section className="app-card p-5">
+      <h3 className="text-base font-black">マネタイズモデル</h3>
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        {plans.map((plan) => (
+          <article key={plan.name} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${plan.accent}`}>{plan.name}</span>
+            <b className="mt-3 block text-base">{plan.price}</b>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{plan.body}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DealDetailPreview({ profile, kpis }: { profile: EntrepreneurProfile | null; kpis: StartupKpi[] }) {
+  const latestKpi = [...kpis].sort((a, b) => (b.kpi_month || '').localeCompare(a.kpi_month || ''))[0];
+  if (!profile) {
+    return <EmptyState title="案件詳細はプロフィール作成後に表示されます" body="会社情報、KPI、ピッチ資料を登録すると投資家向けの案件詳細として整理されます。" />;
+  }
+  return (
+    <section className="app-card overflow-hidden">
+      <PhoneHeader title="案件詳細ページ（ダッシュボード型）" />
+      <div className="p-5">
+        <button className="mb-3 flex items-center gap-1 text-xs font-black text-slate-500"><ChevronRight className="rotate-180" size={14} />戻る</button>
+        <h3 className="text-xl font-black">{profile.company_name || '会社名未設定'} の案件詳細</h3>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {[profile.industry, profile.current_phase, profile.verified_interview ? '運営面談済み' : '確認中'].filter(Boolean).map((tag) => <span className="pill" key={String(tag)}>{String(tag)}</span>)}
+        </div>
+        <div className="mt-4 grid min-h-40 place-items-center rounded-2xl bg-gradient-to-br from-blue-50 via-white to-emerald-50 text-center">
+          <div>
+            <LayoutDashboard className="mx-auto text-blue-500" size={34} />
+            <p className="mt-2 text-sm font-black text-slate-700">KPIと事業進捗を1画面で確認</p>
+          </div>
+        </div>
+        <h4 className="mt-5 text-sm font-black">ハイライト</h4>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <SmallDataCard label="月次売上" value={yen(latestKpi?.monthly_revenue)} />
+          <SmallDataCard label="成長率（MoM）" value={profile.is_fast_growing ? '+25%' : '未入力'} positive={profile.is_fast_growing} />
+          <SmallDataCard label="累計ユーザー数" value={latestKpi?.mau ? `${latestKpi.mau.toLocaleString()}人` : '未入力'} />
+          <SmallDataCard label="継続率" value={percent(latestKpi?.retention_rate)} />
+          <SmallDataCard label="導入社数" value={latestKpi?.customer_count ? `${latestKpi.customer_count.toLocaleString()}社` : '未入力'} />
+          <SmallDataCard label="累計投資金額" value={yen(profile.total_investment_amount)} />
+        </div>
+        <h4 className="mt-5 text-sm font-black">関連情報</h4>
+        <dl className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white text-sm">
+          {[
+            ['調達希望額', yen(profile.fundraising_amount)],
+            ['現在の調達状況', profile.payment_status === 'paid' ? '公開中' : '確認中'],
+            ['資金使途', profile.fund_usage || '未入力'],
+            ['ラウンド', profile.current_phase || '未入力'],
+            ['調達完了予定', '未入力'],
+          ].map(([label, value]) => (
+            <div className="grid grid-cols-[120px_1fr] gap-3 px-4 py-3" key={label}>
+              <dt className="font-bold text-slate-500">{label}</dt>
+              <dd className="text-slate-900">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+          <p className="text-sm font-black">ピッチ資料</p>
+          <p className="mt-1 text-xs text-slate-500">資料をアップロードすると投資家がここから確認できます。</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SmallDataCard({ label, value, positive }: { label: string; value: string; positive?: boolean }) {
+  return (
+    <article className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+      <span className="text-xs font-bold text-slate-500">{label}</span>
+      <b className={`mt-2 block text-base ${positive ? 'text-emerald-600' : 'text-slate-950'}`}>{value}</b>
+    </article>
+  );
+}
+
+function MatchingCandidatesPanel({ profiles, openProfile }: { profiles: EntrepreneurProfile[]; openProfile: (p: EntrepreneurProfile) => void }) {
+  return (
+    <section className="app-card overflow-hidden">
+      <PhoneHeader title="マッチング候補" />
+      <div className="p-5">
+        <div className="phone-tabs">
+          <button data-active>あなたへのおすすめ</button>
+          <button>面談リクエスト</button>
+        </div>
+        {profiles.length === 0 ? (
+          <div className="mt-4"><EmptyState title="候補はまだありません" body="起業家が登録されると、プロフィール完成度やKPIから候補が表示されます。" /></div>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {profiles.slice(0, 4).map((profile) => (
+              <article key={profile.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+                <ProfileAvatar name={profile.company_name} avatarUrl={profile.avatar_url} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-black">{profile.company_name}</p>
+                  <p className="truncate text-xs text-slate-500">{profile.founder_name} CEO</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{profile.industry || '業界未設定'}・{yen(profile.fundraising_amount)}</p>
+                </div>
+                <div className="grid justify-items-end gap-2">
+                  <span className="text-xs font-black text-emerald-600">マッチ度 {calcCompleteness(profile)}%</span>
+                  <button className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white" onClick={() => openProfile(profile)}>面談する</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function NotificationPreviewPanel({ notifications }: { notifications: any[] }) {
+  return (
+    <section className="app-card overflow-hidden">
+      <PhoneHeader title="通知" />
+      <div className="p-5">
+        <div className="phone-tabs">
+          <button data-active>すべて</button>
+          <button>未読</button>
+        </div>
+        {notifications.length === 0 ? (
+          <div className="mt-4"><EmptyState title="通知はまだありません" body="コメント、面談申込、運営からのお知らせがここに表示されます。" /></div>
+        ) : (
+          <div className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white">
+            {notifications.slice(0, 5).map((notification) => (
+              <article key={notification.id} className="flex items-start gap-3 p-4">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><Bell size={16} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-900">{notification.title || '新しい通知'}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{notification.body || 'Leapからのお知らせがあります。'}</p>
+                </div>
+                <span className="text-xs text-slate-400">{notification.created_at ? new Date(notification.created_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function PhoneHeader({ title }: { title: string }) {
