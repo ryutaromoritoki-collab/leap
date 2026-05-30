@@ -520,15 +520,15 @@ export default function LeapApp() {
   const showShellHeader = !(view === 'home' && user.role === 'entrepreneur');
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="glass fixed inset-y-0 left-0 z-20 hidden w-[260px] border-y-0 border-l-0 p-5 lg:block">
+    <div className="min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="glass fixed inset-y-0 left-0 z-20 hidden w-[240px] rounded-none border-y-0 border-l-0 p-5 lg:block">
         <button className="neon-text text-3xl font-black" onClick={() => setView('home')}>Leap</button>
         <nav className="mt-8 grid gap-2">
           {nav.filter((item) => item.view !== 'admin' || user.role === 'admin').map((item) => (
             <button
               key={item.view}
               onClick={() => setView(item.view)}
-              className={`flex min-h-11 items-center gap-3 rounded-2xl px-4 text-left text-sm ${view === item.view ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              className={`flex min-h-11 items-center gap-3 rounded-2xl px-4 text-left text-sm font-bold ${view === item.view ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'}`}
             >
               <item.icon size={18} /> {item.label}
             </button>
@@ -539,11 +539,11 @@ export default function LeapApp() {
         </p>
       </aside>
 
-      <main className="min-w-0 px-4 pb-28 pt-5 sm:px-6 lg:col-start-2 lg:px-8">
+      <main className="min-w-0 px-3 pb-28 pt-4 sm:px-6 lg:col-start-2 lg:px-8">
         {showShellHeader && (
-          <header className="mb-5 flex items-center justify-between gap-3">
+          <header className="mx-auto mb-5 flex w-full max-w-5xl items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-emerald-300">資本提携プラットフォーム</p>
+              <p className="app-section-title">Leap</p>
               <h1 className="text-2xl font-black sm:text-3xl">{titleFor(view, user.role)}</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -590,9 +590,9 @@ export default function LeapApp() {
         {view === 'launch' && <LaunchChecklist />}
       </main>
 
-      <nav className="glass fixed bottom-3 left-3 right-3 z-30 grid grid-cols-6 gap-1 rounded-3xl p-2 lg:hidden">
+      <nav className="bottom-phone-nav fixed bottom-3 left-3 right-3 z-30 mx-auto grid max-w-[430px] grid-cols-6 gap-1 rounded-3xl p-2 lg:hidden">
         {nav.filter((item) => item.view !== 'admin' || user.role === 'admin').map((item) => (
-          <button key={item.view} onClick={() => setView(item.view)} className={`grid min-h-12 place-items-center rounded-2xl ${view === item.view ? 'bg-white/12 text-white' : 'text-slate-400'}`} aria-label={item.label}>
+          <button key={item.view} onClick={() => setView(item.view)} className={`grid min-h-12 place-items-center rounded-2xl ${view === item.view ? 'bg-slate-950 text-white' : 'text-slate-500'}`} aria-label={item.label}>
             <item.icon size={21} />
           </button>
         ))}
@@ -980,79 +980,85 @@ function FieldGrid({ fields, form, set, textarea }: { fields: string[]; form: Re
 
 function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, following, followers, profiles, investors, meetings, openProfile, setView, refresh }: { currentUser: AppUser; profile: EntrepreneurProfile | null; posts: ProgressPost[]; hiddenPosts: ProgressPost[]; kpis: StartupKpi[]; following: any[]; followers: any[]; profiles: EntrepreneurProfile[]; investors: InvestorProfile[]; meetings: any[]; openProfile: (p: EntrepreneurProfile) => void; setView: (view: View) => void; refresh: () => Promise<void> }) {
   const [showComposer, setShowComposer] = useState(false);
-  const [activeTab, setActiveTab] = useState<'threads' | 'replies' | 'media' | 'reposts'>('threads');
+  const [activeTab, setActiveTab] = useState<'following' | 'recommended' | 'investors' | 'entrepreneurs'>('recommended');
   if (!profile) return <Onboarding user={currentUser} onDone={refresh} />;
   const completeness = calcCompleteness(profile);
   const displayName = profile.company_name || profile.founder_name || 'Leapユーザー';
   const accountName = profile.account_name || 'account';
-  const mediaPosts = posts.filter((post) => post.attachment_url);
-  const tabPosts = activeTab === 'media' ? mediaPosts : posts;
+  const tabPosts = activeTab === 'following' ? posts.filter((post) => following.some((row) => row.entrepreneur_id === post.entrepreneur_id)) : posts;
+  const storyProfiles = [profile, ...profiles.filter((item) => item.id !== profile.id)].slice(0, 5);
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-5">
-      <section className="glass overflow-hidden rounded-[28px]">
-        <div className="flex items-center justify-between p-5">
-          <button className="btn-secondary h-11 w-11 rounded-full p-0" aria-label="分析"><ChartNoAxesCombined size={20} /></button>
+    <div className="mobile-screen grid gap-5">
+      <section className="app-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white" aria-label="分析"><ChartNoAxesCombined size={20} /></button>
           <div className="flex items-center gap-2">
-            <button className="btn-secondary h-11 w-11 rounded-full p-0" onClick={() => setView('search')} aria-label="検索"><Search size={21} /></button>
-            <button className="btn-secondary h-11 w-11 rounded-full p-0" onClick={() => setView('settings')} aria-label="メニュー"><Menu size={21} /></button>
+            <button className="grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-950" onClick={() => setView('search')} aria-label="検索"><Search size={22} /></button>
+            <button className="grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-950" onClick={() => setView('settings')} aria-label="メニュー"><Menu size={22} /></button>
           </div>
         </div>
-        <div className="grid gap-4 px-5 pb-5">
-          <div className="flex items-end justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="break-words text-3xl font-black sm:text-4xl">{displayName}</h2>
-              <p className="mt-1 text-base font-bold text-slate-500">@{accountName}</p>
-            </div>
-            <div className="relative shrink-0">
-              <ProfileAvatar name={displayName} avatarUrl={profile.avatar_url} size="lg" />
-              <button className="absolute -left-4 bottom-0 grid h-11 w-11 place-items-center rounded-full border-4 border-white bg-slate-900 text-white shadow-lg" onClick={() => setShowComposer(true)} aria-label="投稿を作成">
-                <Plus size={22} />
-              </button>
-            </div>
-          </div>
-          <p className="whitespace-pre-line break-words text-base leading-8 text-slate-700">
-            {profile.tagline || `${profile.company_name}の最新情報を発信しています。`}
-          </p>
-          <p className="text-sm leading-7 text-slate-500">
-            投資家に評価される投稿は、実行内容、数値変化、課題、次の検証が揃っています。小さな進捗も継続して残しましょう。
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {[profile.industry, profile.current_phase, profile.location, profile.employee_size, `${completeness}%完了`].filter(Boolean).map((item) => (
-              <span className="pill" key={String(item)}>{String(item)}</span>
-            ))}
-          </div>
-          <div className="flex items-center gap-3 text-sm text-slate-500">
-            <div className="flex -space-x-2">
-              {[...followers.slice(0, 3), ...following.slice(0, Math.max(0, 3 - followers.length))].slice(0, 3).map((row, index) => (
-                <span key={`${row.investor_id ?? row.entrepreneur_id ?? index}`} className="grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-slate-200 text-xs font-black">{index + 1}</span>
-              ))}
-            </div>
-            <span>フォロワー {followers.length.toLocaleString()}人</span>
-            <span>フォロー {following.length.toLocaleString()}人</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button className="btn-secondary" onClick={() => setView('settings')}>プロフィールを編集</button>
-            <button className="btn-secondary" onClick={() => navigator.share?.({ title: displayName, text: profile.tagline || displayName }).catch(() => undefined)}>プロフィールをシェア</button>
-          </div>
-        </div>
-        <div className="grid grid-cols-4 border-t border-slate-200 text-sm font-black text-slate-500">
+        <div className="phone-tabs">
           {[
-            ['threads', 'スレッド'],
-            ['replies', '返信'],
-            ['media', 'メディア'],
-            ['reposts', '再投稿'],
+            ['following', 'フォロー中'],
+            ['recommended', 'おすすめ'],
+            ['investors', '投資家'],
+            ['entrepreneurs', '起業家'],
           ].map(([key, label]) => (
-            <button key={key} className={`py-4 ${activeTab === key ? 'border-b-2 border-slate-900 text-slate-950' : ''}`} onClick={() => setActiveTab(key as typeof activeTab)}>{label}</button>
+            <button key={key} data-active={activeTab === key} onClick={() => setActiveTab(key as typeof activeTab)}>{label}</button>
+          ))}
+        </div>
+        <div className="flex gap-4 overflow-x-auto border-b border-slate-100 px-4 py-4">
+          <button className="grid w-16 shrink-0 justify-items-center gap-2 text-xs font-bold text-slate-700" onClick={() => setShowComposer(true)}>
+            <span className="grid h-14 w-14 place-items-center rounded-full border border-blue-200 bg-white text-blue-600"><Plus size={24} /></span>
+            投稿する
+          </button>
+          {storyProfiles.map((item) => (
+            <button key={item.id} className="grid w-16 shrink-0 justify-items-center gap-2 text-xs font-bold text-slate-700" onClick={() => item.id === profile.id ? setView('settings') : openProfile(item)}>
+              <span className="relative">
+                <ProfileAvatar name={item.company_name} avatarUrl={item.avatar_url} />
+                <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />
+              </span>
+              <span className="w-full truncate">{item.account_name || item.company_name}</span>
+            </button>
           ))}
         </div>
         <div>
-          {activeTab === 'replies' || activeTab === 'reposts' ? (
-            <div className="p-5"><EmptyState title={activeTab === 'replies' ? '返信はまだありません' : '再投稿はまだありません'} body="投稿や会話が増えるとここに表示されます。" /></div>
-          ) : tabPosts.length === 0 ? (
-            <div className="p-5"><EmptyState title={activeTab === 'media' ? 'メディア付き投稿はまだありません' : 'まだ投稿がありません。まずは短い近況から投稿しましょう。'} cta="投稿する" onClick={() => setShowComposer(true)} /></div>
+          {tabPosts.length === 0 ? (
+            <div className="p-5"><EmptyState title="まだ投稿がありません" body="投稿するとこのフィードに表示されます。" cta="投稿する" onClick={() => setShowComposer(true)} /></div>
           ) : (
-            tabPosts.map((post) => <HomeThreadPost key={post.id} post={post} name={displayName} accountName={accountName} avatarUrl={profile.avatar_url} currentUser={currentUser} refresh={refresh} />)
+            tabPosts.map((post) => <HomeThreadPost key={post.id} post={post} name={post.entrepreneur_profiles?.company_name || displayName} accountName={post.entrepreneur_profiles?.account_name || accountName} avatarUrl={post.entrepreneur_profiles?.avatar_url || profile.avatar_url} currentUser={currentUser} refresh={refresh} />)
           )}
+        </div>
+      </section>
+      <section className="app-card p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="app-section-title">マイプロフィール</p>
+            <h2 className="mt-3 break-words text-2xl font-black">{displayName}</h2>
+            <p className="mt-1 text-sm font-bold text-slate-500">@{accountName}</p>
+          </div>
+          <div className="relative shrink-0">
+            <ProfileAvatar name={displayName} avatarUrl={profile.avatar_url} size="lg" />
+            <button className="absolute -left-3 bottom-0 grid h-10 w-10 place-items-center rounded-full border-4 border-white bg-slate-950 text-white shadow-lg" onClick={() => setShowComposer(true)} aria-label="投稿を作成">
+              <Plus size={20} />
+            </button>
+          </div>
+        </div>
+        <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">
+          {profile.tagline || `${profile.company_name}の最新情報を発信しています。`}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[profile.industry, profile.current_phase, profile.location, `${completeness}%完了`].filter(Boolean).map((item) => (
+            <span className="pill" key={String(item)}>{String(item)}</span>
+          ))}
+        </div>
+        <div className="mt-4 flex items-center gap-3 text-sm text-slate-500">
+          <span><b className="text-slate-950">{following.length.toLocaleString()}</b> フォロー中</span>
+          <span><b className="text-slate-950">{followers.length.toLocaleString()}</b> フォロワー</span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button className="btn-secondary" onClick={() => setView('settings')}>プロフィールを編集</button>
+          <button className="btn-primary" onClick={() => setShowComposer(true)}>投稿する</button>
         </div>
       </section>
       {showComposer && (
@@ -1066,7 +1072,7 @@ function EntrepreneurHome({ currentUser, profile, posts, hiddenPosts, kpis, foll
           </div>
         </div>
       )}
-      <section id="quick-post-composer" className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
+      <section id="quick-post-composer" className="grid gap-5">
         <PostComposer profile={profile} refresh={refresh} />
         <KpiComposer profile={profile} refresh={refresh} />
       </section>
@@ -1084,12 +1090,12 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
   const followedPosts = posts.filter((post) => followedIds.has(post.entrepreneur_id));
   const recommendedPosts = posts.filter((post) => !followedIds.has(post.entrepreneur_id));
   return (
-    <div className="grid gap-5">
-      <section className="glass rounded-[28px] p-6">
-        <p className="text-sm font-bold text-emerald-300">投資判断の見方</p>
-        <h2 className="mt-2 text-3xl font-black">有望な起業家は、投稿の継続性とKPIの変化で見つける。</h2>
-        <p className="mt-3 max-w-3xl leading-7 text-slate-300">会社概要だけではなく、毎週の進捗、課題への向き合い方、数値の改善速度、投資家コメントへの返信を確認してください。</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+    <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <section className="app-card p-5 lg:col-span-2">
+        <p className="app-section-title">投資家ホーム</p>
+        <h2 className="mt-3 text-2xl font-black">成長投稿とKPIから有望な起業家を発見</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">毎週の進捗、課題への向き合い方、数値の改善速度、返信の丁寧さを見て判断できます。</p>
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Metric label="フォロー数" value={`${following.length}`} icon={Heart} />
           <Metric label="フォロワー数" value={`${followers.length}`} icon={UsersRound} />
           <Metric label="新着進捗" value={`${posts.length}`} icon={TrendingUp} />
@@ -1101,10 +1107,10 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
       <InvestorDocumentPanel investor={investor} refresh={refresh} />
       <FollowOverview following={following} followers={followers} profiles={profiles} investors={investorProfiles} openProfile={openProfile} viewer={currentUser} />
       {follows.length === 0 && <EmptyState title="まだフォロー中の起業家はいません。興味のある起業家を探しましょう。" cta="起業家を探す" onClick={() => setView('search')} />}
-      <section className="grid gap-3">
+      <section className="app-card p-5">
         <h3 className="text-xl font-black">フォロー中のKPI更新</h3>
         {followedKpis.length === 0 ? <EmptyState title="フォロー中のKPI更新はまだありません" body="フォローした起業家がKPIを更新するとここに表示されます。" /> : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{followedKpis.map((kpi) => (
+          <div className="mt-3 grid gap-3">{followedKpis.map((kpi) => (
             <article key={kpi.id} className="glass rounded-2xl p-4">
               <p className="text-sm font-bold text-emerald-300">{kpi.entrepreneur_profiles?.company_name ?? '起業家'}</p>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-300">
@@ -1117,17 +1123,17 @@ function InvestorHome({ currentUser, investor, profiles, investorProfiles, posts
           ))}</div>
         )}
       </section>
-      <section className="grid gap-3">
+      <section className="app-card p-5">
         <h3 className="text-xl font-black">興味領域に合う起業家</h3>
         {profiles.length === 0 ? <EmptyState title="閲覧できる起業家がまだいません" body="起業家が登録すると、検索とウォッチリスト追加が利用できます。" /> : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{profiles.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
+          <div className="mt-3 grid gap-3">{profiles.slice(0, 4).map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
         )}
       </section>
-      <section className="grid gap-3">
+      <section className="app-card p-5 lg:col-span-2">
         <h3 className="text-xl font-black">フォロー中の新着進捗ログ</h3>
         {followedPosts.length === 0 ? <EmptyState title="フォロー中の新着進捗ログはまだありません" body="フォローした起業家の進捗がここに表示されます。" /> : followedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} refresh={refresh} />)}
       </section>
-      <section className="grid gap-3">
+      <section className="app-card p-5 lg:col-span-2">
         <h3 className="text-xl font-black">興味を惹きそうな投稿</h3>
         {recommendedPosts.length === 0 ? <EmptyState title="おすすめ投稿はまだありません" body="フォローしていない起業家の投稿がここに表示されます。" /> : recommendedPosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} investor={investor} refresh={refresh} />)}
       </section>
@@ -1483,13 +1489,15 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
   }, [investors, applied]);
   const newEntrants = profiles.filter((p: any) => Date.now() - new Date(p.created_at).getTime() <= 7 * 24 * 60 * 60 * 1000);
   return (
-    <div className="grid gap-5">
-      <section className="glass rounded-[24px] p-5">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-4">
+    <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <section className="app-card p-5">
+        <p className="app-section-title">検索・発見</p>
+        <h2 className="mt-3 text-2xl font-black">アカウントを探す</h2>
+        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4">
           <Search size={18} />
           <input className="field border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="アカウント名、会社名、名前、業界、地域で検索" />
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3">
           <select className="field" value={filters.industry} onChange={(e) => setFilters({ ...filters, industry: e.target.value })}><option value="">業界すべて</option>{industryOptions.map((p) => <option key={p}>{p}</option>)}</select>
           <select className="field" value={filters.location} onChange={(e) => setFilters({ ...filters, location: e.target.value })}><option value="">地域すべて</option>{locationOptions.map((p) => <option key={p}>{p}</option>)}</select>
           <select className="field" value={filters.phase} onChange={(e) => setFilters({ ...filters, phase: e.target.value })}><option value="">フェーズすべて</option>{phaseOptions.map((p) => <option key={p}>{p}</option>)}</select>
@@ -1498,30 +1506,32 @@ function SearchPage({ query, setQuery, profiles, investors, openProfile, refresh
         </div>
         <button className="btn-primary mt-4 w-full" onClick={() => setApplied({ ...filters, query })}><Search size={17} /> この条件で検索する</button>
       </section>
-      {newEntrants.length > 0 && (
-        <section className="grid gap-3">
-          <h3 className="text-xl font-black">新規参入</h3>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{newEntrants.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
-        </section>
-      )}
-      {filteredEntrepreneurs.length === 0 && filteredInvestors.length === 0 ? (
-        <EmptyState title="条件に一致するアカウントはありません" body="検索条件を広げるか、アカウント名・会社名・名前で検索してください。" />
-      ) : (
-        <section className="grid gap-4">
+      <section className="grid gap-4">
+        {newEntrants.length > 0 && (
+          <div className="app-card p-5">
+            <h3 className="text-xl font-black">新規参入</h3>
+            <div className="mt-3 grid gap-3">{newEntrants.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
+          </div>
+        )}
+        {filteredEntrepreneurs.length === 0 && filteredInvestors.length === 0 ? (
+          <EmptyState title="条件に一致するアカウントはありません" body="検索条件を広げるか、アカウント名・会社名・名前で検索してください。" />
+        ) : (
+          <>
           {filteredEntrepreneurs.length > 0 && (
-            <div className="grid gap-3">
+            <div className="app-card p-5">
               <h3 className="text-xl font-black">起業家アカウント</h3>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filteredEntrepreneurs.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
+              <div className="mt-3 grid gap-3">{filteredEntrepreneurs.map((p) => <StartupCard key={p.id} profile={p} onClick={() => openProfile(p)} />)}</div>
             </div>
           )}
           {filteredInvestors.length > 0 && (
-            <div className="grid gap-3">
+            <div className="app-card p-5">
               <h3 className="text-xl font-black">投資家アカウント</h3>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filteredInvestors.map((p) => <InvestorAccountCard key={p.id} profile={p} />)}</div>
+              <div className="mt-3 grid gap-3">{filteredInvestors.map((p) => <InvestorAccountCard key={p.id} profile={p} />)}</div>
             </div>
           )}
-        </section>
-      )}
+          </>
+        )}
+      </section>
     </div>
   );
 }
@@ -1660,10 +1670,11 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
   }
 
   return (
-    <div className="grid gap-5">
-      <section className="glass overflow-hidden rounded-[24px] p-5 sm:p-8">
-        <div className="grid gap-5 sm:grid-cols-[150px_1fr] sm:items-start">
-          <div className="grid justify-items-center gap-3">
+    <div className="mx-auto grid w-full max-w-5xl gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+      <section className="app-card overflow-hidden lg:col-span-2">
+        <div className="h-28 bg-gradient-to-br from-blue-50 via-indigo-50 to-emerald-50" />
+        <div className="grid gap-5 p-5 sm:grid-cols-[140px_1fr] sm:items-start">
+          <div className="-mt-16 grid justify-items-center gap-3">
             <ProfileAvatar name={profile.company_name} avatarUrl={profile.avatar_url} size="lg" />
             {isOwnProfile && (
               <button className="btn-secondary h-11 w-11 rounded-full p-0" onClick={() => setShowProfileComposer(true)} aria-label="投稿を作成">
@@ -1674,8 +1685,9 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-cyan-300">@{profile.account_name || 'account'}</p>
+                <p className="text-sm font-bold text-blue-600">@{profile.account_name || 'account'}</p>
                 <h2 className="mt-1 text-2xl font-black sm:text-3xl">{profile.company_name}</h2>
+                <p className="mt-1 text-sm text-slate-500">{profile.founder_name} / {profile.current_phase ?? 'フェーズ未入力'}</p>
               </div>
               {isOwnProfile && <button className="btn-primary" onClick={() => setShowProfileComposer(true)}><Plus size={17} /> 投稿する</button>}
             </div>
@@ -1684,7 +1696,6 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
               <div><b className="block text-xl">{profileFollowers.length}</b><span className="text-xs text-slate-500">フォロワー</span></div>
               <div><b className="block text-xl">{yen(profile.total_investment_amount)}</b><span className="text-xs text-slate-500">累計投資</span></div>
             </div>
-            <p className="mt-5 font-bold">{profile.founder_name}</p>
             <p className="mt-2 max-w-2xl whitespace-pre-line leading-7 text-slate-600">{profile.tagline || '一言説明は未入力です。'}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="pill">{profile.industry ?? '業界未入力'}</span>
@@ -1720,7 +1731,7 @@ function StartupProfile({ profile, currentUser, followers, following, profiles, 
             このプロフィールは現在非公開です。運営確認後、投資家に公開されます。
           </div>
         )}
-        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 border-t border-slate-100 p-5 sm:grid-cols-4">
           <Metric label="現在フェーズ" value={profile.current_phase ?? '未入力'} icon={Rocket} />
           <Metric label="調達希望額" value={yen(profile.fundraising_amount)} icon={CircleDollarSign} />
           <Metric label="累計投資金額" value={yen(profile.total_investment_amount)} icon={CircleDollarSign} />

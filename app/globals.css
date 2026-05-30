@@ -24,8 +24,8 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   touch-action: manipulation;
-  background: #f7f8fa;
-  color: #1f2937;
+  background: linear-gradient(180deg, #edf5ff 0%, #f8fbff 28%, #ffffff 100%);
+  color: #0f172a;
   font-family: Inter, "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -62,7 +62,7 @@ button {
 .glass {
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
 }
 
 .neon-text {
@@ -73,12 +73,12 @@ button {
 
 .field {
   width: 100%;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
-  color: #1f2937;
+  color: #0f172a;
   outline: none;
-  padding: 13px 14px;
+  padding: 12px 14px;
 }
 
 .field:focus {
@@ -93,12 +93,12 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 14px;
-  background: #00a4bb;
+  border-radius: 12px;
+  background: #050816;
   color: #ffffff;
   font-weight: 800;
   padding: 0 16px;
-  box-shadow: 0 12px 26px rgba(0, 164, 187, 0.22);
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.18);
   text-align: center;
   white-space: normal;
 }
@@ -110,10 +110,10 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
-  color: #1f2937;
+  color: #0f172a;
   padding: 0 16px;
   text-align: center;
   white-space: normal;
@@ -126,7 +126,7 @@ button {
   gap: 6px;
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #f2f4f7;
+  background: #f8fafc;
   color: #475569;
   padding: 6px 10px;
   font-size: 12px;
@@ -162,7 +162,7 @@ body .text-cyan-200,
 body .text-cyan-300,
 body .text-emerald-100,
 body .text-emerald-300 {
-  color: #00a4bb;
+  color: #2563eb;
 }
 
 body .bg-black\/20,
@@ -171,12 +171,62 @@ body .bg-white\/5,
 body .bg-white\/\[0\.04\],
 body .bg-white\/10,
 body .bg-white\/8 {
-  background: #f7f8fa;
+  background: #f8fafc;
 }
 
 body .border-white\/10,
 body .border-white\/12 {
   border-color: rgba(15, 23, 42, 0.08);
+}
+
+.mobile-screen {
+  width: min(100%, 430px);
+  margin-inline: auto;
+}
+
+.app-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.app-section-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #2f5df5;
+  color: #ffffff;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.phone-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.phone-tabs button {
+  min-height: 48px;
+  border-bottom: 2px solid transparent;
+}
+
+.phone-tabs button[data-active="true"] {
+  border-bottom-color: #2563eb;
+  color: #0f172a;
+}
+
+.bottom-phone-nav {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 -12px 28px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(18px);
 }
 
 @media (max-width: 640px) {
