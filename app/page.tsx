@@ -103,7 +103,16 @@ type DirectMessage = {
   body: string;
   createdAt: string;
   mine: boolean;
-  meetingStatus?: 'requested' | 'approved';
+  meetingStatus?: 'requested' | 'approved' | 'rejected';
+};
+
+type MeetingApplication = {
+  id: string;
+  applicantId: string;
+  partnerId: string;
+  scheduledAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
 };
 
 type Notice = {
@@ -199,6 +208,7 @@ export default function LeapApp() {
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [posts, setPosts] = useState<Post[]>(() => loadLocal('leap.posts', []));
   const [messages, setMessages] = useState<DirectMessage[]>(() => loadLocal('leap.messages', []));
+  const [meetingApplications, setMeetingApplications] = useState<MeetingApplication[]>(() => loadLocal('leap.meetingApplications', []));
   const [notices, setNotices] = useState<Notice[]>(() => loadLocal('leap.notices', []));
   const [following, setFollowing] = useState<string[]>(() => loadLocal('leap.following', []));
   const [savedPosts, setSavedPosts] = useState<string[]>(() => loadLocal('leap.savedPosts', []));
@@ -220,6 +230,7 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.currentAccountId', currentAccountId), [currentAccountId]);
   useEffect(() => saveLocal('leap.posts', posts), [posts]);
   useEffect(() => saveLocal('leap.messages', messages), [messages]);
+  useEffect(() => saveLocal('leap.meetingApplications', meetingApplications), [meetingApplications]);
   useEffect(() => saveLocal('leap.notices', notices), [notices]);
   useEffect(() => saveLocal('leap.following', following), [following]);
   useEffect(() => saveLocal('leap.savedPosts', savedPosts), [savedPosts]);
@@ -228,6 +239,7 @@ export default function LeapApp() {
       if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
       if (event.key === 'leap.posts') setPosts(loadLocal('leap.posts', []));
       if (event.key === 'leap.messages') setMessages(loadLocal('leap.messages', []));
+      if (event.key === 'leap.meetingApplications') setMeetingApplications(loadLocal('leap.meetingApplications', []));
       if (event.key === 'leap.notices') setNotices(loadLocal('leap.notices', []));
     }
     window.addEventListener('storage', syncAcrossTabs);
@@ -401,6 +413,57 @@ export default function LeapApp() {
     flash('面談メッセージに切り替えました');
   }
 
+  function rejectMeeting(partner: Account) {
+    setMessages((list) => [
+      { id: crypto.randomUUID(), partnerId: partner.id, kind: 'direct', body: '面談申請を非承認にしました。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'rejected' },
+      ...list.map((message) => message.partnerId === partner.id && message.meetingStatus === 'requested' ? { ...message, meetingStatus: 'rejected' as const } : message),
+    ]);
+    flash('面談申請を非承認にしました');
+  }
+
+  function submitMeetingApplication(partner: Account, scheduledAt: string) {
+    if (!requireAccount()) return;
+    if (!scheduledAt) {
+      flash('面談日時を選択してください');
+      return;
+    }
+    const existing = meetingApplications.find((item) => item.applicantId === currentAccount!.id && item.partnerId === partner.id && item.status === 'pending');
+    if (existing) {
+      flash('すでに管理者確認待ちです');
+      return;
+    }
+    const application: MeetingApplication = {
+      id: crypto.randomUUID(),
+      applicantId: currentAccount!.id,
+      partnerId: partner.id,
+      scheduledAt,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    setMeetingApplications((list) => [application, ...list]);
+    setMessages((list) => [{ id: crypto.randomUUID(), partnerId: partner.id, kind: 'meeting', body: `面談日時を管理者に申請しました：${formatDate(scheduledAt)}`, createdAt: new Date().toISOString(), mine: true }, ...list]);
+    setNotices((list) => [{ id: crypto.randomUUID(), body: `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんが面談日時を管理者に申請しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+    flash('面談日時を管理者へ申請しました');
+  }
+
+  function reviewMeetingApplication(applicationId: string, status: 'approved' | 'rejected') {
+    const application = meetingApplications.find((item) => item.id === applicationId);
+    if (!application) return;
+    const currentStatus = application.status;
+    setMeetingApplications((list) => list.map((item) => item.id === applicationId ? { ...item, status } : item));
+    setMessages((list) => [{ id: crypto.randomUUID(), partnerId: application.partnerId, kind: 'meeting', body: status === 'approved' ? `管理者が面談を承認しました：${formatDate(application.scheduledAt)}` : '管理者が面談申請を非承認にしました。再度日程調整をしてください。', createdAt: new Date().toISOString(), mine: false, meetingStatus: status === 'approved' ? 'approved' : 'rejected' }, ...list]);
+    const entrepreneur = [accounts.find((account) => account.id === application.applicantId), accounts.find((account) => account.id === application.partnerId)].find((account) => account?.role === 'entrepreneur');
+    if (entrepreneur && currentStatus !== status) {
+      setAccounts((list) => list.map((account) => {
+        if (account.id !== entrepreneur.id) return account;
+        if (status === 'approved') return { ...account, ticketBalance: Math.max(0, account.ticketBalance - 1) };
+        if (currentStatus === 'approved') return { ...account, ticketBalance: account.ticketBalance + 1 };
+        return account;
+      }));
+    }
+    flash(status === 'approved' ? '面談申請を承認しました' : '面談申請を非承認にしました');
+  }
+
   function follow(account: Account) {
     if (!requireAccount()) return;
     setFollowing((list) => list.includes(account.id) ? list.filter((id) => id !== account.id) : [...list, account.id]);
@@ -446,7 +509,7 @@ export default function LeapApp() {
           {page === 'search' && <SearchPage query={query} setQuery={setQuery} results={searchResults} openProfile={openProfile} />}
           {page === 'notifications' && <NotificationsPage notices={notices} setNotices={setNotices} />}
           {page === 'messages' && (
-            <MessagesPage accounts={accounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} requestMeeting={requestMeeting} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} />
+            <MessagesPage accounts={accounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} meetingApplications={meetingApplications} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} rejectMeeting={rejectMeeting} requestMeeting={requestMeeting} submitMeetingApplication={submitMeetingApplication} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} />
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'mypage' && (
@@ -454,7 +517,7 @@ export default function LeapApp() {
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
-          {page === 'admin' && <AdminPage accounts={accounts} posts={posts} setAccounts={setAccounts} setPosts={setPosts} openProfile={openProfile} />}
+          {page === 'admin' && <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} />}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
             <ProfilePage account={selectedAccount} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, following) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={following.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -663,12 +726,20 @@ function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNoti
   );
 }
 
-function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mode, setMode, draft, setDraft, sendMessage, approveMeeting, requestMeeting, openProfile, setSelectedAccountId }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; mode: MessageKind; setMode: (mode: MessageKind) => void; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null, kind?: MessageKind) => void; approveMeeting: (partner: Account) => void; requestMeeting: (partner: Account) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void }) {
-  const partners = accounts.filter((account) => account.id !== currentAccount?.id);
-  const activePartner = selectedAccount && selectedAccount.id !== currentAccount?.id ? selectedAccount : partners[0] ?? null;
+function MessagesPage({ accounts, currentAccount, selectedAccount, messages, meetingApplications, mode, setMode, draft, setDraft, sendMessage, approveMeeting, rejectMeeting, requestMeeting, submitMeetingApplication, openProfile, setSelectedAccountId }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; meetingApplications: MeetingApplication[]; mode: MessageKind; setMode: (mode: MessageKind) => void; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null, kind?: MessageKind) => void; approveMeeting: (partner: Account) => void; rejectMeeting: (partner: Account) => void; requestMeeting: (partner: Account) => void; submitMeetingApplication: (partner: Account, scheduledAt: string) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void }) {
+  const [meetingDate, setMeetingDate] = useState('');
+  const [meetingTime, setMeetingTime] = useState('');
+  const directPartners = accounts.filter((account) => account.id !== currentAccount?.id);
+  const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.partnerId));
+  const partners = mode === 'meeting' ? directPartners.filter((account) => approvedPartnerIds.has(account.id)) : directPartners;
+  const activePartner = selectedAccount && selectedAccount.id !== currentAccount?.id && partners.some((partner) => partner.id === selectedAccount.id) ? selectedAccount : partners[0] ?? null;
   const thread = activePartner ? messages.filter((message) => message.partnerId === activePartner.id && message.kind === mode).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
-  const hasRequested = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'requested') : false;
+  const incomingRequested = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'requested' && !message.mine) : false;
+  const outgoingRequested = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'requested' && message.mine) : false;
   const hasApproved = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'approved') : false;
+  const latestApplication = activePartner && currentAccount ? meetingApplications.find((item) => ((item.applicantId === currentAccount.id && item.partnerId === activePartner.id) || (item.applicantId === activePartner.id && item.partnerId === currentAccount.id))) : null;
+  const selectedSchedule = meetingDate && meetingTime ? `${meetingDate}T${meetingTime}:00` : '';
+  const meetingButtonLabel = latestApplication?.status === 'pending' ? '申請中' : latestApplication?.status === 'approved' ? '面談可能' : '面談申請';
   return (
     <div className="grid min-h-[calc(100vh-7rem)] grid-rows-[auto_auto_1fr_auto]">
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-black">
@@ -676,7 +747,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mod
         <button className={`py-3 ${mode === 'meeting' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('meeting')}>面談メッセージ</button>
       </div>
       <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-4 py-3">
-        {partners.length === 0 ? <span className="text-xs text-slate-500">メッセージ相手はまだいません。</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><Avatar account={partner} active={activePartner?.id === partner.id} /><span className="w-full truncate">{partner.accountName || partner.name}</span></button>)}
+        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><Avatar account={partner} active={activePartner?.id === partner.id} /><span className="w-full truncate">{partner.accountName || partner.name}</span></button>)}
       </div>
       {!activePartner ? (
         <EmptyState icon={<Mail size={28} />} title="メッセージはまだありません" body="検索やプロフィールから相手にメッセージできます。" />
@@ -684,10 +755,21 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mod
         <div className="overflow-y-auto px-4 py-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{activePartner.accountName || activePartner.name}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
-            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white" onClick={() => requestMeeting(activePartner)}>面談申請</button>}
-            {mode === 'meeting' && <button className="rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-black text-white">日程申請</button>}
+            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
           </div>
-          {mode === 'direct' && hasRequested && !hasApproved && <button className="secondary mb-3 w-full" onClick={() => approveMeeting(activePartner)}>承認して面談メッセージへ</button>}
+          {mode === 'direct' && incomingRequested && !hasApproved && <div className="mb-3 grid grid-cols-2 gap-2"><button className="primary" onClick={() => approveMeeting(activePartner)}>承認</button><button className="secondary text-rose-600" onClick={() => rejectMeeting(activePartner)}>非承認</button></div>}
+          {mode === 'direct' && outgoingRequested && !hasApproved && <p className="mb-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold text-blue-700">相手の承認待ちです。</p>}
+          {mode === 'meeting' && (
+            <div className="mb-3 rounded-2xl border border-slate-100 p-3">
+              <p className="text-xs font-black">管理者への面談日程申請</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <input className="field" type="date" value={meetingDate} onChange={(event) => setMeetingDate(event.target.value)} disabled={latestApplication?.status === 'pending' || latestApplication?.status === 'approved'} />
+                <input className="field" type="time" value={meetingTime} onChange={(event) => setMeetingTime(event.target.value)} disabled={latestApplication?.status === 'pending' || latestApplication?.status === 'approved'} />
+              </div>
+              <button className="primary mt-3 w-full disabled:bg-slate-300" disabled={latestApplication?.status === 'pending' || latestApplication?.status === 'approved'} onClick={() => submitMeetingApplication(activePartner, selectedSchedule)}>{meetingButtonLabel}</button>
+              {latestApplication?.status === 'rejected' && <p className="mt-2 text-xs font-bold text-rose-600">非承認になりました。日時を再調整して再申請してください。</p>}
+            </div>
+          )}
           {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => <div key={message.id} className={`mb-3 flex ${message.mine ? 'justify-end' : 'justify-start'}`}><p className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${message.mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></p></div>)}
         </div>
       )}
@@ -866,21 +948,51 @@ function TicketPage({ currentAccount, setAccounts }: { currentAccount: Account |
   );
 }
 
-function AdminPage({ accounts, posts, setAccounts, setPosts, openProfile }: { accounts: Account[]; posts: Post[]; setAccounts: (accounts: Account[]) => void; setPosts: (posts: Post[]) => void; openProfile: (account: Account) => void }) {
+function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts, reviewMeetingApplication, openProfile }: { accounts: Account[]; posts: Post[]; meetingApplications: MeetingApplication[]; setAccounts: (accounts: Account[]) => void; setPosts: (posts: Post[]) => void; reviewMeetingApplication: (applicationId: string, status: 'approved' | 'rejected') => void; openProfile: (account: Account) => void }) {
   const pendingTickets = accounts.filter((account) => account.ticketRequestStatus === 'pending');
   const hiddenPosts = posts.filter((post) => post.isHidden);
+  const pendingMeetings = meetingApplications.filter((application) => application.status === 'pending');
   function approveTicket(account: Account) {
     const count = Number(account.ticketRequestPlan.replace('枚', '')) || 1;
     setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '' } : item));
   }
   return (
     <div className="p-4 lg:p-6">
-      <div className="grid gap-3 lg:grid-cols-4">
+      <div className="grid gap-3 lg:grid-cols-5">
         <AdminStat label="ユーザー" value={`${accounts.length}件`} />
         <AdminStat label="投稿" value={`${posts.length}件`} />
         <AdminStat label="非表示投稿" value={`${hiddenPosts.length}件`} />
         <AdminStat label="チケット申請" value={`${pendingTickets.length}件`} />
+        <AdminStat label="面談申請" value={`${pendingMeetings.length}件`} />
       </div>
+      <section className="mt-5 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">面談申請一覧</h2>
+        {meetingApplications.length === 0 ? <p className="mt-3 text-sm text-slate-500">面談申請はまだありません。</p> : (
+          <div className="mt-3 grid gap-2">
+            {meetingApplications.map((application) => {
+              const applicant = accounts.find((account) => account.id === application.applicantId);
+              const partner = accounts.find((account) => account.id === application.partnerId);
+              return (
+                <div key={application.id} className="rounded-2xl bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <b className="block truncate text-sm">{applicant?.accountName || applicant?.name || '申請者未設定'} → {partner?.accountName || partner?.name || '相手未設定'}</b>
+                      <span className="mt-1 block text-xs text-slate-500">面談日時：{formatDate(application.scheduledAt)}</span>
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-black ${application.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : application.status === 'rejected' ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'}`}>{application.status === 'approved' ? '承認済み' : application.status === 'rejected' ? '非承認' : '確認待ち'}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {applicant && <button className="secondary min-h-9 text-[11px]" onClick={() => openProfile(applicant)}>申請者を見る</button>}
+                    {partner && <button className="secondary min-h-9 text-[11px]" onClick={() => openProfile(partner)}>相手を見る</button>}
+                    <button className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white" onClick={() => reviewMeetingApplication(application.id, 'approved')}>承認</button>
+                    <button className="rounded-xl border border-rose-100 px-3 py-2 text-xs font-black text-rose-600" onClick={() => reviewMeetingApplication(application.id, 'rejected')}>非承認</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">チケット入金確認</h2>
         {pendingTickets.length === 0 ? <p className="mt-3 text-sm text-slate-500">確認待ちはありません。</p> : (
