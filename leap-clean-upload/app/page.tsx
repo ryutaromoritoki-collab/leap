@@ -9,6 +9,8 @@ import {
   CalendarCheck,
   CheckCircle2,
   ChevronLeft,
+  Edit3,
+  EyeOff,
   FileText,
   Heart,
   Home,
@@ -22,12 +24,14 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  Trash2,
   UserRound,
   UsersRound,
   X,
 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
-type Page = 'feed' | 'search' | 'notifications' | 'messages' | 'mypage' | 'profile' | 'deal' | 'matching' | 'auth' | 'profileEdit' | 'tickets';
+type Page = 'feed' | 'search' | 'notifications' | 'messages' | 'mypage' | 'profile' | 'deal' | 'matching' | 'auth' | 'profileEdit' | 'tickets' | 'admin';
 type Role = 'entrepreneur' | 'investor';
 type FeedTab = 'following' | 'recommended' | 'investors' | 'entrepreneurs';
 type Visibility = 'public' | 'followers' | 'investors' | 'entrepreneurs' | 'draft';
@@ -66,6 +70,7 @@ type Account = {
   supportAreas: string;
   ticketBalance: number;
   ticketRequestStatus: 'none' | 'pending';
+  ticketRequestPlan: string;
   verified: boolean;
 };
 
@@ -78,6 +83,12 @@ type Post = {
   attachmentName: string;
   imageName: string;
   imageUrl: string;
+  isHidden: boolean;
+  actionUserIds: {
+    likes: string[];
+    saves: string[];
+    meetings: string[];
+  };
   createdAt: string;
   likes: number;
   saves: number;
@@ -149,8 +160,16 @@ const emptyAccount: Account = {
   supportAreas: '',
   ticketBalance: 0,
   ticketRequestStatus: 'none',
+  ticketRequestPlan: '',
   verified: false,
 };
+
+function createSupabaseBrowserClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 function loadLocal<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
@@ -192,6 +211,7 @@ export default function LeapApp() {
   const [postAttachment, setPostAttachment] = useState('');
   const [postImageName, setPostImageName] = useState('');
   const [postImageUrl, setPostImageUrl] = useState('');
+  const [editingPostId, setEditingPostId] = useState('');
   const [messageDraft, setMessageDraft] = useState('');
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -203,11 +223,21 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.notices', notices), [notices]);
   useEffect(() => saveLocal('leap.following', following), [following]);
   useEffect(() => saveLocal('leap.savedPosts', savedPosts), [savedPosts]);
+  useEffect(() => {
+    function syncAcrossTabs(event: StorageEvent) {
+      if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
+      if (event.key === 'leap.posts') setPosts(loadLocal('leap.posts', []));
+      if (event.key === 'leap.messages') setMessages(loadLocal('leap.messages', []));
+      if (event.key === 'leap.notices') setNotices(loadLocal('leap.notices', []));
+    }
+    window.addEventListener('storage', syncAcrossTabs);
+    return () => window.removeEventListener('storage', syncAcrossTabs);
+  }, []);
 
   const currentAccount = accounts.find((account) => account.id === currentAccountId) ?? null;
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? currentAccount;
 
-  const visiblePosts = useMemo(() => posts.filter((post) => canSeePost(post, currentAccount, following)).filter((post) => post.visibility !== 'draft'), [currentAccount, following, posts]);
+  const visiblePosts = useMemo(() => posts.filter((post) => canSeePost(post, currentAccount, following)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, following, posts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => following.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'investor');
@@ -243,6 +273,20 @@ export default function LeapApp() {
   function submitPost() {
     if (!requireAccount()) return;
     if (!postDraft.trim()) return;
+    if (editingPostId) {
+      setPosts((list) => list.map((post) => post.id === editingPostId ? {
+        ...post,
+        body: postDraft.trim(),
+        tags: postTags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        visibility: postVisibility,
+        attachmentName: postAttachment.trim(),
+        imageName: postImageName,
+        imageUrl: postImageUrl,
+      } : post));
+      resetComposer();
+      flash('投稿を更新しました');
+      return;
+    }
     setPosts((list) => [
       {
         id: crypto.randomUUID(),
@@ -253,6 +297,8 @@ export default function LeapApp() {
         attachmentName: postAttachment.trim(),
         imageName: postImageName,
         imageUrl: postImageUrl,
+        isHidden: false,
+        actionUserIds: { likes: [], saves: [], meetings: [] },
         createdAt: new Date().toISOString(),
         likes: 0,
         saves: 0,
@@ -261,6 +307,12 @@ export default function LeapApp() {
       },
       ...list,
     ]);
+    resetComposer();
+    flash(postVisibility === 'draft' ? '下書き保存しました' : '投稿しました');
+  }
+
+  function resetComposer() {
+    setEditingPostId('');
     setPostDraft('');
     setPostTags('');
     setPostVisibility('public');
@@ -268,24 +320,61 @@ export default function LeapApp() {
     setPostImageName('');
     setPostImageUrl('');
     setShowComposer(false);
-    flash(postVisibility === 'draft' ? '下書き保存しました' : '投稿しました');
   }
 
   function reactToPost(postId: string, type: 'like' | 'save' | 'meeting') {
+    if (!requireAccount()) return;
+    const bucket = type === 'like' ? 'likes' : type === 'save' ? 'saves' : 'meetings';
+    let added = false;
     setPosts((list) => list.map((post) => {
       if (post.id !== postId) return post;
-      if (type === 'like') return { ...post, likes: post.likes + 1 };
-      if (type === 'meeting') return { ...post, meetings: post.meetings + 1 };
-      return { ...post, saves: post.saves + 1 };
+      const actionUserIds = post.actionUserIds ?? { likes: [], saves: [], meetings: [] };
+      const current = actionUserIds[bucket] ?? [];
+      const exists = current.includes(currentAccount!.id);
+      added = !exists;
+      const nextUsers = exists ? current.filter((id) => id !== currentAccount!.id) : [...current, currentAccount!.id];
+      return {
+        ...post,
+        actionUserIds: { ...actionUserIds, [bucket]: nextUsers },
+        likes: bucket === 'likes' ? nextUsers.length : post.likes,
+        saves: bucket === 'saves' ? nextUsers.length : post.saves,
+        meetings: bucket === 'meetings' ? nextUsers.length : post.meetings,
+      };
     }));
-    if (type === 'save') setSavedPosts((list) => list.includes(postId) ? list : [...list, postId]);
-    if (type === 'meeting') {
+    if (type === 'save') setSavedPosts((list) => added ? (list.includes(postId) ? list : [...list, postId]) : list.filter((id) => id !== postId));
+    if (type === 'meeting' && added) {
       const post = posts.find((item) => item.id === postId);
       const author = accounts.find((account) => account.id === post?.authorId);
       if (author) requestMeeting(author);
     } else {
-      flash(type === 'like' ? '応援しました' : '保存しました');
+      flash(added ? (type === 'like' ? '応援しました' : '保存しました') : '取り消しました');
     }
+  }
+
+  function startEditPost(post: Post) {
+    setEditingPostId(post.id);
+    setPostDraft(post.body);
+    setPostTags(post.tags.join(', '));
+    setPostVisibility(post.visibility);
+    setPostAttachment(post.attachmentName);
+    setPostImageName(post.imageName);
+    setPostImageUrl(post.imageUrl);
+    setShowComposer(true);
+  }
+
+  function hidePost(postId: string) {
+    let hidden = false;
+    setPosts((list) => list.map((post) => {
+      if (post.id !== postId) return post;
+      hidden = !post.isHidden;
+      return { ...post, isHidden: hidden };
+    }));
+    flash(hidden ? '投稿を非表示にしました' : '投稿を再公開しました');
+  }
+
+  function deletePost(postId: string) {
+    setPosts((list) => list.filter((post) => post.id !== postId));
+    flash('投稿を削除しました');
   }
 
   function requestMeeting(account: Account) {
@@ -335,13 +424,14 @@ export default function LeapApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef5ff] text-[#101828]">
-      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl">
+    <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
+      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:overflow-hidden lg:rounded-[28px]">
+        <DesktopNav page={page} setPage={setPage} openTickets={openTickets} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} />
 
-        <section className="min-h-0 overflow-y-auto pb-24">
+        <section className="min-h-0 overflow-y-auto pb-24 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
-            <FeedPage posts={feedPosts} accounts={accounts} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} />
+            <FeedPage posts={feedPosts} accounts={accounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'search' && <SearchPage query={query} setQuery={setQuery} results={searchResults} openProfile={openProfile} />}
           {page === 'notifications' && <NotificationsPage notices={notices} setNotices={setNotices} />}
@@ -350,12 +440,13 @@ export default function LeapApp() {
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'mypage' && (
-            <MyPage currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} />
+            <MyPage currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
+          {page === 'admin' && <AdminPage accounts={accounts} posts={posts} setAccounts={setAccounts} setPosts={setPosts} openProfile={openProfile} />}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, following))} isFollowing={following.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} />
+            <ProfilePage account={selectedAccount} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, following) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={following.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'matching' && <MatchingPage accounts={accounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
@@ -364,7 +455,7 @@ export default function LeapApp() {
       </div>
 
       {showComposer && (
-        <Modal onClose={() => setShowComposer(false)} title="投稿する">
+        <Modal onClose={resetComposer} title={editingPostId ? '投稿を編集' : '投稿する'}>
           <textarea className="field min-h-40 resize-none" placeholder="近況、学び、相談したいことを気軽に書いてください" value={postDraft} onChange={(event) => setPostDraft(event.target.value)} />
           <Select label="投稿範囲" value={postVisibility} options={Object.values(visibilityLabels)} onChange={(value) => setPostVisibility((Object.keys(visibilityLabels).find((key) => visibilityLabels[key as Visibility] === value) as Visibility) || 'public')} />
           <input className="field mt-3" placeholder="タグ。例：SaaS, AI, 資金調達" value={postTags} onChange={(event) => setPostTags(event.target.value)} />
@@ -401,6 +492,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
     auth: 'アカウント作成',
     profileEdit: 'プロフィール編集',
     tickets: '面談チケット',
+    admin: '管理者画面',
   };
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
   return (
@@ -419,6 +511,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             ['search', '検索'],
             ['messages', 'メッセージ'],
             ['tickets', '面談チケット'],
+            ['admin', '管理者画面'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
         </div>
@@ -427,7 +520,27 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
   );
 }
 
-function FeedPage({ posts, accounts, feedTab, setFeedTab, openComposer, openProfile, reactToPost }: { posts: Post[]; accounts: Account[]; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void }) {
+function DesktopNav({ page, setPage, openTickets }: { page: Page; setPage: (page: Page) => void; openTickets: () => void }) {
+  const items: [Page, string, ReactNode][] = [
+    ['feed', 'フィード', <Home size={18} />],
+    ['search', '検索', <Search size={18} />],
+    ['notifications', '通知', <Bell size={18} />],
+    ['messages', 'メッセージ', <Mail size={18} />],
+    ['mypage', 'マイページ', <UserRound size={18} />],
+    ['admin', '管理者画面', <ShieldCheck size={18} />],
+  ];
+  return (
+    <aside className="hidden border-r border-slate-100 bg-white p-4 lg:row-span-2 lg:block">
+      <div className="mb-6 text-xl font-black text-blue-600">Leap</div>
+      <div className="grid gap-2">
+        {items.map(([key, label, icon]) => <button key={key} className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-black ${page === key ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`} onClick={() => setPage(key)}>{icon}{label}</button>)}
+        <button className="mt-4 flex items-center gap-3 rounded-2xl bg-[#050816] px-3 py-3 text-sm font-black text-white" onClick={openTickets}><BriefcaseBusiness size={18} />面談チケット</button>
+      </div>
+    </aside>
+  );
+}
+
+function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   return (
     <div>
       <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
@@ -451,7 +564,7 @@ function FeedPage({ posts, accounts, feedTab, setFeedTab, openComposer, openProf
         <div className="divide-y divide-slate-100">
           {posts.map((post) => {
             const author = accounts.find((account) => account.id === post.authorId);
-            return <PostCard key={post.id} post={post} author={author} openProfile={openProfile} reactToPost={reactToPost} />;
+            return <PostCard key={post.id} post={post} author={author} currentAccount={currentAccount} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />;
           })}
         </div>
       )}
@@ -563,6 +676,29 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [sent, setSent] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
+  async function sendConfirmation() {
+    const supabase = createSupabaseBrowserClient();
+    if (supabase) {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+          data: { phone, role },
+        },
+      });
+      if (error) {
+        setAuthMessage(`確認メール送信に失敗しました：${error.message}`);
+      } else {
+        setAuthMessage('確認メールを送信しました。メール内のURLを押すと本番のメール認証が完了します。');
+      }
+    } else {
+      setAuthMessage('Supabase環境変数がないため、開発確認モードで進めます。');
+    }
+    setSent(true);
+    flash('確認メールを送信しました');
+  }
   function complete() {
     const account: Account = { ...emptyAccount, id: crypto.randomUUID(), role, email, phone, password, emailVerified: true };
     setAccounts([...accounts, account]);
@@ -581,14 +717,14 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
           <Input label="電話番号" value={phone} onChange={setPhone} />
           <Input label="パスワード" value={password} onChange={setPassword} type="password" />
         </div>
-        {!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={() => { setSent(true); flash('確認メールを送信しました'); }}>確認メールを送信する</button> : <button className="primary mt-5 w-full" onClick={complete}>メール認証を完了する</button>}
-        {sent && <p className="mt-3 text-xs leading-6 text-slate-500">本番ではメール内の確認URLを押すと認証完了になります。このプロトタイプでは上のボタンで認証後の画面を確認できます。</p>}
+        {!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={sendConfirmation}>確認メールを送信する</button> : <button className="primary mt-5 w-full" onClick={complete}>認証後、プロフィール作成へ進む</button>}
+        {sent && <p className="mt-3 text-xs leading-6 text-slate-500">{authMessage || 'メールの確認URLを押してから、プロフィール作成へ進んでください。'}</p>}
       </div>
     </div>
   );
 }
 
-function MyPage({ currentAccount, posts, setPage, openComposer }: { currentAccount: Account | null; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void }) {
+function MyPage({ currentAccount, posts, setPage, openComposer, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
   }
@@ -600,7 +736,7 @@ function MyPage({ currentAccount, posts, setPage, openComposer }: { currentAccou
         <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
       </div>
       <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} />)}
+        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
       </div>
     </div>
   );
@@ -678,7 +814,7 @@ function TicketPage({ currentAccount, setAccounts }: { currentAccount: Account |
   const plans = [['1枚', '11,000円'], ['3枚', '29,700円'], ['5枚', '44,000円']];
   function requestPayment() {
     if (!currentAccount) return;
-    setAccounts((accounts) => accounts.map((account) => account.id === currentAccount.id ? { ...account, ticketRequestStatus: 'pending' } : account));
+    setAccounts((accounts) => accounts.map((account) => account.id === currentAccount.id ? { ...account, ticketRequestStatus: 'pending', ticketRequestPlan: plan } : account));
   }
   return (
     <div className="p-4">
@@ -701,7 +837,57 @@ function TicketPage({ currentAccount, setAccounts }: { currentAccount: Account |
   );
 }
 
-function ProfilePage({ account, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage }: { account: Account; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void }) {
+function AdminPage({ accounts, posts, setAccounts, setPosts, openProfile }: { accounts: Account[]; posts: Post[]; setAccounts: (accounts: Account[]) => void; setPosts: (posts: Post[]) => void; openProfile: (account: Account) => void }) {
+  const pendingTickets = accounts.filter((account) => account.ticketRequestStatus === 'pending');
+  const hiddenPosts = posts.filter((post) => post.isHidden);
+  function approveTicket(account: Account) {
+    const count = Number(account.ticketRequestPlan.replace('枚', '')) || 1;
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '' } : item));
+  }
+  return (
+    <div className="p-4 lg:p-6">
+      <div className="grid gap-3 lg:grid-cols-4">
+        <AdminStat label="ユーザー" value={`${accounts.length}件`} />
+        <AdminStat label="投稿" value={`${posts.length}件`} />
+        <AdminStat label="非表示投稿" value={`${hiddenPosts.length}件`} />
+        <AdminStat label="チケット申請" value={`${pendingTickets.length}件`} />
+      </div>
+      <section className="mt-5 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">チケット入金確認</h2>
+        {pendingTickets.length === 0 ? <p className="mt-3 text-sm text-slate-500">確認待ちはありません。</p> : (
+          <div className="mt-3 grid gap-2">
+            {pendingTickets.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><Avatar account={account} /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || account.email}</b><span className="text-xs text-slate-500">{account.ticketRequestPlan || '1枚'} / {account.company || '会社名未設定'}</span></div><button className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white" onClick={() => approveTicket(account)}>入金確認</button></div>)}
+          </div>
+        )}
+      </section>
+      <section className="mt-5 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">メンバー一覧</h2>
+        {accounts.length === 0 ? <p className="mt-3 text-sm text-slate-500">登録ユーザーはまだいません。</p> : (
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {accounts.map((account) => <button key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left" onClick={() => openProfile(account)}><Avatar account={account} /><span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || '未設定'}</b><span className="block truncate text-xs text-slate-500">{account.email || 'メール未登録'} / {account.company || '会社名未設定'}</span></span><span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'}</span></button>)}
+          </div>
+        )}
+      </section>
+      <section className="mt-5 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">投稿管理</h2>
+        {posts.length === 0 ? <p className="mt-3 text-sm text-slate-500">投稿はまだありません。</p> : (
+          <div className="mt-3 grid gap-2">
+            {posts.map((post) => {
+              const author = accounts.find((account) => account.id === post.authorId);
+              return <div key={post.id} className="rounded-2xl bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><b className="truncate text-sm">{author?.accountName || author?.name || '投稿者未設定'}</b><span className="text-[10px] font-black text-slate-500">{post.isHidden ? '非表示' : visibilityLabels[post.visibility]}</span></div><p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{post.body}</p><div className="mt-2 flex gap-2"><button className="secondary min-h-9 text-[11px]" onClick={() => setPosts(posts.map((item) => item.id === post.id ? { ...item, isHidden: !item.isHidden } : item))}>{post.isHidden ? '再公開' : '非表示'}</button><button className="secondary min-h-9 text-[11px] text-rose-600" onClick={() => setPosts(posts.filter((item) => item.id !== post.id))}>削除</button></div></div>;
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function AdminStat({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-2xl border border-slate-100 p-4"><span className="text-[11px] font-black text-slate-500">{label}</span><b className="mt-2 block text-xl">{value}</b></div>;
+}
+
+function ProfilePage({ account, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, startEditPost, hidePost, deletePost }: { account: Account; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
@@ -724,7 +910,7 @@ function ProfilePage({ account, posts, isFollowing, isMine, follow, message, req
         )}
       </div>
       <div className="divide-y divide-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} openProfile={() => undefined} reactToPost={() => undefined} />)}
+        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
       </div>
     </div>
   );
@@ -762,25 +948,41 @@ function MatchingPage({ accounts, openProfile, requestMeeting }: { accounts: Acc
   );
 }
 
-function PostCard({ post, author, openProfile, reactToPost }: { post: Post; author?: Account; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void }) {
+function PostCard({ post, author, currentAccount, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { post: Post; author?: Account; currentAccount: Account | null; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isOwner = Boolean(currentAccount && currentAccount.id === post.authorId);
+  const actions = post.actionUserIds ?? { likes: [], saves: [], meetings: [] };
+  const liked = currentAccount ? actions.likes?.includes(currentAccount.id) : false;
+  const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
+  const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   return (
-    <article className="px-4 py-4">
-      <button className="flex w-full gap-3 text-left" onClick={() => author && openProfile(author)}>
+    <article className={`relative px-4 py-4 ${post.isHidden ? 'bg-slate-50' : ''}`}>
+      <div className="flex w-full gap-3 text-left">
+        <button className="flex min-w-0 flex-1 gap-3 text-left" onClick={() => author && openProfile(author)}>
         {author ? <Avatar account={author} /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
         <span className="min-w-0 flex-1">
           <b className="block truncate text-sm">{author?.accountName || author?.name || 'アカウント未設定'}</b>
-          <span className="text-[11px] text-slate-500">{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
+          <span className="text-[11px] text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
         </span>
-        <MoreHorizontal size={18} className="text-slate-400" />
-      </button>
+        </button>
+        <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} className="text-slate-400" /></button>
+      </div>
+      {menuOpen && isOwner && (
+        <div className="absolute right-4 top-12 z-20 w-40 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
+          <button className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { startEditPost(post); setMenuOpen(false); }}><Edit3 size={14} />編集</button>
+          <button className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { hidePost(post.id); setMenuOpen(false); }}><EyeOff size={14} />{post.isHidden ? '再公開' : '非表示'}</button>
+          <button className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={() => { deletePost(post.id); setMenuOpen(false); }}><Trash2 size={14} />削除</button>
+        </div>
+      )}
+      {menuOpen && !isOwner && <div className="absolute right-4 top-12 z-20 rounded-2xl border border-slate-100 bg-white p-3 text-xs font-bold text-slate-500 shadow-xl">投稿者のみ操作できます</div>}
       <p className="mt-3 whitespace-pre-line text-sm leading-7">{post.body}</p>
       {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
       {post.imageUrl && <img className="mt-3 aspect-video w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} />}
       {post.attachmentName && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black">
-        <button className="rounded-xl border border-slate-100 py-2 text-rose-600" onClick={() => reactToPost(post.id, 'like')}><Heart className="mx-auto mb-1" size={16} />応援 {post.likes}</button>
-        <button className="rounded-xl border border-slate-100 py-2 text-emerald-600" onClick={() => reactToPost(post.id, 'save')}><Bookmark className="mx-auto mb-1" size={16} />保存 {post.saves}</button>
-        <button className="rounded-xl border border-slate-100 py-2 text-blue-600" onClick={() => reactToPost(post.id, 'meeting')}><UsersRound className="mx-auto mb-1" size={16} />面談 {post.meetings}</button>
+        <button className={`rounded-xl border py-2 ${liked ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-100 text-rose-600'}`} onClick={() => reactToPost(post.id, 'like')}><Heart className="mx-auto mb-1" size={16} />応援 {post.likes}</button>
+        <button className={`rounded-xl border py-2 ${saved ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-emerald-600'}`} onClick={() => reactToPost(post.id, 'save')}><Bookmark className="mx-auto mb-1" size={16} />保存 {post.saves}</button>
+        <button className={`rounded-xl border py-2 ${meetingRequested ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-100 text-blue-600'}`} onClick={() => reactToPost(post.id, 'meeting')}><UsersRound className="mx-auto mb-1" size={16} />面談 {post.meetings}</button>
       </div>
       <p className="mt-2 text-right text-[10px] text-slate-400">閲覧 {post.views} 回</p>
     </article>
@@ -797,10 +999,10 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   ] as const;
   return (
     <>
-      <button className="fixed bottom-20 left-1/2 z-40 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-2xl bg-[#050816] text-white shadow-xl" onClick={openComposer} aria-label="投稿する">
+      <button className="fixed bottom-20 left-1/2 z-40 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-2xl bg-[#050816] text-white shadow-xl lg:hidden" onClick={openComposer} aria-label="投稿する">
         <Plus size={24} />
       </button>
-      <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)]">
+      <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
         {tabs.map(([key, label, Icon]) => (
           <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
             <Icon size={18} />
@@ -825,7 +1027,7 @@ function ProfileHero({ account, isMine, posts, setPage }: { account: Account; is
       </div>
       <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
       <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>0</b> フォロー</span><span><b>0</b> フォロワー</span>{account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>0</b> フォロー</span><span><b>0</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
       {isMine && <button className="secondary mt-4 w-full" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>}
     </section>
   );
