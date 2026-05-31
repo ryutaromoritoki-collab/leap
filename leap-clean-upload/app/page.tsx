@@ -401,16 +401,20 @@ function withAdminAccount(accounts: Account[]): Account[] {
   return [adminAccount, ...aiAccounts, ...normalized];
 }
 
-async function sendDirectEmail(to: string, subject: string, body: string) {
-  if (!to) return;
+async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number }> {
+  const recipients = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
+  if (recipients.length === 0) return { ok: false, error: '送信先メールアドレスがありません。' };
   try {
-    await fetch('/api/send-direct-email', {
+    const response = await fetch('/api/send-direct-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, body }),
+      body: JSON.stringify({ to: recipients, subject, body }),
     });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok: false, error: result.error || `メール送信に失敗しました。status=${response.status}` };
+    return { ok: true, sent: result.sent ?? recipients.length };
   } catch {
-    // Email delivery is best-effort; in-app notifications still remain.
+    return { ok: false, error: 'メール送信APIに接続できませんでした。' };
   }
 }
 
@@ -442,6 +446,7 @@ export default function LeapApp() {
   const [notices, setNotices] = useState<Notice[]>(() => loadLocal('leap.notices', []));
   const [following, setFollowing] = useState<string[]>(() => loadLocal('leap.following', []));
   const [savedPosts, setSavedPosts] = useState<string[]>(() => loadLocal('leap.savedPosts', []));
+  const [readMessageIds, setReadMessageIds] = useState<string[]>(() => loadLocal('leap.readMessageIds', []));
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
   const [showComposer, setShowComposer] = useState(false);
@@ -468,6 +473,7 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.notices', notices), [notices]);
   useEffect(() => saveLocal('leap.following', following), [following]);
   useEffect(() => saveLocal('leap.savedPosts', savedPosts), [savedPosts]);
+  useEffect(() => saveLocal('leap.readMessageIds', readMessageIds), [readMessageIds]);
   useEffect(() => {
     function syncAcrossTabs(event: StorageEvent) {
       if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
@@ -899,7 +905,7 @@ export default function LeapApp() {
           {page === 'search' && <SearchPage query={query} setQuery={setQuery} results={searchResults} openProfile={openProfile} />}
           {page === 'notifications' && <NotificationsPage notices={notices} currentAccount={currentAccount} setNotices={setNotices} />}
           {page === 'messages' && (
-            <MessagesPage accounts={visibleAccounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} meetingApplications={meetingApplications} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} rejectMeeting={rejectMeeting} requestMeeting={requestMeeting} submitMeetingApplication={submitMeetingApplication} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} />
+            <MessagesPage accounts={visibleAccounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} meetingApplications={meetingApplications} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} rejectMeeting={rejectMeeting} requestMeeting={requestMeeting} submitMeetingApplication={submitMeetingApplication} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} readMessageIds={readMessageIds} setReadMessageIds={setReadMessageIds} />
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} onAuthenticated={syncAuthenticatedAccount} />}
           {page === 'mypage' && (
@@ -1119,7 +1125,7 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
   );
 }
 
-function MessagesPage({ accounts, currentAccount, selectedAccount, messages, meetingApplications, mode, setMode, draft, setDraft, sendMessage, approveMeeting, rejectMeeting, requestMeeting, submitMeetingApplication, openProfile, setSelectedAccountId }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; meetingApplications: MeetingApplication[]; mode: MessageKind; setMode: (mode: MessageKind) => void; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null, kind?: MessageKind, attachment?: { name: string; url: string; type: 'image' | 'file' }) => void; approveMeeting: (partner: Account) => void; rejectMeeting: (partner: Account) => void; requestMeeting: (partner: Account) => void; submitMeetingApplication: (partner: Account, scheduledAt: string) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void }) {
+function MessagesPage({ accounts, currentAccount, selectedAccount, messages, meetingApplications, mode, setMode, draft, setDraft, sendMessage, approveMeeting, rejectMeeting, requestMeeting, submitMeetingApplication, openProfile, setSelectedAccountId, readMessageIds, setReadMessageIds }: { accounts: Account[]; currentAccount: Account | null; selectedAccount: Account | null; messages: DirectMessage[]; meetingApplications: MeetingApplication[]; mode: MessageKind; setMode: (mode: MessageKind) => void; draft: string; setDraft: (value: string) => void; sendMessage: (partner: Account | null, kind?: MessageKind, attachment?: { name: string; url: string; type: 'image' | 'file' }) => void; approveMeeting: (partner: Account) => void; rejectMeeting: (partner: Account) => void; requestMeeting: (partner: Account) => void; submitMeetingApplication: (partner: Account, scheduledAt: string) => void; openProfile: (account: Account) => void; setSelectedAccountId: (id: string) => void; readMessageIds: string[]; setReadMessageIds: (updater: string[] | ((ids: string[]) => string[])) => void }) {
   const [meetingDate, setMeetingDate] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
   const [attachment, setAttachment] = useState<{ name: string; url: string; type: 'image' | 'file' } | undefined>();
@@ -1135,6 +1141,20 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
     return message.partnerId === activePartner.id && message.kind === mode;
   };
   const thread = activePartner ? messages.filter(isThreadMessage).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
+  const unreadMessageIds = new Set(messages.filter((message) => {
+    const fromOther = message.senderId ? message.recipientId === currentAccount?.id : !message.mine;
+    return fromOther && !readMessageIds.includes(message.id);
+  }).map((message) => message.id));
+  const hasUnreadFromPartner = (partner: Account) => messages.some((message) => {
+    const fromPartner = message.senderId ? message.senderId === partner.id && message.recipientId === currentAccount?.id : message.partnerId === partner.id && !message.mine;
+    return message.kind === mode && fromPartner && unreadMessageIds.has(message.id);
+  });
+  useEffect(() => {
+    if (!activePartner || thread.length === 0) return;
+    const incomingIds = thread.filter((message) => message.senderId ? message.senderId === activePartner.id && message.recipientId === currentAccount?.id : !message.mine).map((message) => message.id);
+    if (incomingIds.length === 0) return;
+    setReadMessageIds((ids) => Array.from(new Set([...ids, ...incomingIds])));
+  }, [activePartner?.id, currentAccount?.id, mode, thread.length]);
   const incomingRequested = activePartner ? messages.some((message) => isThreadMessage(message) && message.meetingStatus === 'requested' && (message.senderId ? message.senderId !== currentAccount?.id : !message.mine)) : false;
   const outgoingRequested = activePartner ? messages.some((message) => isThreadMessage(message) && message.meetingStatus === 'requested' && (message.senderId ? message.senderId === currentAccount?.id : message.mine)) : false;
   const hasApproved = activePartner ? messages.some((message) => isThreadMessage(message) && message.meetingStatus === 'approved') : false;
@@ -1142,13 +1162,15 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
   const selectedSchedule = meetingDate && meetingTime ? `${meetingDate}T${meetingTime}:00` : '';
   const meetingButtonLabel = latestApplication?.status === 'pending' ? '申請中' : latestApplication?.status === 'approved' ? '面談可能' : '面談申請';
   return (
-    <div className="grid min-h-[calc(100vh-7rem)] grid-rows-[auto_auto_1fr_auto]">
+    <div className="grid min-h-[calc(100vh-7rem)] min-w-0 grid-rows-[auto_auto_1fr_auto]">
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-black">
         <button className={`py-3 ${mode === 'direct' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('direct')}>個別メッセージ</button>
         <button className={`py-3 ${mode === 'meeting' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('meeting')}>面談メッセージ</button>
       </div>
-      <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-4 py-3">
-        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><Avatar account={partner} active={activePartner?.id === partner.id} /><span className="w-full truncate">{partner.accountName || partner.name}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
+      <div className="min-w-0 overflow-x-auto border-b border-slate-100 px-4 py-3 [scrollbar-width:thin]">
+        <div className="flex w-max min-w-full gap-3">
+        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{partner.accountName || partner.name}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
+        </div>
       </div>
       {!activePartner ? (
         <EmptyState icon={<Mail size={28} />} title="メッセージはまだありません" body="検索やプロフィールから相手にメッセージできます。" />
@@ -1514,6 +1536,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSubject, setBroadcastSubject] = useState('Leap運営からのお知らせ');
   const [broadcastEmailBody, setBroadcastEmailBody] = useState('');
+  const [broadcastEmailStatus, setBroadcastEmailStatus] = useState('');
   const pendingTickets = accounts.filter((account) => account.ticketRequestStatus === 'pending');
   const hiddenPosts = posts.filter((post) => post.isHidden);
   const pendingMeetings = meetingApplications.filter((application) => application.status === 'pending');
@@ -1550,12 +1573,22 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
     ]);
     setBroadcastMessage('');
   }
-  function sendBroadcastEmail() {
+  async function sendBroadcastEmail() {
     if (!broadcastEmailBody.trim()) return;
-    activeUsers.filter((account) => account.emailNotificationsEnabled).forEach((account) => {
-      void sendDirectEmail(account.email, broadcastSubject || 'Leap運営からのお知らせ', broadcastEmailBody);
-    });
-    setBroadcastEmailBody('');
+    const recipients = Array.from(new Set(activeUsers.filter((account) => account.emailNotificationsEnabled && account.email.includes('@')).map((account) => account.email.trim())));
+    if (recipients.length === 0) {
+      setBroadcastEmailStatus('送信対象のメールアドレスがありません。メール通知ONのユーザーを確認してください。');
+      return;
+    }
+    setBroadcastEmailStatus('送信中です...');
+    const result = await sendDirectEmail(recipients, broadcastSubject || 'Leap運営からのお知らせ', broadcastEmailBody);
+    if (result.ok) {
+      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。`);
+      setBroadcastEmailBody('');
+      return;
+    }
+    setBroadcastEmailStatus(`一斉メール送信に失敗しました：${result.error || '原因不明のエラー'}`);
+    return;
   }
   return (
     <div className="p-4 lg:p-6">
@@ -1617,6 +1650,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <Input label="メール件名" value={broadcastSubject} onChange={setBroadcastSubject} />
         <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">登録メールアドレスへの一斉DM<textarea className="field min-h-24 resize-none" value={broadcastEmailBody} onChange={(event) => setBroadcastEmailBody(event.target.value)} /></label>
         <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>メール通知ONのユーザーへ一斉メール送信</button>
+        {broadcastEmailStatus && <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-6 text-slate-600">{broadcastEmailStatus}</p>}
       </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">投稿管理</h2>
@@ -1758,19 +1792,24 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
     ['mypage', 'マイページ', UserRound],
   ] as const;
   return (
-    <>
-      <button className="fixed bottom-20 left-1/2 z-40 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-2xl bg-[#050816] text-white shadow-xl lg:hidden" onClick={openComposer} aria-label="投稿する">
-        <Plus size={24} />
+    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-6 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
+      {tabs.slice(0, 3).map(([key, label, Icon]) => (
+        <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
+          <Icon size={18} />
+          <span>{label}</span>
+        </button>
+      ))}
+      <button className="grid justify-items-center gap-1 rounded-2xl bg-[#050816] px-1 py-2 text-[9px] font-bold text-white" onClick={openComposer} aria-label="投稿する">
+        <Plus size={18} />
+        <span>投稿</span>
       </button>
-      <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
-        {tabs.map(([key, label, Icon]) => (
+      {tabs.slice(3).map(([key, label, Icon]) => (
           <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
             <Icon size={18} />
             <span>{label}</span>
           </button>
-        ))}
-      </nav>
-    </>
+      ))}
+    </nav>
   );
 }
 
