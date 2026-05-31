@@ -79,6 +79,10 @@ type Account = {
   isHidden: boolean;
   isDeleted: boolean;
   emailNotificationsEnabled: boolean;
+  isBot: boolean;
+  botKind: Role | '';
+  age: string;
+  gender: string;
   verified: boolean;
 };
 
@@ -203,6 +207,10 @@ const emptyAccount: Account = {
   isHidden: false,
   isDeleted: false,
   emailNotificationsEnabled: true,
+  isBot: false,
+  botKind: '',
+  age: '',
+  gender: '',
   verified: false,
 };
 
@@ -221,6 +229,99 @@ const adminAccount: Account = {
   avatarLabel: '運',
   verified: true,
 };
+
+const aiPersonNames = ['山田 太郎', '佐藤 花子', '鈴木 健一', '田中 明', '伊藤 真央', '高橋 優', '渡辺 航', '中村 葵', '小林 直樹', '加藤 美咲', '吉田 悠斗', '山本 紗季', '井上 蓮', '木村 彩乃', '林 大輔', '清水 結衣', '斎藤 陽菜', '山崎 匠', '森 里奈', '池田 蒼', '橋本 凛', '石川 翔', '前田 菜月', '藤田 亮', '岡田 美月', '後藤 悠真', '長谷川 栞', '村上 智也', '近藤 愛', '遠藤 颯'];
+const aiInvestorNames = ['松本 拓也', '藤原 玲奈', '青木 大地', '石井 美穂', '坂本 悠介', '西村 沙織', '福田 直人', '太田 佳奈', '三浦 健太', '原田 杏奈', '中川 智', '小川 真由', '岡本 裕也', '松田 千尋', '中島 亮介', '平野 彩', '上田 航平', '森田 奈緒', '内田 諒', '柴田 優香', '酒井 慎', '宮本 由衣', '横山 大輔', '安藤 萌', '島田 啓太', '片山 香織', '大野 翔太', '栗原 梨央', '西田 司', '杉山 美里'];
+const aiCompanyWords = ['NextFlow', 'GreenBridge', 'RetailMind', 'CareSync', 'FinPulse', 'HRWave', 'LogiCore', 'EduLift', 'MedLink', 'LegalBase'];
+const aiIndustries = ['AI / SaaS', 'FinTech', 'ヘルスケア', 'HRTech', '物流DX', '教育', 'Climate Tech', '小売DX', 'リーガルテック', 'クリエイター支援'];
+
+function createAiAccounts(): Account[] {
+  const entrepreneurs = aiPersonNames.map((name, index): Account => ({
+    ...emptyAccount,
+    id: `ai-entrepreneur-${index + 1}`,
+    role: 'entrepreneur',
+    email: `ai-entrepreneur-${index + 1}@leap.local`,
+    phone: '',
+    emailVerified: true,
+    accountName: `ai_founder_${String(index + 1).padStart(2, '0')}`,
+    name,
+    company: `${aiCompanyWords[index % aiCompanyWords.length]}株式会社`,
+    title: '代表取締役',
+    industry: aiIndustries[index % aiIndustries.length],
+    location: locations[index % locations.length],
+    stage: stages[(index % (stages.length - 1)) + 1],
+    foundedYear: String(2020 + (index % 6)),
+    foundedMonth: `${(index % 12) + 1}月`,
+    employeeSize: employeeSizes[index % employeeSizes.length],
+    revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
+    bio: 'AI運用アカウントです。Leap内の投稿・検索・メッセージ体験を確認するための参考アカウントとして運用しています。',
+    achievements: 'プロダクト検証、顧客ヒアリング、KPI改善の記録を公開しています。',
+    avatarLabel: name.slice(0, 1),
+    fundingGoal: `${(index % 5) + 1},000万円`,
+    monthlyRevenue: `${80 + index * 12}万円`,
+    growthRate: `+${8 + (index % 18)}%`,
+    customerCount: `${6 + index}社`,
+    isBot: true,
+    botKind: 'entrepreneur',
+    age: `${28 + (index % 18)}歳`,
+    gender: index % 2 === 0 ? '男性' : '女性',
+    verified: true,
+  }));
+  const investors = aiInvestorNames.map((name, index): Account => ({
+    ...emptyAccount,
+    id: `ai-investor-${index + 1}`,
+    role: 'investor',
+    email: `ai-investor-${index + 1}@leap.local`,
+    phone: '',
+    emailVerified: true,
+    accountName: `ai_investor_${String(index + 1).padStart(2, '0')}`,
+    name,
+    company: `${['Future Ventures', 'Seed Partners', 'Bridge Capital', 'Growth Angels', 'Impact Studio'][index % 5]}`,
+    title: index % 3 === 0 ? 'パートナー' : '投資担当',
+    industry: aiIndustries[index % aiIndustries.length],
+    location: locations[(index + 12) % locations.length],
+    stage: ['プレシード', 'シード', 'シリーズA'][index % 3],
+    foundedYear: String(2014 + (index % 10)),
+    foundedMonth: `${(index % 12) + 1}月`,
+    employeeSize: employeeSizes[(index + 2) % employeeSizes.length],
+    revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
+    bio: 'AI運用アカウントです。Leap内の投資家プロフィール、検索、メッセージ体験を確認するための参考アカウントとして運用しています。',
+    achievements: 'SaaS、AI、DX領域の投資検討プロセスを想定した公開プロフィールです。',
+    avatarLabel: name.slice(0, 1),
+    investmentRange: ['500万円〜3,000万円', '1,000万円〜1億円', '3,000万円〜3億円'][index % 3],
+    supportAreas: ['事業戦略', '採用支援', '営業支援', '資金調達', 'ネットワーク提供'][index % 5],
+    isBot: true,
+    botKind: 'investor',
+    age: `${32 + (index % 22)}歳`,
+    gender: index % 2 === 0 ? '男性' : '女性',
+    verified: true,
+  }));
+  return [...entrepreneurs, ...investors];
+}
+
+const aiAccounts = createAiAccounts();
+
+function createAiPosts(accounts: Account[]): Post[] {
+  return accounts.map((account, index) => ({
+    id: `ai-post-${account.id}`,
+    authorId: account.id,
+    body: account.role === 'entrepreneur'
+      ? `${account.company}の今週の進捗です。顧客ヒアリングを追加で実施し、導入前の不安点を整理しました。次はオンボーディング資料を改善して、継続率の変化を見ていきます。`
+      : `${account.industry}領域で、初期の利用継続と紹介発生率を重視して見ています。数字だけではなく、創業者が課題をどう学習しているかも確認しています。`,
+    tags: account.role === 'entrepreneur' ? ['進捗', account.industry] : ['投資観点', account.industry],
+    visibility: 'public',
+    attachmentName: '',
+    imageName: '',
+    imageUrl: '',
+    isHidden: false,
+    actionUserIds: { likes: [], saves: [], meetings: [] },
+    createdAt: new Date(Date.now() - (index + 1) * 42 * 60 * 1000).toISOString(),
+    likes: 0,
+    saves: 0,
+    meetings: 0,
+    views: 0,
+  }));
+}
 
 function createSupabaseBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -254,6 +355,10 @@ function normalizeAccount(account: Account): Account {
     isHidden: Boolean(account.isHidden),
     isDeleted: Boolean(account.isDeleted),
     emailNotificationsEnabled: account.emailNotificationsEnabled !== false,
+    isBot: Boolean(account.isBot),
+    botKind: account.botKind || '',
+    age: account.age || '',
+    gender: account.gender || '',
     ticketTransferName: account.ticketTransferName || '',
   };
 }
@@ -291,8 +396,9 @@ function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapClou
 }
 
 function withAdminAccount(accounts: Account[]): Account[] {
-  const normalized = accounts.map(normalizeAccount).filter((account) => account.id !== adminAccount.id && account.email.trim().toLowerCase() !== adminEmail);
-  return [adminAccount, ...normalized];
+  const systemIds = new Set([adminAccount.id, ...aiAccounts.map((account) => account.id)]);
+  const normalized = accounts.map(normalizeAccount).filter((account) => !systemIds.has(account.id) && account.email.trim().toLowerCase() !== adminEmail && !account.isBot);
+  return [adminAccount, ...aiAccounts, ...normalized];
 }
 
 async function sendDirectEmail(to: string, subject: string, body: string) {
@@ -341,6 +447,7 @@ export default function LeapApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
+  const [systemPostActions, setSystemPostActions] = useState<Record<string, Post['actionUserIds']>>({});
 
   useEffect(() => saveLocal('leap.accounts', accounts), [accounts]);
   useEffect(() => saveLocal('leap.currentAccountId', currentAccountId), [currentAccountId]);
@@ -438,8 +545,13 @@ export default function LeapApp() {
   const selectedAccount = accountsWithAdmin.find((account) => account.id === selectedAccountId) ?? currentAccount;
   const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
   const currentFollowing = currentAccount?.followingIds ?? following;
+  const systemPosts = useMemo(() => createAiPosts(aiAccounts), []);
+  const allPosts = useMemo(() => mergeById(systemPosts.map((post) => {
+    const actionUserIds = systemPostActions[post.id] ?? post.actionUserIds;
+    return { ...post, actionUserIds, likes: actionUserIds.likes.length, saves: actionUserIds.saves.length, meetings: actionUserIds.meetings.length };
+  }), posts).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [posts, systemPostActions, systemPosts]);
 
-  const visiblePosts = useMemo(() => posts.filter((post) => visibleAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, currentFollowing, posts, visibleAccounts]);
+  const visiblePosts = useMemo(() => allPosts.filter((post) => visibleAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, visibleAccounts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'investor');
@@ -527,26 +639,32 @@ export default function LeapApp() {
   function reactToPost(postId: string, type: 'like' | 'save' | 'meeting') {
     if (!requireAccount()) return;
     const bucket = type === 'like' ? 'likes' : type === 'save' ? 'saves' : 'meetings';
-    let added = false;
-    setPosts((list) => list.map((post) => {
-      if (post.id !== postId) return post;
-      const actionUserIds = post.actionUserIds ?? { likes: [], saves: [], meetings: [] };
-      const current = actionUserIds[bucket] ?? [];
-      const exists = current.includes(currentAccount!.id);
-      added = !exists;
-      const nextUsers = exists ? current.filter((id) => id !== currentAccount!.id) : [...current, currentAccount!.id];
-      return {
-        ...post,
-        actionUserIds: { ...actionUserIds, [bucket]: nextUsers },
-        likes: bucket === 'likes' ? nextUsers.length : post.likes,
-        saves: bucket === 'saves' ? nextUsers.length : post.saves,
-        meetings: bucket === 'meetings' ? nextUsers.length : post.meetings,
-      };
-    }));
+    const targetPost = allPosts.find((item) => item.id === postId);
+    if (!targetPost) return;
+    const actionUserIds = targetPost.actionUserIds ?? { likes: [], saves: [], meetings: [] };
+    const current = actionUserIds[bucket] ?? [];
+    const exists = current.includes(currentAccount!.id);
+    const added = !exists;
+    const nextUsers = exists ? current.filter((id) => id !== currentAccount!.id) : [...current, currentAccount!.id];
+    const nextActions = { ...actionUserIds, [bucket]: nextUsers };
+    if (posts.some((post) => post.id === postId)) {
+      setPosts((list) => list.map((post) => {
+        if (post.id !== postId) return post;
+        return {
+          ...post,
+          actionUserIds: nextActions,
+          likes: bucket === 'likes' ? nextUsers.length : post.likes,
+          saves: bucket === 'saves' ? nextUsers.length : post.saves,
+          meetings: bucket === 'meetings' ? nextUsers.length : post.meetings,
+        };
+      }));
+    } else {
+      setSystemPostActions((currentActions) => ({ ...currentActions, [postId]: nextActions }));
+    }
     if (type === 'save') setSavedPosts((list) => added ? (list.includes(postId) ? list : [...list, postId]) : list.filter((id) => id !== postId));
     if (type === 'meeting' && added) {
-      const post = posts.find((item) => item.id === postId);
-      const author = accounts.find((account) => account.id === post?.authorId);
+      const post = allPosts.find((item) => item.id === postId);
+      const author = accountsWithAdmin.find((account) => account.id === post?.authorId);
       if (author) requestMeeting(author);
     } else {
       flash(added ? (type === 'like' ? '応援しました' : '保存しました') : '取り消しました');
@@ -581,6 +699,18 @@ export default function LeapApp() {
 
   function requestMeeting(account: Account) {
     if (!requireAccount()) return;
+    if (account.isBot) {
+      const body = 'お問い合わせありがとうございます。AI運用アカウントのため、面談は受け付けていません。公開プロフィールや投稿に関する質問にはメッセージで回答します。';
+      setMessages((list) => [
+        { id: crypto.randomUUID(), partnerId: account.id, senderId: account.id, recipientId: currentAccount!.id, kind: 'direct', body, createdAt: new Date().toISOString(), mine: false, meetingStatus: 'rejected' },
+        ...list,
+      ]);
+      setSelectedAccountId(account.id);
+      setMessageMode('direct');
+      setPage('messages');
+      flash('AI運用アカウントは面談を受け付けていません');
+      return;
+    }
     const body = `${currentAccount?.accountName || currentAccount?.name || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
     setMessages((list) => [
       { id: crypto.randomUUID(), partnerId: account.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body: '面談申請を送信しました。相手が承認すると面談メッセージに移行できます。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'requested' },
@@ -687,7 +817,19 @@ export default function LeapApp() {
   function sendMessage(partner: Account | null, kind = messageMode, attachment?: { name: string; url: string; type: 'image' | 'file' }) {
     if (!partner || (!messageDraft.trim() && !attachment)) return;
     const newMessage = { id: crypto.randomUUID(), partnerId: partner.id, senderId: currentAccount?.id, recipientId: partner.id, kind, body: messageDraft.trim(), createdAt: new Date().toISOString(), mine: true, attachmentName: attachment?.name, attachmentUrl: attachment?.url, attachmentType: attachment?.type };
-    setMessages((list) => [newMessage, ...list]);
+    const autoReply = partner.isBot && kind === 'direct' ? {
+      id: crypto.randomUUID(),
+      partnerId: partner.id,
+      senderId: partner.id,
+      recipientId: currentAccount?.id,
+      kind: 'direct' as const,
+      body: partner.role === 'entrepreneur'
+        ? 'メッセージありがとうございます。AI運用アカウントとして、公開している事業進捗やKPIの見方について回答できます。面談は受け付けていません。'
+        : 'メッセージありがとうございます。AI運用アカウントとして、投資観点や公開プロフィールに関する質問に回答できます。面談は受け付けていません。',
+      createdAt: new Date(Date.now() + 1000).toISOString(),
+      mine: false,
+    } : null;
+    setMessages((list) => autoReply ? [autoReply, newMessage, ...list] : [newMessage, ...list]);
     if (partner.emailNotificationsEnabled) void sendDirectEmail(partner.email, 'Leap: メッセージが届きました', `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんからメッセージが届きました。\n\n${messageDraft.trim()}`);
     setMessageDraft('');
     flash('メッセージを送信しました');
@@ -735,7 +877,7 @@ export default function LeapApp() {
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
           {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} setMessages={setMessages} setNotices={setNotices} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'matching' && <MatchingPage accounts={visibleAccounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
@@ -848,7 +990,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
           投稿する
         </button>
-        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{account.accountName || account.name}</span></button>)}
+        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{account.accountName || account.name}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
       </div>
       {posts.length === 0 ? (
         <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
@@ -974,15 +1116,15 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
         <button className={`py-3 ${mode === 'meeting' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('meeting')}>面談メッセージ</button>
       </div>
       <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-4 py-3">
-        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><Avatar account={partner} active={activePartner?.id === partner.id} /><span className="w-full truncate">{partner.accountName || partner.name}</span></button>)}
+        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><Avatar account={partner} active={activePartner?.id === partner.id} /><span className="w-full truncate">{partner.accountName || partner.name}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
       </div>
       {!activePartner ? (
         <EmptyState icon={<Mail size={28} />} title="メッセージはまだありません" body="検索やプロフィールから相手にメッセージできます。" />
       ) : (
         <div className="overflow-y-auto px-4 py-4">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{activePartner.accountName || activePartner.name}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
-            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
+            <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{activePartner.accountName || activePartner.name} {activePartner.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
+            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{activePartner.isBot ? '面談不可' : outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
           </div>
           {mode === 'direct' && incomingRequested && !hasApproved && <div className="mb-3 grid grid-cols-2 gap-2"><button className="primary" onClick={() => approveMeeting(activePartner)}>承認</button><button className="secondary text-rose-600" onClick={() => rejectMeeting(activePartner)}>非承認</button></div>}
           {mode === 'direct' && outgoingRequested && !hasApproved && <p className="mb-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold text-blue-700">相手の承認待ちです。</p>}
@@ -1557,7 +1699,7 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
         <button className="flex min-w-0 flex-1 gap-3 text-left" onClick={() => author && openProfile(author)}>
         {author ? <Avatar account={author} /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
         <span className="min-w-0 flex-1">
-          <b className="block truncate text-sm">{author?.accountName || author?.name || 'アカウント未設定'}</b>
+          <b className="block truncate text-sm">{author?.accountName || author?.name || 'アカウント未設定'} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
           <span className="text-[11px] text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
         </span>
         </button>
@@ -1620,13 +1762,14 @@ function ProfileHero({ account, accounts, isMine, posts, setPage }: { account: A
       <div className="flex items-start gap-4">
         <Avatar account={account} size="lg" />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xl font-black">{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={16} />}</h2>
+          <h2 className="truncate text-xl font-black">{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={16} />} {account.isBot && <span className="align-middle rounded-full bg-indigo-50 px-2 py-1 text-[10px] text-indigo-700">AI運用</span>}</h2>
           <p className="mt-1 text-xs text-slate-500">@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
           <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
         </div>
       </div>
       <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
-      <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
+      {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
+      <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
       <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{followings.length}</b> フォロー</span><span><b>{followers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
       {canShowSocialGraph ? (
         <div className="mt-3 grid gap-2 text-xs text-slate-600">
@@ -1662,7 +1805,7 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
   return (
     <button className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3 text-left" onClick={onClick}>
       <Avatar account={account} />
-      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.company || account.name}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
+      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.company || account.name} {account.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
       <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">{account.location || '地域未入力'}</span>
     </button>
   );
