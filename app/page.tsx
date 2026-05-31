@@ -274,6 +274,7 @@ export default function LeapApp() {
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
+  const [authBootstrapped, setAuthBootstrapped] = useState(false);
 
   useEffect(() => saveLocal('leap.accounts', accounts), [accounts]);
   useEffect(() => saveLocal('leap.currentAccountId', currentAccountId), [currentAccountId]);
@@ -311,6 +312,43 @@ export default function LeapApp() {
     const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }), 700);
     return () => window.clearTimeout(timer);
   }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
+  useEffect(() => {
+    if (!cloudReady || authBootstrapped) return;
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      setAuthBootstrapped(true);
+      return;
+    }
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user?.email || !user.email_confirmed_at) {
+        setAuthBootstrapped(true);
+        return;
+      }
+      const email = user.email.trim().toLowerCase();
+      const existing = accounts.find((account) => account.email.trim().toLowerCase() === email);
+      if (existing) {
+        setCurrentAccountId(existing.id);
+        setAuthBootstrapped(true);
+        return;
+      }
+      const metadata = user.user_metadata ?? {};
+      const account: Account = {
+        ...emptyAccount,
+        id: user.id || crypto.randomUUID(),
+        role: metadata.role === 'investor' ? 'investor' : 'entrepreneur',
+        email: user.email,
+        phone: String(metadata.phone || ''),
+        password: '',
+        emailVerified: true,
+      };
+      setAccounts([...accounts, account]);
+      setCurrentAccountId(account.id);
+      setPage('profileEdit');
+      flash('メール認証が完了しました。プロフィールを作成してください');
+      setAuthBootstrapped(true);
+    });
+  }, [accounts, authBootstrapped, cloudReady]);
 
   const currentAccount = accounts.find((account) => account.id === currentAccountId) ?? null;
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? currentAccount;
@@ -593,7 +631,7 @@ export default function LeapApp() {
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} />
 
-        <section className="min-h-0 overflow-y-auto pb-24 lg:col-start-2 lg:pb-6">
+        <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
             <FeedPage posts={feedPosts} accounts={accounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -714,9 +752,9 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           ['recommended', 'おすすめ'],
           ['investors', '投資家'],
           ['entrepreneurs', '起業家'],
-        ].map(([key, label]) => <button key={key} className={`py-3 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
+        ].map(([key, label]) => <button key={key} className={`py-2.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
       </div>
-      <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-4 py-3">
+      <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-3 py-2">
         <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
           <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
           投稿する
@@ -785,15 +823,15 @@ function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNoti
   return (
     <div>
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-3 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
-        <button className={`py-3 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
+        <button className={`py-2.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
+        <button className={`py-2.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
         <EmptyState icon={<Bell size={28} />} title={tab === 'unread' ? '未読通知はありません' : '通知はまだありません'} body="フォロー、コメント、面談申込、メッセージが届くと表示されます。" />
       ) : (
         <div className="divide-y divide-slate-100">
           {visibleNotices.map((notice) => (
-            <button key={notice.id} className="flex w-full gap-3 px-4 py-4 text-left" onClick={() => openNotice(notice)}>
+            <button key={notice.id} className="flex w-full gap-3 px-3 py-3 text-left" onClick={() => openNotice(notice)}>
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600"><Bell size={18} /></span>
               <span className="min-w-0 flex-1">
                 <b className="block text-sm">{notice.body}</b>
@@ -893,8 +931,33 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
   const [sent, setSent] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
   const normalizedEmail = email.trim().toLowerCase();
-  function login() {
-    const account = accounts.find((item) => item.email.trim().toLowerCase() === normalizedEmail && item.password === password);
+  async function login() {
+    const supabase = createSupabaseBrowserClient();
+    if (supabase) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error && data.user?.email_confirmed_at) {
+        const userEmail = data.user.email?.trim().toLowerCase() ?? normalizedEmail;
+        const existing = accounts.find((item) => item.email.trim().toLowerCase() === userEmail);
+        if (existing) {
+          setCurrentAccountId(existing.id);
+          setPage(existing.accountName || existing.name ? 'feed' : 'profileEdit');
+          flash('ログインしました');
+          return;
+        }
+        const metadata = data.user.user_metadata ?? {};
+        const account: Account = { ...emptyAccount, id: data.user.id || crypto.randomUUID(), role: metadata.role === 'investor' ? 'investor' : 'entrepreneur', email: data.user.email || email, phone: String(metadata.phone || ''), password: '', emailVerified: true };
+        setAccounts([...accounts, account]);
+        setCurrentAccountId(account.id);
+        setPage('profileEdit');
+        flash('ログインしました。プロフィールを作成してください');
+        return;
+      }
+      if (error?.message?.toLowerCase().includes('email not confirmed')) {
+        setAuthMessage('メール認証が完了していません。確認メールのURLを押してからログインしてください。');
+        return;
+      }
+    }
+    const account = accounts.find((item) => item.email.trim().toLowerCase() === normalizedEmail && item.password === password && item.emailVerified);
     if (!account) {
       setAuthMessage('メールアドレスまたはパスワードが違います。');
       return;
@@ -903,7 +966,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
     setPage(account.accountName || account.name ? 'feed' : 'profileEdit');
     flash('ログインしました');
   }
-  async function sendConfirmation() {
+  async function sendConfirmation(resend = false) {
     if (accounts.some((account) => account.email.trim().toLowerCase() === normalizedEmail)) {
       setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
       setMode('login');
@@ -912,33 +975,49 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
       return;
     }
     const supabase = createSupabaseBrowserClient();
-    if (supabase) {
-      const { error } = await supabase.auth.signUp({
+    if (!supabase) {
+      setAuthMessage('Supabase接続がないため、確認メールを送信できません。環境変数を確認してください。');
+      return;
+    }
+    const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
+    const result = resend
+      ? await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } })
+      : await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+          emailRedirectTo,
           data: { phone, role },
         },
       });
-      if (error) {
-        setAuthMessage(`確認メール送信に失敗しました：${error.message}`);
-      } else {
-        setAuthMessage('確認メールを送信しました。メール内のURLを押すと本番のメール認証が完了します。');
-      }
+    if (result.error) {
+      setAuthMessage(`確認メール送信に失敗しました：${result.error.message}`);
     } else {
-      setAuthMessage('Supabase環境変数がないため、開発確認モードで進めます。');
+      setAuthMessage(resend ? '確認メールを再送しました。メール内のURLを押すと認証が完了します。' : '確認メールを送信しました。メール内のURLを押すと認証が完了します。');
     }
     setSent(true);
-    flash('確認メールを送信しました');
+    flash(resend ? '確認メールを再送しました' : '確認メールを送信しました');
   }
-  function complete() {
+  async function complete() {
     if (accounts.some((account) => account.email.trim().toLowerCase() === normalizedEmail)) {
       setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
       setMode('login');
       return;
     }
-    const account: Account = { ...emptyAccount, id: crypto.randomUUID(), role, email, phone, password, emailVerified: true };
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      setAuthMessage('Supabase接続がないため、メール認証を確認できません。');
+      return;
+    }
+    const { data, error } = await supabase.auth.getUser();
+    const user = data.user;
+    if (error || !user?.email || !user.email_confirmed_at || user.email.trim().toLowerCase() !== normalizedEmail) {
+      setAuthMessage('まだメール認証が完了していません。確認メールのURLを押してから、もう一度このボタンを押してください。');
+      flash('メール認証が未完了です');
+      return;
+    }
+    const metadata = user.user_metadata ?? {};
+    const account: Account = { ...emptyAccount, id: user.id || crypto.randomUUID(), role: metadata.role === 'investor' ? 'investor' : role, email: user.email, phone: String(metadata.phone || phone), password: '', emailVerified: true };
     setAccounts([...accounts, account]);
     setCurrentAccountId(account.id);
     setPage('profileEdit');
@@ -959,7 +1038,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
           {mode === 'signup' && <Input label="電話番号" value={phone} onChange={setPhone} />}
           <Input label="パスワード" value={password} onChange={setPassword} type="password" />
         </div>
-        {mode === 'signup' ? (!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={sendConfirmation}>確認メールを送信する</button> : <button className="primary mt-5 w-full" onClick={complete}>認証後、プロフィール作成へ進む</button>) : <button className="primary mt-5 w-full" disabled={!email || !password} onClick={login}>ログイン</button>}
+        {mode === 'signup' ? (!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={() => sendConfirmation(false)}>確認メールを送信する</button> : <div className="mt-5 grid gap-2"><button className="primary w-full" onClick={complete}>メール認証を確認する</button><button className="secondary w-full" onClick={() => sendConfirmation(true)}>確認メールを再送する</button></div>) : <button className="primary mt-5 w-full" disabled={!email || !password} onClick={login}>ログイン</button>}
         {(sent || authMessage) && <p className="mt-3 text-xs leading-6 text-slate-500">{authMessage || 'メールの確認URLを押してから、プロフィール作成へ進んでください。'}</p>}
       </div>
     </div>
@@ -1343,7 +1422,7 @@ function KpiGrid({ account }: { account: Account }) {
 
 function EmptyState({ icon, title, body, action, onAction }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void }) {
   return (
-    <div className="grid min-h-72 place-items-center p-8 text-center">
+    <div className="grid min-h-52 place-items-center p-5 text-center">
       <div>
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-blue-600">{icon}</div>
         <h2 className="mt-4 text-lg font-black">{title}</h2>
