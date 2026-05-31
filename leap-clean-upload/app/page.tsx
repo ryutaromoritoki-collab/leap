@@ -420,6 +420,10 @@ function readFileAsDataUrl(file: File, onDone: (url: string) => void) {
   reader.readAsDataURL(file);
 }
 
+function isSupabaseEmailConfirmed(user: { email_confirmed_at?: string | null; confirmed_at?: string | null } | null | undefined): boolean {
+  return Boolean(user?.email_confirmed_at || user?.confirmed_at);
+}
+
 export default function LeapApp() {
   const [page, setPage] = useState<Page>('feed');
   const [feedTab, setFeedTab] = useState<FeedTab>('recommended');
@@ -447,6 +451,7 @@ export default function LeapApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
+  const [authenticatedEmail, setAuthenticatedEmail] = useState('');
   const [systemPostActions, setSystemPostActions] = useState<Record<string, Post['actionUserIds']>>({});
 
   useEffect(() => saveLocal('leap.accounts', accounts), [accounts]);
@@ -510,11 +515,12 @@ export default function LeapApp() {
     }
     supabase.auth.getUser().then(({ data }) => {
       const user = data.user;
-      if (!user?.email || !user.email_confirmed_at) {
+      if (!user?.email || !isSupabaseEmailConfirmed(user)) {
         setAuthBootstrapped(true);
         return;
       }
       const email = user.email.trim().toLowerCase();
+      setAuthenticatedEmail(email);
       const existing = accounts.find((account) => account.email.trim().toLowerCase() === email);
       if (existing) {
         setCurrentAccountId(existing.id);
@@ -541,10 +547,13 @@ export default function LeapApp() {
 
   const accountsWithAdmin = useMemo(() => withAdminAccount(accounts).filter((account) => !account.isDeleted), [accounts]);
   const visibleAccounts = useMemo(() => accountsWithAdmin.filter((account) => account.id === currentAccountId || account.id === adminAccount.id || !account.isHidden), [accountsWithAdmin, currentAccountId]);
-  const currentAccount = accountsWithAdmin.find((account) => account.id === currentAccountId) ?? null;
+  const currentAccount = accountsWithAdmin.find((account) => account.id === currentAccountId) ?? accountsWithAdmin.find((account) => authenticatedEmail && account.email.trim().toLowerCase() === authenticatedEmail) ?? null;
   const selectedAccount = accountsWithAdmin.find((account) => account.id === selectedAccountId) ?? currentAccount;
   const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
   const currentFollowing = currentAccount?.followingIds ?? following;
+  useEffect(() => {
+    if (currentAccount && currentAccount.id !== currentAccountId) setCurrentAccountId(currentAccount.id);
+  }, [currentAccount, currentAccountId]);
   const systemPosts = useMemo(() => createAiPosts(aiAccounts), []);
   const allPosts = useMemo(() => mergeById(systemPosts.map((post) => {
     const actionUserIds = systemPostActions[post.id] ?? post.actionUserIds;
@@ -1177,7 +1186,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
     const supabase = createSupabaseBrowserClient();
     if (supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (!error && data.user?.email_confirmed_at) {
+      if (!error && isSupabaseEmailConfirmed(data.user)) {
         const userEmail = data.user.email?.trim().toLowerCase() ?? normalizedEmail;
         const existing = accounts.find((item) => item.email.trim().toLowerCase() === userEmail);
         if (existing) {
@@ -1253,7 +1262,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
     }
     const { data, error } = await supabase.auth.getUser();
     const user = data.user;
-    if (error || !user?.email || !user.email_confirmed_at || user.email.trim().toLowerCase() !== normalizedEmail) {
+    if (error || !user?.email || !isSupabaseEmailConfirmed(user) || user.email.trim().toLowerCase() !== normalizedEmail) {
       setAuthMessage('まだメール認証が完了していません。確認メールのURLを押してから、もう一度このボタンを押してください。');
       flash('メール認証が未完了です');
       return;
