@@ -75,6 +75,10 @@ type Account = {
   followingIds: string[];
   followerIds: string[];
   hideSocialGraph: boolean;
+  achievements: string;
+  isHidden: boolean;
+  isDeleted: boolean;
+  emailNotificationsEnabled: boolean;
   verified: boolean;
 };
 
@@ -103,6 +107,8 @@ type Post = {
 type DirectMessage = {
   id: string;
   partnerId: string;
+  senderId?: string;
+  recipientId?: string;
   kind: MessageKind;
   body: string;
   createdAt: string;
@@ -134,6 +140,7 @@ type MeetingApplication = {
 
 type Notice = {
   id: string;
+  userId?: string;
   body: string;
   createdAt: string;
   unread: boolean;
@@ -192,7 +199,27 @@ const emptyAccount: Account = {
   followingIds: [],
   followerIds: [],
   hideSocialGraph: false,
+  achievements: '',
+  isHidden: false,
+  isDeleted: false,
+  emailNotificationsEnabled: true,
   verified: false,
+};
+
+const adminAccount: Account = {
+  ...emptyAccount,
+  id: 'leap-admin',
+  role: 'investor',
+  email: adminEmail,
+  phone: '',
+  emailVerified: true,
+  accountName: 'leap_admin',
+  name: 'Leap運営',
+  company: 'Leap',
+  title: '運営チーム',
+  bio: 'Leap運営への相談・お問い合わせはこちらから送れます。',
+  avatarLabel: '運',
+  verified: true,
 };
 
 function createSupabaseBrowserClient() {
@@ -223,6 +250,10 @@ function normalizeAccount(account: Account): Account {
     followingIds: Array.isArray(account.followingIds) ? account.followingIds : [],
     followerIds: Array.isArray(account.followerIds) ? account.followerIds : [],
     hideSocialGraph: Boolean(account.hideSocialGraph),
+    achievements: account.achievements || '',
+    isHidden: Boolean(account.isHidden),
+    isDeleted: Boolean(account.isDeleted),
+    emailNotificationsEnabled: account.emailNotificationsEnabled !== false,
     ticketTransferName: account.ticketTransferName || '',
   };
 }
@@ -257,6 +288,24 @@ function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapClou
     meetingApplications: mergeById(local.meetingApplications, cloud.meetingApplications),
     notices: mergeById(local.notices, cloud.notices),
   };
+}
+
+function withAdminAccount(accounts: Account[]): Account[] {
+  const normalized = accounts.map(normalizeAccount).filter((account) => account.id !== adminAccount.id && account.email.trim().toLowerCase() !== adminEmail);
+  return [adminAccount, ...normalized];
+}
+
+async function sendDirectEmail(to: string, subject: string, body: string) {
+  if (!to) return;
+  try {
+    await fetch('/api/send-direct-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body }),
+    });
+  } catch {
+    // Email delivery is best-effort; in-app notifications still remain.
+  }
 }
 
 function readFileAsDataUrl(file: File, onDone: (url: string) => void) {
@@ -383,24 +432,26 @@ export default function LeapApp() {
     });
   }, [accounts, authBootstrapped, cloudReady]);
 
-  const currentAccount = accounts.find((account) => account.id === currentAccountId) ?? null;
-  const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? currentAccount;
+  const accountsWithAdmin = useMemo(() => withAdminAccount(accounts).filter((account) => !account.isDeleted), [accounts]);
+  const visibleAccounts = useMemo(() => accountsWithAdmin.filter((account) => account.id === currentAccountId || account.id === adminAccount.id || !account.isHidden), [accountsWithAdmin, currentAccountId]);
+  const currentAccount = accountsWithAdmin.find((account) => account.id === currentAccountId) ?? null;
+  const selectedAccount = accountsWithAdmin.find((account) => account.id === selectedAccountId) ?? currentAccount;
   const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
   const currentFollowing = currentAccount?.followingIds ?? following;
 
-  const visiblePosts = useMemo(() => posts.filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, currentFollowing, posts]);
+  const visiblePosts = useMemo(() => posts.filter((post) => visibleAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [currentAccount, currentFollowing, posts, visibleAccounts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
-    if (feedTab === 'investors') return visiblePosts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'investor');
-    if (feedTab === 'entrepreneurs') return visiblePosts.filter((post) => accounts.find((account) => account.id === post.authorId)?.role === 'entrepreneur');
+    if (feedTab === 'investors') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'investor');
+    if (feedTab === 'entrepreneurs') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'entrepreneur');
     return visiblePosts;
-  }, [accounts, currentFollowing, feedTab, visiblePosts]);
+  }, [currentFollowing, feedTab, visibleAccounts, visiblePosts]);
 
   const searchResults = useMemo(() => {
     const text = query.trim().toLowerCase();
-    if (!text) return accounts;
-    return accounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
-  }, [accounts, query]);
+    if (!text) return visibleAccounts;
+    return visibleAccounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
+  }, [query, visibleAccounts]);
 
   function flash(body: string) {
     setToast(body);
@@ -532,11 +583,12 @@ export default function LeapApp() {
     if (!requireAccount()) return;
     const body = `${currentAccount?.accountName || currentAccount?.name || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
     setMessages((list) => [
-      { id: crypto.randomUUID(), partnerId: account.id, kind: 'direct', body: '面談申請を送信しました。相手が承認すると面談メッセージに移行できます。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'requested' },
-      { id: crypto.randomUUID(), partnerId: account.id, kind: 'direct', body, createdAt: new Date().toISOString(), mine: false, meetingStatus: 'requested' },
+      { id: crypto.randomUUID(), partnerId: account.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body: '面談申請を送信しました。相手が承認すると面談メッセージに移行できます。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'requested' },
+      { id: crypto.randomUUID(), partnerId: currentAccount!.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body, createdAt: new Date().toISOString(), mine: false, meetingStatus: 'requested' },
       ...list,
     ]);
     setNotices((list) => [{ id: crypto.randomUUID(), body: `${account.accountName || account.name}へ面談申請を送信しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+    if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: 面談希望が届きました', `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんから面談希望が届きました。`);
     setSelectedAccountId(account.id);
     setMessageMode('direct');
     setPage('messages');
@@ -634,7 +686,9 @@ export default function LeapApp() {
 
   function sendMessage(partner: Account | null, kind = messageMode, attachment?: { name: string; url: string; type: 'image' | 'file' }) {
     if (!partner || (!messageDraft.trim() && !attachment)) return;
-    setMessages((list) => [{ id: crypto.randomUUID(), partnerId: partner.id, kind, body: messageDraft.trim(), createdAt: new Date().toISOString(), mine: true, attachmentName: attachment?.name, attachmentUrl: attachment?.url, attachmentType: attachment?.type }, ...list]);
+    const newMessage = { id: crypto.randomUUID(), partnerId: partner.id, senderId: currentAccount?.id, recipientId: partner.id, kind, body: messageDraft.trim(), createdAt: new Date().toISOString(), mine: true, attachmentName: attachment?.name, attachmentUrl: attachment?.url, attachmentType: attachment?.type };
+    setMessages((list) => [newMessage, ...list]);
+    if (partner.emailNotificationsEnabled) void sendDirectEmail(partner.email, 'Leap: メッセージが届きました', `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんからメッセージが届きました。\n\n${messageDraft.trim()}`);
     setMessageDraft('');
     flash('メッセージを送信しました');
   }
@@ -666,24 +720,24 @@ export default function LeapApp() {
 
         <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
-            <FeedPage posts={feedPosts} accounts={accounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <FeedPage posts={feedPosts} accounts={visibleAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'search' && <SearchPage query={query} setQuery={setQuery} results={searchResults} openProfile={openProfile} />}
-          {page === 'notifications' && <NotificationsPage notices={notices} setNotices={setNotices} />}
+          {page === 'notifications' && <NotificationsPage notices={notices} currentAccount={currentAccount} setNotices={setNotices} />}
           {page === 'messages' && (
-            <MessagesPage accounts={accounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} meetingApplications={meetingApplications} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} rejectMeeting={rejectMeeting} requestMeeting={requestMeeting} submitMeetingApplication={submitMeetingApplication} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} />
+            <MessagesPage accounts={visibleAccounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} meetingApplications={meetingApplications} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} rejectMeeting={rejectMeeting} requestMeeting={requestMeeting} submitMeetingApplication={submitMeetingApplication} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} />
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'mypage' && (
-            <MyPage currentAccount={currentAccount} accounts={accounts} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
-          {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
+          {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} setMessages={setMessages} setNotices={setNotices} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} accounts={accounts} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={posts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
-          {page === 'matching' && <MatchingPage accounts={accounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
+          {page === 'matching' && <MatchingPage accounts={visibleAccounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
 
         <BottomTabs page={page} setPage={setPage} openComposer={() => setShowComposer(true)} />
@@ -748,6 +802,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             ['messages', 'メッセージ'],
             ['tickets', '面談チケット'],
             ...(isAdmin ? [['admin', '管理者画面']] : []),
+            [currentAccount ? 'profileEdit' : 'auth', '設定'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
@@ -844,10 +899,11 @@ function SearchPage({ query, setQuery, results, openProfile }: { query: string; 
   );
 }
 
-function NotificationsPage({ notices, setNotices }: { notices: Notice[]; setNotices: (notices: Notice[]) => void }) {
+function NotificationsPage({ notices, currentAccount, setNotices }: { notices: Notice[]; currentAccount: Account | null; setNotices: (notices: Notice[]) => void }) {
   const [tab, setTab] = useState<'all' | 'unread'>('all');
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
-  const visibleNotices = tab === 'unread' ? notices.filter((notice) => notice.unread) : notices;
+  const ownNotices = notices.filter((notice) => !notice.userId || notice.userId === currentAccount?.id);
+  const visibleNotices = tab === 'unread' ? ownNotices.filter((notice) => notice.unread) : ownNotices;
   function openNotice(notice: Notice) {
     const readNotice = { ...notice, unread: false };
     setNotices(notices.map((item) => item.id === notice.id ? readNotice : item));
@@ -894,13 +950,20 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
   const [meetingTime, setMeetingTime] = useState('');
   const [attachment, setAttachment] = useState<{ name: string; url: string; type: 'image' | 'file' } | undefined>();
   const directPartners = accounts.filter((account) => account.id !== currentAccount?.id);
-  const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.partnerId));
+  const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.senderId === currentAccount?.id ? message.recipientId || message.partnerId : message.senderId || message.partnerId));
   const partners = mode === 'meeting' ? directPartners.filter((account) => approvedPartnerIds.has(account.id)) : directPartners;
   const activePartner = selectedAccount && selectedAccount.id !== currentAccount?.id && partners.some((partner) => partner.id === selectedAccount.id) ? selectedAccount : partners[0] ?? null;
-  const thread = activePartner ? messages.filter((message) => message.partnerId === activePartner.id && message.kind === mode).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
-  const incomingRequested = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'requested' && !message.mine) : false;
-  const outgoingRequested = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'requested' && message.mine) : false;
-  const hasApproved = activePartner ? messages.some((message) => message.partnerId === activePartner.id && message.meetingStatus === 'approved') : false;
+  const isThreadMessage = (message: DirectMessage) => {
+    if (!activePartner) return false;
+    if (message.senderId || message.recipientId) {
+      return message.kind === mode && ((message.senderId === currentAccount?.id && message.recipientId === activePartner.id) || (message.senderId === activePartner.id && message.recipientId === currentAccount?.id));
+    }
+    return message.partnerId === activePartner.id && message.kind === mode;
+  };
+  const thread = activePartner ? messages.filter(isThreadMessage).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
+  const incomingRequested = activePartner ? messages.some((message) => isThreadMessage(message) && message.meetingStatus === 'requested' && (message.senderId ? message.senderId !== currentAccount?.id : !message.mine)) : false;
+  const outgoingRequested = activePartner ? messages.some((message) => isThreadMessage(message) && message.meetingStatus === 'requested' && (message.senderId ? message.senderId === currentAccount?.id : message.mine)) : false;
+  const hasApproved = activePartner ? messages.some((message) => isThreadMessage(message) && message.meetingStatus === 'approved') : false;
   const latestApplication = activePartner && currentAccount ? meetingApplications.find((item) => ((item.applicantId === currentAccount.id && item.partnerId === activePartner.id) || (item.applicantId === activePartner.id && item.partnerId === currentAccount.id))) : null;
   const selectedSchedule = meetingDate && meetingTime ? `${meetingDate}T${meetingTime}:00` : '';
   const meetingButtonLabel = latestApplication?.status === 'pending' ? '申請中' : latestApplication?.status === 'approved' ? '面談可能' : '面談申請';
@@ -934,7 +997,10 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
               {latestApplication?.status === 'rejected' && <p className="mt-2 text-xs font-bold text-rose-600">非承認になりました。日時を再調整して再申請してください。</p>}
             </div>
           )}
-          {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => <div key={message.id} className={`mb-3 flex ${message.mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${message.mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body && <p>{message.body}</p>}{message.attachmentUrl && (message.attachmentType === 'image' ? <img src={message.attachmentUrl} alt={message.attachmentName || '添付画像'} className="mt-2 max-h-52 rounded-xl object-cover" /> : <a className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-black text-blue-600" href={message.attachmentUrl} download={message.attachmentName}><Paperclip size={14} />{message.attachmentName || '添付ファイル'}</a>)}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></div></div>)}
+          {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => {
+            const mine = message.senderId ? message.senderId === currentAccount?.id : message.mine;
+            return <div key={message.id} className={`mb-3 flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body && <p>{message.body}</p>}{message.attachmentUrl && (message.attachmentType === 'image' ? <img src={message.attachmentUrl} alt={message.attachmentName || '添付画像'} className="mt-2 max-h-52 rounded-xl object-cover" /> : <a className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-black text-blue-600" href={message.attachmentUrl} download={message.attachmentName}><Paperclip size={14} />{message.attachmentName || '添付ファイル'}</a>)}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></div></div>;
+          })}
         </div>
       )}
       <div className="border-t border-slate-100 bg-white p-3">
@@ -1209,6 +1275,8 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           <div className="grid grid-cols-2 gap-2"><Select label="設立年" value={form.foundedYear} options={foundedYears} onChange={(value) => update('foundedYear', value)} /><Select label="設立月" value={form.foundedMonth} options={foundedMonths} onChange={(value) => update('foundedMonth', value)} /></div>
           <Select label="従業員数" value={form.employeeSize} options={employeeSizes} onChange={(value) => update('employeeSize', value)} />
           <Select label="年商規模" value={form.revenueScale} options={revenueScales} onChange={(value) => update('revenueScale', value)} />
+          <label className="grid gap-1 text-[11px] font-bold text-slate-600">実績<textarea className="field min-h-20 resize-none" placeholder="受賞歴、導入実績、投資実績、支援実績など" value={form.achievements} onChange={(event) => update('achievements', event.target.value)} /></label>
+          <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.emailNotificationsEnabled} onChange={(event) => update('emailNotificationsEnabled', event.target.checked)} />コメント・面談希望・運営連絡などのメール通知を受け取る</label>
           <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.hideSocialGraph} onChange={(event) => update('hideSocialGraph', event.target.checked)} />フォロー・フォロワーリストを他のユーザーに非表示にする</label>
           <Select label="本人確認種別" value={form.businessType} options={['corporation', 'sole']} displayMap={{ corporation: '法人', sole: '個人事業主' }} onChange={(value) => update('businessType', value)} />
           {form.businessType === 'corporation' ? <Input label="法人番号" value={form.corporateNumber} onChange={(value) => update('corporateNumber', value)} /> : <label className="grid gap-1 text-[11px] font-bold text-slate-600">運転免許証の写真<input className="field" type="file" accept="image/*" onChange={(event) => update('licenseFileName', event.target.files?.[0]?.name || '')} />{form.licenseFileName && <span className="text-slate-500">{form.licenseFileName}</span>}</label>}
@@ -1278,16 +1346,52 @@ function TicketPage({ currentAccount, setAccounts }: { currentAccount: Account |
   );
 }
 
-function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts, reviewMeetingApplication, openProfile }: { accounts: Account[]; posts: Post[]; meetingApplications: MeetingApplication[]; setAccounts: (accounts: Account[]) => void; setPosts: (posts: Post[]) => void; reviewMeetingApplication: (applicationId: string, status: 'approved' | 'rejected') => void; openProfile: (account: Account) => void }) {
+function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts, setMessages, setNotices, reviewMeetingApplication, openProfile }: { accounts: Account[]; posts: Post[]; meetingApplications: MeetingApplication[]; setAccounts: (accounts: Account[]) => void; setPosts: (posts: Post[]) => void; setMessages: (updater: DirectMessage[] | ((messages: DirectMessage[]) => DirectMessage[])) => void; setNotices: (updater: Notice[] | ((notices: Notice[]) => Notice[])) => void; reviewMeetingApplication: (applicationId: string, status: 'approved' | 'rejected') => void; openProfile: (account: Account) => void }) {
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastSubject, setBroadcastSubject] = useState('Leap運営からのお知らせ');
+  const [broadcastEmailBody, setBroadcastEmailBody] = useState('');
   const pendingTickets = accounts.filter((account) => account.ticketRequestStatus === 'pending');
   const hiddenPosts = posts.filter((post) => post.isHidden);
   const pendingMeetings = meetingApplications.filter((application) => application.status === 'pending');
+  const activeUsers = accounts.filter((account) => account.email.trim().toLowerCase() !== adminEmail && !account.isDeleted);
   function approveTicket(account: Account) {
     const count = Number(account.ticketRequestPlan.replace('枚', '')) || 1;
     setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '', ticketTransferName: '' } : item));
   }
   function rejectTicket(account: Account) {
     setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketRequestStatus: 'none', ticketRequestPlan: '', ticketTransferName: '' } : item));
+  }
+  function hideUser(account: Account, hidden: boolean) {
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, isHidden: hidden } : item));
+    if (hidden) {
+      setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: 'アカウントが非表示となっています', createdAt: new Date().toISOString(), unread: true }, ...list]);
+      if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: アカウントが非表示となっています', '運営により、あなたのアカウントは現在非表示となっています。詳細は運営までお問い合わせください。');
+    }
+  }
+  function deleteUser(account: Account) {
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, isDeleted: true, isHidden: true } : item));
+    setPosts(posts.filter((post) => post.authorId !== account.id));
+    void sendDirectEmail(account.email, 'Leap: アカウント削除のお知らせ', '運営によりアカウントが削除されました。');
+  }
+  function sendBroadcastMessage() {
+    if (!broadcastMessage.trim()) return;
+    const now = new Date().toISOString();
+    setMessages((list) => [
+      ...activeUsers.map((account) => ({ id: crypto.randomUUID(), partnerId: adminAccount.id, senderId: adminAccount.id, recipientId: account.id, kind: 'direct' as const, body: broadcastMessage.trim(), createdAt: now, mine: false })),
+      ...list,
+    ]);
+    setNotices((list) => [
+      ...activeUsers.map((account) => ({ id: crypto.randomUUID(), userId: account.id, body: '運営からメッセージが届きました', createdAt: now, unread: true })),
+      ...list,
+    ]);
+    setBroadcastMessage('');
+  }
+  function sendBroadcastEmail() {
+    if (!broadcastEmailBody.trim()) return;
+    activeUsers.filter((account) => account.emailNotificationsEnabled).forEach((account) => {
+      void sendDirectEmail(account.email, broadcastSubject || 'Leap運営からのお知らせ', broadcastEmailBody);
+    });
+    setBroadcastEmailBody('');
   }
   return (
     <div className="p-4 lg:p-6">
@@ -1338,9 +1442,17 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <h2 className="text-sm font-black">メンバー一覧</h2>
         {accounts.length === 0 ? <p className="mt-3 text-sm text-slate-500">登録ユーザーはまだいません。</p> : (
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
-            {accounts.map((account) => <button key={account.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left" onClick={() => openProfile(account)}><Avatar account={account} /><span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || '未設定'}</b><span className="block truncate text-xs text-slate-500">{account.email || 'メール未登録'} / {account.company || '会社名未設定'}</span></span><span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'}</span></button>)}
+            {activeUsers.map((account) => <div key={account.id} className="rounded-2xl bg-slate-50 p-3"><button className="flex w-full items-center gap-3 text-left" onClick={() => openProfile(account)}><Avatar account={account} /><span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.name || '未設定'}</b><span className="block truncate text-xs text-slate-500">{account.email || 'メール未登録'} / {account.company || '会社名未設定'}</span></span><span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-500">{account.isHidden ? '非表示' : account.role === 'entrepreneur' ? '起業家' : '投資家'}</span></button><div className="mt-3 grid grid-cols-3 gap-2"><button className="secondary min-h-9 text-[11px]" onClick={() => hideUser(account, false)}>公開</button><button className="secondary min-h-9 text-[11px]" onClick={() => hideUser(account, true)}>非表示</button><button className="secondary min-h-9 text-[11px] text-rose-600" onClick={() => deleteUser(account)}>削除</button></div></div>)}
           </div>
         )}
+      </section>
+      <section className="mt-5 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">一斉メッセージ・一斉メール</h2>
+        <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">全ユーザーへの運営メッセージ<textarea className="field min-h-24 resize-none" value={broadcastMessage} onChange={(event) => setBroadcastMessage(event.target.value)} /></label>
+        <button className="primary mt-3 w-full" onClick={sendBroadcastMessage}>全ユーザーへメッセージ送信</button>
+        <Input label="メール件名" value={broadcastSubject} onChange={setBroadcastSubject} />
+        <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">登録メールアドレスへの一斉DM<textarea className="field min-h-24 resize-none" value={broadcastEmailBody} onChange={(event) => setBroadcastEmailBody(event.target.value)} /></label>
+        <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>メール通知ONのユーザーへ一斉メール送信</button>
       </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">投稿管理</h2>
@@ -1362,30 +1474,40 @@ function AdminStat({ label, value }: { label: string; value: string }) {
 }
 
 function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, startEditPost, hidePost, deletePost }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  const [tab, setTab] = useState<'overview' | 'achievements' | 'posts'>('overview');
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
       <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} />
       <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className="border-b-2 border-blue-600 py-3">概要</button>
-        <button className="py-3 text-slate-500">実績</button>
-        <button className="py-3 text-slate-500">投稿</button>
+        <button className={`py-3 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
+        <button className={`py-3 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
+        <button className={`py-3 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
       </div>
-      <div className="p-4">
-        <KpiGrid account={account} />
-        <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
-        {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
-        {!isMine && (
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <button className="secondary" onClick={follow}>{isFollowing ? '解除' : 'フォロー'}</button>
-            <button className="secondary" onClick={message}>メッセージ</button>
-            <button className="primary" onClick={requestMeeting}>面談</button>
-          </div>
-        )}
-      </div>
-      <div className="divide-y divide-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
-      </div>
+      {tab === 'overview' && (
+        <div className="p-4">
+          <KpiGrid account={account} />
+          <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
+          {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
+          {!isMine && (
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button className="secondary" onClick={follow}>{isFollowing ? '解除' : 'フォロー'}</button>
+              <button className="secondary" onClick={message}>メッセージ</button>
+              <button className="primary" onClick={requestMeeting}>面談</button>
+            </div>
+          )}
+        </div>
+      )}
+      {tab === 'achievements' && (
+        <div className="p-4">
+          <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} />
+        </div>
+      )}
+      {tab === 'posts' && (
+        <div className="divide-y divide-slate-100">
+          {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
+        </div>
+      )}
     </div>
   );
 }
