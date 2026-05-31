@@ -401,7 +401,7 @@ function withAdminAccount(accounts: Account[]): Account[] {
   return [adminAccount, ...aiAccounts, ...normalized];
 }
 
-async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number }> {
+async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number; failed?: number }> {
   const recipients = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
   if (recipients.length === 0) return { ok: false, error: '送信先メールアドレスがありません。' };
   try {
@@ -412,7 +412,7 @@ async function sendDirectEmail(to: string | string[], subject: string, body: str
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) return { ok: false, error: result.error || `メール送信に失敗しました。status=${response.status}` };
-    return { ok: true, sent: result.sent ?? recipients.length };
+    return { ok: true, sent: result.sent ?? recipients.length, failed: result.failed, error: result.error };
   } catch {
     return { ok: false, error: 'メール送信APIに接続できませんでした。' };
   }
@@ -1600,15 +1600,16 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   }
   async function sendBroadcastEmail() {
     if (!broadcastEmailBody.trim()) return;
-    const recipients = Array.from(new Set(activeUsers.filter((account) => account.emailNotificationsEnabled && account.email.includes('@')).map((account) => account.email.trim())));
+    const recipients = Array.from(new Set(activeUsers.filter((account) => account.email.includes('@')).map((account) => account.email.trim())));
     if (recipients.length === 0) {
-      setBroadcastEmailStatus('送信対象のメールアドレスがありません。メール通知ONのユーザーを確認してください。');
+      setBroadcastEmailStatus('送信対象のメールアドレスがありません。登録メールアドレスを確認してください。');
       return;
     }
     setBroadcastEmailStatus('送信中です...');
     const result = await sendDirectEmail(recipients, broadcastSubject || 'Leap運営からのお知らせ', broadcastEmailBody);
     if (result.ok) {
-      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。`);
+      const failedText = result.failed ? `（${result.failed}件は失敗）` : '';
+      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。${failedText}${result.error ? `\n${result.error}` : ''}`);
       setBroadcastEmailBody('');
       return;
     }
@@ -1674,7 +1675,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <button className="primary mt-3 w-full" onClick={sendBroadcastMessage}>全ユーザーへメッセージ送信</button>
         <Input label="メール件名" value={broadcastSubject} onChange={setBroadcastSubject} />
         <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">登録メールアドレスへの一斉DM<textarea className="field min-h-24 resize-none" value={broadcastEmailBody} onChange={(event) => setBroadcastEmailBody(event.target.value)} /></label>
-        <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>メール通知ONのユーザーへ一斉メール送信</button>
+        <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>登録メールアドレスへ一斉メール送信</button>
         {broadcastEmailStatus && <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-6 text-slate-600">{broadcastEmailStatus}</p>}
       </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
