@@ -562,6 +562,7 @@ export default function LeapApp() {
 
   const accountsWithAdmin = useMemo(() => withAdminAccount(accounts).filter((account) => !account.isDeleted), [accounts]);
   const visibleAccounts = useMemo(() => accountsWithAdmin.filter((account) => account.id === currentAccountId || account.id === adminAccount.id || !account.isHidden), [accountsWithAdmin, currentAccountId]);
+  const discoverableAccounts = useMemo(() => visibleAccounts.filter((account) => account.role !== 'investor' && account.id !== adminAccount.id), [visibleAccounts]);
   const currentAccount = accountsWithAdmin.find((account) => account.id === currentAccountId) ?? accountsWithAdmin.find((account) => authenticatedEmail && account.email.trim().toLowerCase() === authenticatedEmail) ?? null;
   const selectedAccount = accountsWithAdmin.find((account) => account.id === selectedAccountId) ?? currentAccount;
   const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
@@ -575,19 +576,22 @@ export default function LeapApp() {
     return { ...post, actionUserIds, likes: actionUserIds.likes.length, saves: actionUserIds.saves.length, meetings: actionUserIds.meetings.length };
   }), posts).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [posts, systemPostActions, systemPosts]);
 
-  const visiblePosts = useMemo(() => allPosts.filter((post) => visibleAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, visibleAccounts]);
+  const visiblePosts = useMemo(() => allPosts.filter((post) => discoverableAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, discoverableAccounts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'investor');
     if (feedTab === 'entrepreneurs') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'entrepreneur');
     return visiblePosts;
   }, [currentFollowing, feedTab, visibleAccounts, visiblePosts]);
+  useEffect(() => {
+    if (feedTab === 'investors') setFeedTab('recommended');
+  }, [feedTab]);
 
   const searchResults = useMemo(() => {
     const text = query.trim().toLowerCase();
-    if (!text) return visibleAccounts;
-    return visibleAccounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
-  }, [query, visibleAccounts]);
+    if (!text) return discoverableAccounts;
+    return discoverableAccounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
+  }, [query, discoverableAccounts]);
 
   function flash(body: string) {
     setToast(body);
@@ -914,7 +918,7 @@ export default function LeapApp() {
 
         <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
-            <FeedPage posts={feedPosts} accounts={visibleAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'search' && <SearchPage query={query} setQuery={setQuery} results={searchResults} openProfile={openProfile} />}
           {page === 'notifications' && <NotificationsPage notices={notices} currentAccount={currentAccount} setNotices={setNotices} />}
@@ -1029,11 +1033,10 @@ function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPa
 function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   return (
     <div>
-      <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
+      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
         {[
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
-          ['investors', '投資家'],
           ['entrepreneurs', '起業家'],
         ].map(([key, label]) => <button key={key} className={`py-2.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
       </div>
@@ -1063,7 +1066,16 @@ function SearchPage({ query, setQuery, results, openProfile }: { query: string; 
   const [industry, setIndustry] = useState('');
   const [stage, setStage] = useState('');
   const [location, setLocation] = useState('');
-  const filtered = results.filter((account) => (!role || account.role === role) && (!industry || account.industry === industry) && (!stage || account.stage === stage) && (!location || account.location === location));
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const toggleType = (type: string) => setSelectedTypes((types) => types.includes(type) ? types.filter((item) => item !== type) : [...types, type]);
+  const typeMatched = (account: Account) => {
+    if (selectedTypes.length === 0) return true;
+    if (selectedTypes.includes('起業家') && account.role === 'entrepreneur') return true;
+    if (selectedTypes.includes('案件') && account.role === 'entrepreneur') return true;
+    if (selectedTypes.includes('投稿')) return true;
+    return false;
+  };
+  const filtered = results.filter((account) => typeMatched(account) && (!role || account.role === role) && (!industry || account.industry === industry) && (!stage || account.stage === stage) && (!location || account.location === location));
   return (
     <div className="p-4">
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3">
@@ -1071,15 +1083,18 @@ function SearchPage({ query, setQuery, results, openProfile }: { query: string; 
         <input className="min-w-0 flex-1 text-sm outline-none" placeholder="アカウント名、会社名、業界で検索" value={query} onChange={(event) => setQuery(event.target.value)} />
       </div>
       <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] font-bold">
-        {['起業家', '投資家', '案件', '投稿'].map((item) => <button className="rounded-full bg-slate-50 px-2 py-2" key={item}>{item}</button>)}
+        {['起業家', '投資家', '案件', '投稿'].map((item) => {
+          const active = selectedTypes.includes(item);
+          return <button className={`rounded-full px-2 py-2 ${active ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-600'}`} key={item} onClick={() => toggleType(item)}>{item}</button>;
+        })}
       </div>
       <div className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">高度な検索</h2>
-        <Select label="ユーザー種別" value={role} options={['entrepreneur', 'investor']} displayMap={{ entrepreneur: '起業家', investor: '投資家' }} onChange={setRole} />
+        <Select label="ユーザー種別" value={role} options={['entrepreneur']} displayMap={{ entrepreneur: '起業家' }} onChange={setRole} />
         <Select label="業界" value={industry} options={industries} onChange={setIndustry} />
         <Select label="フェーズ" value={stage} options={stages} onChange={setStage} />
         <Select label="地域" value={location} options={locations} onChange={setLocation} />
-        <button className="secondary mt-3 w-full" onClick={() => { setRole(''); setIndustry(''); setStage(''); setLocation(''); }}>条件をクリア</button>
+        <button className="secondary mt-3 w-full" onClick={() => { setRole(''); setIndustry(''); setStage(''); setLocation(''); setSelectedTypes([]); }}>条件をクリア</button>
       </div>
       <h2 className="mt-6 text-sm font-black">検索結果</h2>
       {filtered.length === 0 ? (
@@ -1722,14 +1737,14 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
-      <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} />
+      <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} compact={tab !== 'overview'} />
       <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
         <button className={`py-3 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
         <button className={`py-3 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
         <button className={`py-3 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
       </div>
       {tab === 'overview' && (
-        <div className="p-4">
+        <div className="px-4 py-3">
           <KpiGrid account={account} />
           <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
           {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
@@ -1865,13 +1880,13 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   );
 }
 
-function ProfileHero({ account, accounts, isMine, posts, setPage }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void }) {
+function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean }) {
   const normalized = normalizeAccount(account);
   const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
   return (
-    <section className="rounded-3xl border border-slate-100 p-4">
+    <section className={compact ? 'border-b border-slate-100 px-4 py-3' : 'rounded-3xl border border-slate-100 p-4'}>
       <div className="flex items-start gap-4">
         <Avatar account={account} size="lg" />
         <div className="min-w-0 flex-1">
@@ -1880,16 +1895,20 @@ function ProfileHero({ account, accounts, isMine, posts, setPage }: { account: A
           <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
         </div>
       </div>
-      <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
-      {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
-      <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{followings.length}</b> フォロー</span><span><b>{followers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
-      {canShowSocialGraph ? (
-        <div className="mt-3 grid gap-2 text-xs text-slate-600">
-          <p><b>フォロー：</b>{followings.length ? followings.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
-          <p><b>フォロワー：</b>{followers.length ? followers.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
-        </div>
-      ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
+      {!compact && (
+        <>
+          <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
+          {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
+          <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
+          <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{followings.length}</b> フォロー</span><span><b>{followers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+          {canShowSocialGraph ? (
+            <div className="mt-3 grid gap-2 text-xs text-slate-600">
+              <p><b>フォロー：</b>{followings.length ? followings.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
+              <p><b>フォロワー：</b>{followers.length ? followers.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
+            </div>
+          ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
+        </>
+      )}
     </section>
   );
 }
