@@ -1097,7 +1097,12 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
         <button className={`py-2.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
-        <EmptyState icon={<Bell size={28} />} title={tab === 'unread' ? '未読通知はありません' : '通知はまだありません'} body="フォロー、コメント、面談申込、メッセージが届くと表示されます。" />
+        <div className="px-3 py-3">
+          <div className="rounded-2xl bg-slate-50 px-4 py-4">
+            <p className="text-sm font-black text-slate-700">{tab === 'unread' ? '未読通知はありません' : '通知はまだありません'}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-slate-500">フォロー、コメント、面談申込、メッセージが届くと表示されます。</p>
+          </div>
+        </div>
       ) : (
         <div className="divide-y divide-slate-100">
           {visibleNotices.map((notice) => (
@@ -1131,7 +1136,34 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
   const [attachment, setAttachment] = useState<{ name: string; url: string; type: 'image' | 'file' } | undefined>();
   const directPartners = accounts.filter((account) => account.id !== currentAccount?.id);
   const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.senderId === currentAccount?.id ? message.recipientId || message.partnerId : message.senderId || message.partnerId));
-  const partners = mode === 'meeting' ? directPartners.filter((account) => approvedPartnerIds.has(account.id)) : directPartners;
+  const unreadMessageIds = new Set(messages.filter((message) => {
+    const fromOther = message.senderId ? message.recipientId === currentAccount?.id : !message.mine;
+    return fromOther && !readMessageIds.includes(message.id);
+  }).map((message) => message.id));
+  const getPartnerStats = (partner: Account) => {
+    const related = messages.filter((message) => {
+      if (message.kind !== mode) return false;
+      if (message.senderId || message.recipientId) {
+        return (message.senderId === currentAccount?.id && message.recipientId === partner.id) || (message.senderId === partner.id && message.recipientId === currentAccount?.id);
+      }
+      return message.partnerId === partner.id;
+    });
+    const unreadCount = related.filter((message) => {
+      const fromPartner = message.senderId ? message.senderId === partner.id && message.recipientId === currentAccount?.id : !message.mine;
+      return fromPartner && unreadMessageIds.has(message.id);
+    }).length;
+    const latestAt = related.reduce((latest, message) => Math.max(latest, new Date(message.createdAt).getTime()), 0);
+    return { unreadCount, messageCount: related.length, latestAt };
+  };
+  const basePartners = mode === 'meeting' ? directPartners.filter((account) => approvedPartnerIds.has(account.id)) : directPartners;
+  const partners = [...basePartners].sort((a, b) => {
+    const aStats = getPartnerStats(a);
+    const bStats = getPartnerStats(b);
+    if (aStats.unreadCount !== bStats.unreadCount) return bStats.unreadCount - aStats.unreadCount;
+    if (aStats.messageCount !== bStats.messageCount) return bStats.messageCount - aStats.messageCount;
+    if (aStats.latestAt !== bStats.latestAt) return bStats.latestAt - aStats.latestAt;
+    return (a.accountName || a.name).localeCompare(b.accountName || b.name, 'ja');
+  });
   const activePartner = selectedAccount && selectedAccount.id !== currentAccount?.id && partners.some((partner) => partner.id === selectedAccount.id) ? selectedAccount : partners[0] ?? null;
   const isThreadMessage = (message: DirectMessage) => {
     if (!activePartner) return false;
@@ -1141,14 +1173,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
     return message.partnerId === activePartner.id && message.kind === mode;
   };
   const thread = activePartner ? messages.filter(isThreadMessage).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
-  const unreadMessageIds = new Set(messages.filter((message) => {
-    const fromOther = message.senderId ? message.recipientId === currentAccount?.id : !message.mine;
-    return fromOther && !readMessageIds.includes(message.id);
-  }).map((message) => message.id));
-  const hasUnreadFromPartner = (partner: Account) => messages.some((message) => {
-    const fromPartner = message.senderId ? message.senderId === partner.id && message.recipientId === currentAccount?.id : message.partnerId === partner.id && !message.mine;
-    return message.kind === mode && fromPartner && unreadMessageIds.has(message.id);
-  });
+  const hasUnreadFromPartner = (partner: Account) => getPartnerStats(partner).unreadCount > 0;
   useEffect(() => {
     if (!activePartner || thread.length === 0) return;
     const incomingIds = thread.filter((message) => message.senderId ? message.senderId === activePartner.id && message.recipientId === currentAccount?.id : !message.mine).map((message) => message.id);
