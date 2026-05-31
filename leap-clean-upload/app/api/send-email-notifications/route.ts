@@ -22,7 +22,7 @@ type QueueRow = {
 export async function POST() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendApiKey = (process.env.RESEND_API_KEY ?? '').trim().replace(/^Bearer\s+/i, '').replace(/^Value\s+/i, '');
   const fromEmail = process.env.NOTIFICATION_FROM_EMAIL ?? 'Leap <no-reply@leap-club.jp>';
 
   if (!supabaseUrl || !serviceRoleKey || !resendApiKey) {

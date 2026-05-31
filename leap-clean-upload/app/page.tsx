@@ -363,6 +363,20 @@ function normalizeAccount(account: Account): Account {
   };
 }
 
+function displayAccountName(account?: Account | null): string {
+  if (!account) return 'アカウント未設定';
+  const candidates = [account.accountName, account.name, account.company, account.email?.split('@')[0]];
+  const name = candidates.find((value) => {
+    const text = (value || '').trim();
+    return text && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text);
+  });
+  return name || 'アカウント未設定';
+}
+
+function replaceAccountIds(text: string, accounts: Account[]): string {
+  return accounts.reduce((body, account) => body.replaceAll(account.id, displayAccountName(account)), text);
+}
+
 async function loadCloudState(): Promise<LeapCloudState | null> {
   const supabase = createSupabaseBrowserClient();
   if (!supabase) return null;
@@ -401,7 +415,7 @@ function withAdminAccount(accounts: Account[]): Account[] {
   return [adminAccount, ...aiAccounts, ...normalized];
 }
 
-async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number }> {
+async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number; failed?: number }> {
   const recipients = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
   if (recipients.length === 0) return { ok: false, error: '送信先メールアドレスがありません。' };
   try {
@@ -412,7 +426,7 @@ async function sendDirectEmail(to: string | string[], subject: string, body: str
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) return { ok: false, error: result.error || `メール送信に失敗しました。status=${response.status}` };
-    return { ok: true, sent: result.sent ?? recipients.length };
+    return { ok: true, sent: result.sent ?? recipients.length, failed: result.failed, error: result.error };
   } catch {
     return { ok: false, error: 'メール送信APIに接続できませんでした。' };
   }
@@ -548,6 +562,7 @@ export default function LeapApp() {
 
   const accountsWithAdmin = useMemo(() => withAdminAccount(accounts).filter((account) => !account.isDeleted), [accounts]);
   const visibleAccounts = useMemo(() => accountsWithAdmin.filter((account) => account.id === currentAccountId || account.id === adminAccount.id || !account.isHidden), [accountsWithAdmin, currentAccountId]);
+  const discoverableAccounts = useMemo(() => visibleAccounts.filter((account) => account.role !== 'investor' && account.id !== adminAccount.id), [visibleAccounts]);
   const currentAccount = accountsWithAdmin.find((account) => account.id === currentAccountId) ?? accountsWithAdmin.find((account) => authenticatedEmail && account.email.trim().toLowerCase() === authenticatedEmail) ?? null;
   const selectedAccount = accountsWithAdmin.find((account) => account.id === selectedAccountId) ?? currentAccount;
   const isAdmin = currentAccount?.email.trim().toLowerCase() === adminEmail;
@@ -561,19 +576,22 @@ export default function LeapApp() {
     return { ...post, actionUserIds, likes: actionUserIds.likes.length, saves: actionUserIds.saves.length, meetings: actionUserIds.meetings.length };
   }), posts).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [posts, systemPostActions, systemPosts]);
 
-  const visiblePosts = useMemo(() => allPosts.filter((post) => visibleAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, visibleAccounts]);
+  const visiblePosts = useMemo(() => allPosts.filter((post) => discoverableAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, discoverableAccounts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'investor');
     if (feedTab === 'entrepreneurs') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'entrepreneur');
     return visiblePosts;
   }, [currentFollowing, feedTab, visibleAccounts, visiblePosts]);
+  useEffect(() => {
+    if (feedTab === 'investors') setFeedTab('recommended');
+  }, [feedTab]);
 
   const searchResults = useMemo(() => {
     const text = query.trim().toLowerCase();
-    if (!text) return visibleAccounts;
-    return visibleAccounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
-  }, [query, visibleAccounts]);
+    if (!text) return discoverableAccounts;
+    return discoverableAccounts.filter((account) => `${account.accountName} ${account.name} ${account.company} ${account.industry} ${account.location}`.toLowerCase().includes(text));
+  }, [query, discoverableAccounts]);
 
   function flash(body: string) {
     setToast(body);
@@ -748,14 +766,14 @@ export default function LeapApp() {
       flash('AI運用アカウントは面談を受け付けていません');
       return;
     }
-    const body = `${currentAccount?.accountName || currentAccount?.name || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
+    const body = `${displayAccountName(currentAccount) || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
     setMessages((list) => [
       { id: crypto.randomUUID(), partnerId: account.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body: '面談申請を送信しました。相手が承認すると面談メッセージに移行できます。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'requested' },
       { id: crypto.randomUUID(), partnerId: currentAccount!.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body, createdAt: new Date().toISOString(), mine: false, meetingStatus: 'requested' },
       ...list,
     ]);
-    setNotices((list) => [{ id: crypto.randomUUID(), body: `${account.accountName || account.name}へ面談申請を送信しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
-    if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: 面談希望が届きました', `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんから面談希望が届きました。`);
+    setNotices((list) => [{ id: crypto.randomUUID(), body: `${displayAccountName(account)}へ面談申請を送信しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+    if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: 面談希望が届きました', `${displayAccountName(currentAccount)}さんから面談希望が届きました。`);
     setSelectedAccountId(account.id);
     setMessageMode('direct');
     setPage('messages');
@@ -813,7 +831,7 @@ export default function LeapApp() {
     };
     setMeetingApplications((list) => [application, ...list]);
     setMessages((list) => [{ id: crypto.randomUUID(), partnerId: partner.id, kind: 'meeting', body: `面談日時を管理者に申請しました：${formatDate(scheduledAt)}`, createdAt: new Date().toISOString(), mine: true }, ...list]);
-    setNotices((list) => [{ id: crypto.randomUUID(), body: `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんが面談日時を管理者に申請しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+    setNotices((list) => [{ id: crypto.randomUUID(), body: `${displayAccountName(currentAccount)}さんが面談日時を管理者に申請しました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
     flash('面談日時を管理者へ申請しました');
   }
 
@@ -848,6 +866,10 @@ export default function LeapApp() {
       return normalizeAccount(item);
     }));
     setFollowing(nextFollowing);
+    if (!alreadyFollowing) {
+      setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: `${displayAccountName(currentAccount)}さんにフォローされました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+      if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: フォローされました', `${displayAccountName(currentAccount)}さんがあなたをフォローしました。`);
+    }
     flash(alreadyFollowing ? 'フォロー解除しました' : 'フォローしました');
   }
 
@@ -867,7 +889,7 @@ export default function LeapApp() {
       mine: false,
     } : null;
     setMessages((list) => autoReply ? [autoReply, newMessage, ...list] : [newMessage, ...list]);
-    if (partner.emailNotificationsEnabled) void sendDirectEmail(partner.email, 'Leap: メッセージが届きました', `${currentAccount?.accountName || currentAccount?.name || 'ユーザー'}さんからメッセージが届きました。\n\n${messageDraft.trim()}`);
+    if (partner.emailNotificationsEnabled) void sendDirectEmail(partner.email, 'Leap: メッセージが届きました', `${displayAccountName(currentAccount)}さんからメッセージが届きました。\n\n${messageDraft.trim()}`);
     setMessageDraft('');
     flash('メッセージを送信しました');
   }
@@ -900,7 +922,7 @@ export default function LeapApp() {
 
         <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:pb-6">
           {page === 'feed' && (
-            <FeedPage posts={feedPosts} accounts={visibleAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'search' && <SearchPage query={query} setQuery={setQuery} results={searchResults} openProfile={openProfile} />}
           {page === 'notifications' && <NotificationsPage notices={notices} currentAccount={currentAccount} setNotices={setNotices} />}
@@ -937,7 +959,7 @@ export default function LeapApp() {
               readFileAsDataUrl(file, setPostImageUrl);
             }} />
           </label>
-          {postImageUrl && <img src={postImageUrl} alt={postImageName} className="mt-3 aspect-video w-full rounded-2xl object-cover" />}
+          {postImageUrl && <img src={postImageUrl} alt={postImageName} className="mt-3 aspect-square w-full rounded-2xl object-cover" />}
           <input className="field mt-3" placeholder="添付ファイル名" value={postAttachment} onChange={(event) => setPostAttachment(event.target.value)} />
           <button className="primary mt-4 w-full" onClick={submitPost}>投稿する</button>
         </Modal>
@@ -1015,11 +1037,10 @@ function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPa
 function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   return (
     <div>
-      <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
+      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
         {[
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
-          ['investors', '投資家'],
           ['entrepreneurs', '起業家'],
         ].map(([key, label]) => <button key={key} className={`py-2.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
       </div>
@@ -1028,7 +1049,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
           投稿する
         </button>
-        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{account.accountName || account.name}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
+        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
       </div>
       {posts.length === 0 ? (
         <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
@@ -1049,7 +1070,16 @@ function SearchPage({ query, setQuery, results, openProfile }: { query: string; 
   const [industry, setIndustry] = useState('');
   const [stage, setStage] = useState('');
   const [location, setLocation] = useState('');
-  const filtered = results.filter((account) => (!role || account.role === role) && (!industry || account.industry === industry) && (!stage || account.stage === stage) && (!location || account.location === location));
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const toggleType = (type: string) => setSelectedTypes((types) => types.includes(type) ? types.filter((item) => item !== type) : [...types, type]);
+  const typeMatched = (account: Account) => {
+    if (selectedTypes.length === 0) return true;
+    if (selectedTypes.includes('起業家') && account.role === 'entrepreneur') return true;
+    if (selectedTypes.includes('案件') && account.role === 'entrepreneur') return true;
+    if (selectedTypes.includes('投稿')) return true;
+    return false;
+  };
+  const filtered = results.filter((account) => typeMatched(account) && (!role || account.role === role) && (!industry || account.industry === industry) && (!stage || account.stage === stage) && (!location || account.location === location));
   return (
     <div className="p-4">
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-3">
@@ -1057,15 +1087,18 @@ function SearchPage({ query, setQuery, results, openProfile }: { query: string; 
         <input className="min-w-0 flex-1 text-sm outline-none" placeholder="アカウント名、会社名、業界で検索" value={query} onChange={(event) => setQuery(event.target.value)} />
       </div>
       <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] font-bold">
-        {['起業家', '投資家', '案件', '投稿'].map((item) => <button className="rounded-full bg-slate-50 px-2 py-2" key={item}>{item}</button>)}
+        {['起業家', '投資家', '案件', '投稿'].map((item) => {
+          const active = selectedTypes.includes(item);
+          return <button className={`rounded-full px-2 py-2 ${active ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-600'}`} key={item} onClick={() => toggleType(item)}>{item}</button>;
+        })}
       </div>
       <div className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">高度な検索</h2>
-        <Select label="ユーザー種別" value={role} options={['entrepreneur', 'investor']} displayMap={{ entrepreneur: '起業家', investor: '投資家' }} onChange={setRole} />
+        <Select label="ユーザー種別" value={role} options={['entrepreneur']} displayMap={{ entrepreneur: '起業家' }} onChange={setRole} />
         <Select label="業界" value={industry} options={industries} onChange={setIndustry} />
         <Select label="フェーズ" value={stage} options={stages} onChange={setStage} />
         <Select label="地域" value={location} options={locations} onChange={setLocation} />
-        <button className="secondary mt-3 w-full" onClick={() => { setRole(''); setIndustry(''); setStage(''); setLocation(''); }}>条件をクリア</button>
+        <button className="secondary mt-3 w-full" onClick={() => { setRole(''); setIndustry(''); setStage(''); setLocation(''); setSelectedTypes([]); }}>条件をクリア</button>
       </div>
       <h2 className="mt-6 text-sm font-black">検索結果</h2>
       {filtered.length === 0 ? (
@@ -1134,6 +1167,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
   const [meetingDate, setMeetingDate] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
   const [attachment, setAttachment] = useState<{ name: string; url: string; type: 'image' | 'file' } | undefined>();
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const directPartners = accounts.filter((account) => account.id !== currentAccount?.id);
   const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.senderId === currentAccount?.id ? message.recipientId || message.partnerId : message.senderId || message.partnerId));
   const unreadMessageIds = new Set(messages.filter((message) => {
@@ -1162,7 +1196,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
     if (aStats.unreadCount !== bStats.unreadCount) return bStats.unreadCount - aStats.unreadCount;
     if (aStats.messageCount !== bStats.messageCount) return bStats.messageCount - aStats.messageCount;
     if (aStats.latestAt !== bStats.latestAt) return bStats.latestAt - aStats.latestAt;
-    return (a.accountName || a.name).localeCompare(b.accountName || b.name, 'ja');
+  return displayAccountName(a).localeCompare(displayAccountName(b), 'ja');
   });
   const activePartner = selectedAccount && selectedAccount.id !== currentAccount?.id && partners.some((partner) => partner.id === selectedAccount.id) ? selectedAccount : partners[0] ?? null;
   const isThreadMessage = (message: DirectMessage) => {
@@ -1194,7 +1228,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
       </div>
       <div className="min-w-0 overflow-x-auto border-b border-slate-100 px-4 py-3 [scrollbar-width:thin]">
         <div className="flex w-max min-w-full gap-3">
-        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{partner.accountName || partner.name}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
+        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{displayAccountName(partner)}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
         </div>
       </div>
       {!activePartner ? (
@@ -1202,7 +1236,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
       ) : (
         <div className="overflow-y-auto px-4 py-4">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{activePartner.accountName || activePartner.name} {activePartner.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
+            <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{displayAccountName(activePartner)} {activePartner.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
             {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{activePartner.isBot ? '面談不可' : outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
           </div>
           {mode === 'direct' && incomingRequested && !hasApproved && <div className="mb-3 grid grid-cols-2 gap-2"><button className="primary" onClick={() => approveMeeting(activePartner)}>承認</button><button className="secondary text-rose-600" onClick={() => rejectMeeting(activePartner)}>非承認</button></div>}
@@ -1220,7 +1254,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
           )}
           {thread.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">まだやり取りはありません。</p> : thread.map((message) => {
             const mine = message.senderId ? message.senderId === currentAccount?.id : message.mine;
-            return <div key={message.id} className={`mb-3 flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body && <p>{message.body}</p>}{message.attachmentUrl && (message.attachmentType === 'image' ? <img src={message.attachmentUrl} alt={message.attachmentName || '添付画像'} className="mt-2 max-h-52 rounded-xl object-cover" /> : <a className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-black text-blue-600" href={message.attachmentUrl} download={message.attachmentName}><Paperclip size={14} />{message.attachmentName || '添付ファイル'}</a>)}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></div></div>;
+            return <div key={message.id} className={`mb-3 flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm ${mine ? 'bg-[#050816] text-white' : 'bg-slate-100'}`}>{message.body && <p>{replaceAccountIds(message.body, accounts)}</p>}{message.attachmentUrl && (message.attachmentType === 'image' ? <button className="mt-2 block" onClick={() => setPreviewImage({ url: message.attachmentUrl!, name: message.attachmentName || '添付画像' })}><img src={message.attachmentUrl} alt={message.attachmentName || '添付画像'} className="aspect-square w-44 max-w-full rounded-xl object-cover" /></button> : <a className="mt-2 flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-black text-blue-600" href={message.attachmentUrl} download={message.attachmentName}><Paperclip size={14} />{message.attachmentName || '添付ファイル'}</a>)}<span className="mt-1 block text-[10px] opacity-60">{formatDate(message.createdAt)}</span></div></div>;
           })}
         </div>
       )}
@@ -1239,6 +1273,11 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
         <button className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#050816] text-white disabled:opacity-30" disabled={!activePartner || (!draft.trim() && !attachment)} onClick={() => { sendMessage(activePartner, mode, attachment); setAttachment(undefined); }}><Send size={18} /></button>
         </div>
       </div>
+      {previewImage && (
+        <Modal title={previewImage.name} onClose={() => setPreviewImage(null)}>
+          <img src={previewImage.url} alt={previewImage.name} className="max-h-[70vh] w-full rounded-2xl object-contain" />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -1600,15 +1639,16 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   }
   async function sendBroadcastEmail() {
     if (!broadcastEmailBody.trim()) return;
-    const recipients = Array.from(new Set(activeUsers.filter((account) => account.emailNotificationsEnabled && account.email.includes('@')).map((account) => account.email.trim())));
+    const recipients = Array.from(new Set(activeUsers.filter((account) => account.email.includes('@')).map((account) => account.email.trim())));
     if (recipients.length === 0) {
-      setBroadcastEmailStatus('送信対象のメールアドレスがありません。メール通知ONのユーザーを確認してください。');
+      setBroadcastEmailStatus('送信対象のメールアドレスがありません。登録メールアドレスを確認してください。');
       return;
     }
     setBroadcastEmailStatus('送信中です...');
     const result = await sendDirectEmail(recipients, broadcastSubject || 'Leap運営からのお知らせ', broadcastEmailBody);
     if (result.ok) {
-      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。`);
+      const failedText = result.failed ? `（${result.failed}件は失敗）` : '';
+      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。${failedText}${result.error ? `\n${result.error}` : ''}`);
       setBroadcastEmailBody('');
       return;
     }
@@ -1674,7 +1714,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <button className="primary mt-3 w-full" onClick={sendBroadcastMessage}>全ユーザーへメッセージ送信</button>
         <Input label="メール件名" value={broadcastSubject} onChange={setBroadcastSubject} />
         <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">登録メールアドレスへの一斉DM<textarea className="field min-h-24 resize-none" value={broadcastEmailBody} onChange={(event) => setBroadcastEmailBody(event.target.value)} /></label>
-        <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>メール通知ONのユーザーへ一斉メール送信</button>
+        <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>登録メールアドレスへ一斉メール送信</button>
         {broadcastEmailStatus && <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-6 text-slate-600">{broadcastEmailStatus}</p>}
       </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
@@ -1701,14 +1741,14 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
-      <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} />
+      <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} compact={tab !== 'overview'} />
       <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
         <button className={`py-3 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
         <button className={`py-3 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
         <button className={`py-3 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
       </div>
       {tab === 'overview' && (
-        <div className="p-4">
+        <div className="px-4 py-3">
           <KpiGrid account={account} />
           <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
           {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
@@ -1769,6 +1809,7 @@ function MatchingPage({ accounts, openProfile, requestMeeting }: { accounts: Acc
 
 function PostCard({ post, author, currentAccount, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { post: Post; author?: Account; currentAccount: Account | null; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState(false);
   const isOwner = Boolean(currentAccount && currentAccount.id === post.authorId);
   const actions = post.actionUserIds ?? { likes: [], saves: [], meetings: [] };
   const liked = currentAccount ? actions.likes?.includes(currentAccount.id) : false;
@@ -1780,7 +1821,7 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
         <button className="flex min-w-0 flex-1 gap-3 text-left" onClick={() => author && openProfile(author)}>
         {author ? <Avatar account={author} /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
         <span className="min-w-0 flex-1">
-          <b className="block truncate text-sm">{author?.accountName || author?.name || 'アカウント未設定'} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
+          <b className="block truncate text-sm">{displayAccountName(author)} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
           <span className="text-[11px] text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
         </span>
         </button>
@@ -1796,7 +1837,7 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
       {menuOpen && !isOwner && <div className="absolute right-4 top-12 z-20 rounded-2xl border border-slate-100 bg-white p-3 text-xs font-bold text-slate-500 shadow-xl">投稿者のみ操作できます</div>}
       <p className="mt-3 whitespace-pre-line text-sm leading-7">{post.body}</p>
       {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
-      {post.imageUrl && <img className="mt-3 aspect-video w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} />}
+      {post.imageUrl && <button className="mt-3 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
       {post.attachmentName && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black">
         <button className={`rounded-xl border py-2 ${liked ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-100 text-rose-600'}`} onClick={() => reactToPost(post.id, 'like')}><Heart className="mx-auto mb-1" size={16} />応援 {post.likes}</button>
@@ -1804,6 +1845,11 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
         <button className={`rounded-xl border py-2 ${meetingRequested ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-100 text-blue-600'}`} onClick={() => reactToPost(post.id, 'meeting')}><UsersRound className="mx-auto mb-1" size={16} />面談 {post.meetings}</button>
       </div>
       <p className="mt-2 text-right text-[10px] text-slate-400">閲覧 {post.views} 回</p>
+      {previewImage && (
+        <Modal title={post.imageName || '投稿画像'} onClose={() => setPreviewImage(false)}>
+          <img className="max-h-[70vh] w-full rounded-2xl object-contain" src={post.imageUrl} alt={post.imageName || '投稿画像'} />
+        </Modal>
+      )}
     </article>
   );
 }
@@ -1838,13 +1884,15 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   );
 }
 
-function ProfileHero({ account, accounts, isMine, posts, setPage }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void }) {
+function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean }) {
   const normalized = normalizeAccount(account);
   const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
+  const visibleFollowings = isMine ? followings : followings.filter((item) => item.role !== 'investor');
+  const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
   const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
   return (
-    <section className="rounded-3xl border border-slate-100 p-4">
+    <section className={compact ? 'border-b border-slate-100 px-4 py-3' : 'rounded-3xl border border-slate-100 p-4'}>
       <div className="flex items-start gap-4">
         <Avatar account={account} size="lg" />
         <div className="min-w-0 flex-1">
@@ -1853,17 +1901,44 @@ function ProfileHero({ account, accounts, isMine, posts, setPage }: { account: A
           <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
         </div>
       </div>
-      <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
-      {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
-      <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-      <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{followings.length}</b> フォロー</span><span><b>{followers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
-      {canShowSocialGraph ? (
-        <div className="mt-3 grid gap-2 text-xs text-slate-600">
-          <p><b>フォロー：</b>{followings.length ? followings.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
-          <p><b>フォロワー：</b>{followers.length ? followers.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
-        </div>
-      ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
+      {!compact && (
+        <>
+          <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
+          {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
+          <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
+          <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{visibleFollowings.length}</b> フォロー</span><span><b>{visibleFollowers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+          {canShowSocialGraph ? (
+            <div className="mt-3 grid gap-3 text-xs text-slate-600">
+              <SocialList title="フォロー" accounts={visibleFollowings} />
+              <SocialList title="フォロワー" accounts={visibleFollowers} />
+            </div>
+          ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
+        </>
+      )}
     </section>
+  );
+}
+
+function SocialList({ title, accounts }: { title: string; accounts: Account[] }) {
+  return (
+    <div>
+      <p className="font-black text-slate-700">{title}</p>
+      {accounts.length === 0 ? (
+        <p className="mt-1 text-slate-500">なし</p>
+      ) : (
+        <div className="mt-2 grid gap-2">
+          {accounts.map((account) => (
+            <div key={account.id} className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+              <Avatar account={account} />
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-xs text-slate-800">{displayAccountName(account)}</b>
+                <span className="text-[10px] font-bold text-slate-500">{account.role === 'investor' ? '投資家' : '起業家'} / {account.company || '会社名未設定'}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1891,7 +1966,7 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
   return (
     <button className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3 text-left" onClick={onClick}>
       <Avatar account={account} />
-      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{account.accountName || account.company || account.name} {account.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
+      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{displayAccountName(account)} {account.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
       <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">{account.location || '地域未入力'}</span>
     </button>
   );
@@ -1899,8 +1974,8 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
 
 function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'lg'; active?: boolean }) {
   const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : 'h-11 w-11 text-sm';
-  const label = account.avatarLabel || account.accountName?.slice(0, 1) || account.name?.slice(0, 1) || 'L';
-  return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={account.accountName || 'avatar'} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
+  const label = account.avatarLabel || displayAccountName(account).slice(0, 1) || 'L';
+  return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {

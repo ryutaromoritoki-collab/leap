@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendApiKey = (process.env.RESEND_API_KEY ?? '').trim().replace(/^Bearer\s+/i, '').replace(/^Value\s+/i, '');
   const fromEmail = process.env.NOTIFICATION_FROM_EMAIL ?? 'Leap <no-reply@leap-club.jp>';
   const { to, subject, body } = await request.json().catch(() => ({ to: '', subject: '', body: '' }));
-  const recipients = (Array.isArray(to) ? to : [to]).filter((email) => typeof email === 'string' && email.includes('@'));
+  const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map((email) => typeof email === 'string' ? email.trim() : '').filter((email) => email.includes('@'))));
 
   if (!resendApiKey) {
     return NextResponse.json({ error: 'RESEND_API_KEYをVercelに設定してください。' }, { status: 500 });
@@ -16,9 +16,8 @@ export async function POST(request: Request) {
   }
 
   let sent = 0;
-  const errors: string[] = [];
-  for (let index = 0; index < recipients.length; index += 50) {
-    const chunk = recipients.slice(index, index + 50);
+  const errors: Array<{ email: string; error: string }> = [];
+  for (const recipient of recipients) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -27,20 +26,31 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         from: fromEmail,
-        to: chunk,
+        to: [recipient],
         subject,
         text: `${body}\n\nLeapを開く: https://leap-club.jp`,
       }),
     });
 
     if (response.ok) {
-      sent += chunk.length;
+      sent += 1;
     } else {
-      errors.push(await response.text());
+      const raw = await response.text();
+      let message = raw;
+      try {
+        const parsed = JSON.parse(raw);
+        message = parsed.message || parsed.error || raw;
+      } catch {
+        message = raw;
+      }
+      errors.push({ email: recipient, error: message });
     }
   }
   if (errors.length > 0) {
-    return NextResponse.json({ error: errors.join('\n'), sent }, { status: 500 });
+    const detail = errors.slice(0, 5).map((item) => `${item.email}: ${item.error}`).join('\n');
+    const error = `${errors.length}件の送信に失敗しました。\n${detail}${errors.length > 5 ? '\nほかにも失敗があります。' : ''}`;
+    if (sent === 0) return NextResponse.json({ error, sent, failed: errors.length }, { status: 500 });
+    return NextResponse.json({ ok: true, sent, failed: errors.length, error });
   }
   return NextResponse.json({ ok: true, sent });
 }
