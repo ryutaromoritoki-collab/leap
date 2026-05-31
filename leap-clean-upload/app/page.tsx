@@ -424,6 +424,12 @@ function isSupabaseEmailConfirmed(user: { email_confirmed_at?: string | null; co
   return Boolean(user?.email_confirmed_at || user?.confirmed_at);
 }
 
+type SupabaseUserLike = {
+  id?: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+};
+
 export default function LeapApp() {
   const [page, setPage] = useState<Page>('feed');
   const [feedTab, setFeedTab] = useState<FeedTab>('recommended');
@@ -527,19 +533,8 @@ export default function LeapApp() {
         setAuthBootstrapped(true);
         return;
       }
-      const metadata = user.user_metadata ?? {};
-      const account: Account = {
-        ...emptyAccount,
-        id: user.id || crypto.randomUUID(),
-        role: metadata.role === 'investor' ? 'investor' : 'entrepreneur',
-        email: user.email,
-        phone: String(metadata.phone || ''),
-        password: '',
-        emailVerified: true,
-      };
-      setAccounts([...accounts, account]);
-      setCurrentAccountId(account.id);
-      setPage('profileEdit');
+      const synced = syncAuthenticatedAccount(user, 'entrepreneur', '');
+      setPage(synced.profileComplete ? 'feed' : 'profileEdit');
       flash('メール認証が完了しました。プロフィールを作成してください');
       setAuthBootstrapped(true);
     });
@@ -591,6 +586,33 @@ export default function LeapApp() {
       return false;
     }
     return true;
+  }
+
+  function syncAuthenticatedAccount(user: SupabaseUserLike, fallbackRole: Role, fallbackPhone: string) {
+    const email = user.email?.trim().toLowerCase() || '';
+    const metadata = user.user_metadata ?? {};
+    const metadataRole = metadata.role === 'investor' ? 'investor' : metadata.role === 'entrepreneur' ? 'entrepreneur' : fallbackRole;
+    const metadataPhone = String(metadata.phone || fallbackPhone || '');
+    const existing = accounts.find((account) => account.email.trim().toLowerCase() === email);
+    const id = existing?.id || user.id || crypto.randomUUID();
+    const nextAccount: Account = normalizeAccount({
+      ...emptyAccount,
+      ...existing,
+      id,
+      role: existing?.role || metadataRole,
+      email,
+      phone: existing?.phone || metadataPhone,
+      password: '',
+      emailVerified: true,
+    });
+    setAuthenticatedEmail(email);
+    setAccounts((list) => {
+      const index = list.findIndex((account) => account.email.trim().toLowerCase() === email || account.id === id);
+      if (index === -1) return [nextAccount, ...list];
+      return list.map((account, accountIndex) => accountIndex === index ? { ...normalizeAccount(account), ...nextAccount } : account);
+    });
+    setCurrentAccountId(id);
+    return { account: nextAccount, profileComplete: Boolean(nextAccount.accountName || nextAccount.name || nextAccount.company) };
   }
 
   function submitPost() {
@@ -858,6 +880,7 @@ export default function LeapApp() {
     if (supabase) await supabase.auth.signOut();
     setCurrentAccountId('');
     setSelectedAccountId('');
+    setAuthenticatedEmail('');
     setMenuOpen(false);
     setPage('auth');
     flash('ログアウトしました');
@@ -878,7 +901,7 @@ export default function LeapApp() {
           {page === 'messages' && (
             <MessagesPage accounts={visibleAccounts} currentAccount={currentAccount} selectedAccount={selectedAccount} messages={messages} meetingApplications={meetingApplications} mode={messageMode} setMode={setMessageMode} draft={messageDraft} setDraft={setMessageDraft} sendMessage={sendMessage} approveMeeting={approveMeeting} rejectMeeting={rejectMeeting} requestMeeting={requestMeeting} submitMeetingApplication={submitMeetingApplication} openProfile={openProfile} setSelectedAccountId={setSelectedAccountId} />
           )}
-          {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
+          {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} onAuthenticated={syncAuthenticatedAccount} />}
           {page === 'mypage' && (
             <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -1173,7 +1196,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
   );
 }
 
-function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }: { accounts: Account[]; setAccounts: (accounts: Account[]) => void; setCurrentAccountId: (id: string) => void; setPage: (page: Page) => void; flash: (message: string) => void }) {
+function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, onAuthenticated }: { accounts: Account[]; setAccounts: (accounts: Account[]) => void; setCurrentAccountId: (id: string) => void; setPage: (page: Page) => void; flash: (message: string) => void; onAuthenticated: (user: SupabaseUserLike, fallbackRole: Role, fallbackPhone: string) => { profileComplete: boolean } }) {
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [role, setRole] = useState<Role>('entrepreneur');
   const [email, setEmail] = useState('');
@@ -1187,24 +1210,13 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
     if (supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (!error && isSupabaseEmailConfirmed(data.user)) {
-        const userEmail = data.user.email?.trim().toLowerCase() ?? normalizedEmail;
-        const existing = accounts.find((item) => item.email.trim().toLowerCase() === userEmail);
-        if (existing) {
-          setCurrentAccountId(existing.id);
-          setPage(existing.accountName || existing.name ? 'feed' : 'profileEdit');
-          flash('ログインしました');
-          return;
-        }
-        const metadata = data.user.user_metadata ?? {};
-        const account: Account = { ...emptyAccount, id: data.user.id || crypto.randomUUID(), role: metadata.role === 'investor' ? 'investor' : 'entrepreneur', email: data.user.email || email, phone: String(metadata.phone || ''), password: '', emailVerified: true };
-        setAccounts([...accounts, account]);
-        setCurrentAccountId(account.id);
-        setPage('profileEdit');
-        flash('ログインしました。プロフィールを作成してください');
+        const synced = onAuthenticated(data.user, role, phone);
+        setPage(synced.profileComplete ? 'feed' : 'profileEdit');
+        flash(synced.profileComplete ? 'ログインしました' : 'ログインしました。プロフィールを作成してください');
         return;
       }
       if (error?.message?.toLowerCase().includes('email not confirmed')) {
-        setAuthMessage('メール認証が完了していません。確認メールのURLを押してからログインしてください。');
+        setAuthMessage('メール認証が完了していません。確認メールのURLを押してからログインしてください。届かない場合は下の再送ボタンを押してください。');
         return;
       }
     }
@@ -1217,8 +1229,9 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
     setPage(account.accountName || account.name ? 'feed' : 'profileEdit');
     flash('ログインしました');
   }
-  async function sendConfirmation(resend = false) {
-    if (accounts.some((account) => account.email.trim().toLowerCase() === normalizedEmail)) {
+  async function sendConfirmation(resend = false, force = false) {
+    const existing = accounts.find((account) => account.email.trim().toLowerCase() === normalizedEmail);
+    if (existing?.emailVerified && !force) {
       setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
       setMode('login');
       setSent(false);
@@ -1231,7 +1244,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
       return;
     }
     const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-    const result = resend
+    let result = (resend || Boolean(existing) || force)
       ? await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } })
       : await supabase.auth.signUp({
         email,
@@ -1241,6 +1254,9 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
           data: { phone, role },
         },
       });
+    if (result.error && !resend && !force) {
+      result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+    }
     if (result.error) {
       setAuthMessage(`確認メール送信に失敗しました：${result.error.message}`);
     } else {
@@ -1267,10 +1283,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
       flash('メール認証が未完了です');
       return;
     }
-    const metadata = user.user_metadata ?? {};
-    const account: Account = { ...emptyAccount, id: user.id || crypto.randomUUID(), role: metadata.role === 'investor' ? 'investor' : role, email: user.email, phone: String(metadata.phone || phone), password: '', emailVerified: true };
-    setAccounts([...accounts, account]);
-    setCurrentAccountId(account.id);
+    onAuthenticated(user, role, phone);
     setPage('profileEdit');
     flash('メール認証が完了しました。プロフィールを作成してください');
   }
@@ -1289,7 +1302,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash }
           {mode === 'signup' && <Input label="電話番号" value={phone} onChange={setPhone} />}
           <Input label="パスワード" value={password} onChange={setPassword} type="password" />
         </div>
-        {mode === 'signup' ? (!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={() => sendConfirmation(false)}>確認メールを送信する</button> : <div className="mt-5 grid gap-2"><button className="primary w-full" onClick={complete}>メール認証を確認する</button><button className="secondary w-full" onClick={() => sendConfirmation(true)}>確認メールを再送する</button></div>) : <button className="primary mt-5 w-full" disabled={!email || !password} onClick={login}>ログイン</button>}
+        {mode === 'signup' ? (!sent ? <button className="primary mt-5 w-full" disabled={!email || !phone || !password} onClick={() => sendConfirmation(false)}>確認メールを送信する</button> : <div className="mt-5 grid gap-2"><button className="primary w-full" onClick={complete}>メール認証を確認する</button><button className="secondary w-full" onClick={() => sendConfirmation(true)}>確認メールを再送する</button></div>) : <div className="mt-5 grid gap-2"><button className="primary w-full" disabled={!email || !password} onClick={login}>ログイン</button><button className="secondary w-full" disabled={!email} onClick={() => sendConfirmation(true, true)}>確認メールを再送する</button></div>}
         {(sent || authMessage) && <p className="mt-3 text-xs leading-6 text-slate-500">{authMessage || 'メールの確認URLを押してから、プロフィール作成へ進んでください。'}</p>}
       </div>
     </div>
