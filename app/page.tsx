@@ -242,6 +242,23 @@ async function saveCloudState(state: LeapCloudState) {
   await supabase.from('app_state').upsert({ key: 'leap-main', data: state, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 }
 
+function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
+  const map = new Map<string, T>();
+  local.forEach((item) => map.set(item.id, item));
+  cloud.forEach((item) => map.set(item.id, { ...(map.get(item.id) ?? {} as T), ...item }));
+  return Array.from(map.values());
+}
+
+function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapCloudState {
+  return {
+    accounts: mergeById(local.accounts.map(normalizeAccount), cloud.accounts.map(normalizeAccount)),
+    posts: mergeById(local.posts, cloud.posts),
+    messages: mergeById(local.messages, cloud.messages),
+    meetingApplications: mergeById(local.meetingApplications, cloud.meetingApplications),
+    notices: mergeById(local.notices, cloud.notices),
+  };
+}
+
 function readFileAsDataUrl(file: File, onDone: (url: string) => void) {
   const reader = new FileReader();
   reader.onload = () => onDone(String(reader.result));
@@ -298,15 +315,31 @@ export default function LeapApp() {
   useEffect(() => {
     loadCloudState().then((cloud) => {
       if (cloud) {
-        setAccounts(cloud.accounts);
-        setPosts(cloud.posts);
-        setMessages(cloud.messages);
-        setMeetingApplications(cloud.meetingApplications);
-        setNotices(cloud.notices);
+        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }, cloud);
+        setAccounts(merged.accounts);
+        setPosts(merged.posts);
+        setMessages(merged.messages);
+        setMeetingApplications(merged.meetingApplications);
+        setNotices(merged.notices);
       }
       setCloudReady(true);
     });
   }, []);
+  useEffect(() => {
+    if (!cloudReady) return;
+    const timer = window.setInterval(() => {
+      loadCloudState().then((cloud) => {
+        if (!cloud) return;
+        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }, cloud);
+        setAccounts(merged.accounts);
+        setPosts(merged.posts);
+        setMessages(merged.messages);
+        setMeetingApplications(merged.meetingApplications);
+        setNotices(merged.notices);
+      });
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
     if (!cloudReady) return;
     const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }), 700);
@@ -644,7 +677,7 @@ export default function LeapApp() {
           {page === 'mypage' && (
             <MyPage currentAccount={currentAccount} accounts={accounts} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
-          {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} />}
+          {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
           {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
@@ -697,9 +730,10 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
     admin: '管理者画面',
   };
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
+  const compact = page === 'feed' || page === 'notifications';
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
-      <div className="flex h-14 items-center justify-between px-4">
+      <div className={`flex items-center justify-between px-4 ${compact ? 'h-10' : 'h-14'}`}>
         <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
           {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
         </button>
@@ -1063,14 +1097,68 @@ function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startE
   );
 }
 
-function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAccountId, setPage }: { accounts: Account[]; currentAccount: Account | null; setAccounts: (accounts: Account[]) => void; setCurrentAccountId: (id: string) => void; setPage: (page: Page) => void }) {
+function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAccountId, setPage, flash }: { accounts: Account[]; currentAccount: Account | null; setAccounts: (accounts: Account[]) => void; setCurrentAccountId: (id: string) => void; setPage: (page: Page) => void; flash: (message: string) => void }) {
   const [form, setForm] = useState<Account>(currentAccount ?? emptyAccount);
+  const [contactMessage, setContactMessage] = useState('');
   useEffect(() => setForm(currentAccount ?? emptyAccount), [currentAccount?.id]);
   function update(key: keyof Account, value: string | number | boolean) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+  async function requestEmailChange() {
+    if (!currentAccount || !form.email.trim()) return;
+    const nextEmail = form.email.trim().toLowerCase();
+    if (nextEmail === currentAccount.email.trim().toLowerCase()) {
+      setContactMessage('現在のメールアドレスと同じです。');
+      return;
+    }
+    if (accounts.some((account) => account.id !== currentAccount.id && account.email.trim().toLowerCase() === nextEmail)) {
+      setContactMessage('このメールアドレスはすでに登録されています。');
+      return;
+    }
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      setContactMessage('Supabase接続がないため、確認メールを送信できません。');
+      return;
+    }
+    const { error } = await supabase.auth.updateUser(
+      { email: nextEmail },
+      { emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined },
+    );
+    setContactMessage(error ? `確認メール送信に失敗しました：${error.message}` : '新しいメールアドレスへ確認メールを送信しました。メール内のURLを押した後、「メール認証を確認して変更」を押してください。');
+    if (!error) flash('確認メールを送信しました');
+  }
+  async function confirmEmailChange() {
+    if (!currentAccount) return;
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      setContactMessage('Supabase接続がないため、メール認証を確認できません。');
+      return;
+    }
+    const { data, error } = await supabase.auth.getUser();
+    const userEmail = data.user?.email?.trim().toLowerCase();
+    const nextEmail = form.email.trim().toLowerCase();
+    if (error || !data.user?.email_confirmed_at || userEmail !== nextEmail) {
+      setContactMessage('まだ新しいメールアドレスの認証が確認できません。確認メールのURLを押してから再度お試しください。');
+      return;
+    }
+    setAccounts(accounts.map((account) => account.id === currentAccount.id ? { ...account, email: data.user!.email || form.email, emailVerified: true } : account));
+    setContactMessage('メールアドレスを変更しました。');
+    flash('メールアドレスを変更しました');
+  }
+  async function savePhoneOnly() {
+    if (!currentAccount) return;
+    const supabase = createSupabaseBrowserClient();
+    if (supabase) await supabase.auth.updateUser({ data: { phone: form.phone } });
+    setAccounts(accounts.map((account) => account.id === currentAccount.id ? { ...account, phone: form.phone } : account));
+    setContactMessage('電話番号を変更しました。');
+    flash('電話番号を変更しました');
+  }
   function save() {
     const next: Account = { ...form, id: form.id || crypto.randomUUID(), avatarLabel: form.avatarLabel || (form.accountName || form.name || 'L').slice(0, 1), verified: Boolean(form.corporateNumber || form.licenseFileName) };
+    if (currentAccount && next.email.trim().toLowerCase() !== currentAccount.email.trim().toLowerCase()) {
+      setContactMessage('メールアドレスは確認メールの認証後に変更されます。先に「確認メールを送る」を押してください。');
+      next.email = currentAccount.email;
+    }
     const exists = accounts.some((account) => account.id === next.id);
     setAccounts(exists ? accounts.map((account) => account.id === next.id ? next : account) : [...accounts, next]);
     setCurrentAccountId(next.id);
@@ -1097,6 +1185,21 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
             </span>
           </label>
           <Input label="アカウント名" value={form.accountName} onChange={(value) => update('accountName', value)} />
+          {currentAccount && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+              <p className="text-xs font-black text-slate-700">ログイン情報</p>
+              <div className="mt-3 grid gap-3">
+                <Input label="メールアドレス" value={form.email} onChange={(value) => update('email', value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="secondary min-h-10 text-[11px]" onClick={requestEmailChange}>確認メールを送る</button>
+                  <button className="primary min-h-10 text-[11px]" onClick={confirmEmailChange}>メール認証を確認して変更</button>
+                </div>
+                <Input label="電話番号" value={form.phone} onChange={(value) => update('phone', value)} />
+                <button className="secondary min-h-10 text-[11px]" onClick={savePhoneOnly}>電話番号だけ変更する</button>
+                {contactMessage && <p className="text-xs font-bold leading-5 text-slate-500">{contactMessage}</p>}
+              </div>
+            </div>
+          )}
           <Input label="名前" value={form.name} onChange={(value) => update('name', value)} />
           <Input label="会社名" value={form.company} onChange={(value) => update('company', value)} />
           <Input label="肩書き" value={form.title} onChange={(value) => update('title', value)} />
