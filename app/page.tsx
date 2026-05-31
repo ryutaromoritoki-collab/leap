@@ -866,6 +866,10 @@ export default function LeapApp() {
       return normalizeAccount(item);
     }));
     setFollowing(nextFollowing);
+    if (!alreadyFollowing) {
+      setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: `${displayAccountName(currentAccount)}さんにフォローされました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
+      if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: フォローされました', `${displayAccountName(currentAccount)}さんがあなたをフォローしました。`);
+    }
     flash(alreadyFollowing ? 'フォロー解除しました' : 'フォローしました');
   }
 
@@ -1884,6 +1888,8 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
   const normalized = normalizeAccount(account);
   const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
+  const visibleFollowings = isMine ? followings : followings.filter((item) => item.role !== 'investor');
+  const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
   const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
   return (
     <section className={compact ? 'border-b border-slate-100 px-4 py-3' : 'rounded-3xl border border-slate-100 p-4'}>
@@ -1900,16 +1906,39 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
           <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
           {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
           <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-          <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{followings.length}</b> フォロー</span><span><b>{followers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+          <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{visibleFollowings.length}</b> フォロー</span><span><b>{visibleFollowers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
           {canShowSocialGraph ? (
-            <div className="mt-3 grid gap-2 text-xs text-slate-600">
-              <p><b>フォロー：</b>{followings.length ? followings.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
-              <p><b>フォロワー：</b>{followers.length ? followers.map((item) => item.accountName || item.name || item.company || '未設定').join('、') : 'なし'}</p>
+            <div className="mt-3 grid gap-3 text-xs text-slate-600">
+              <SocialList title="フォロー" accounts={visibleFollowings} />
+              <SocialList title="フォロワー" accounts={visibleFollowers} />
             </div>
           ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
         </>
       )}
     </section>
+  );
+}
+
+function SocialList({ title, accounts }: { title: string; accounts: Account[] }) {
+  return (
+    <div>
+      <p className="font-black text-slate-700">{title}</p>
+      {accounts.length === 0 ? (
+        <p className="mt-1 text-slate-500">なし</p>
+      ) : (
+        <div className="mt-2 grid gap-2">
+          {accounts.map((account) => (
+            <div key={account.id} className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+              <Avatar account={account} />
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-xs text-slate-800">{displayAccountName(account)}</b>
+                <span className="text-[10px] font-bold text-slate-500">{account.role === 'investor' ? '投資家' : '起業家'} / {account.company || '会社名未設定'}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
