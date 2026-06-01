@@ -6,6 +6,7 @@ import {
   Bell,
   Bookmark,
   BriefcaseBusiness,
+  Building2,
   CalendarCheck,
   CheckCircle2,
   ChevronLeft,
@@ -1480,6 +1481,95 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
     setCurrentAccountId(next.id);
     setPage('mypage');
   }
+  if (form.role === 'entrepreneur') {
+    return (
+      <div className="bg-[#f7f9fb] pb-20">
+        <section className="bg-white px-4 py-6">
+          <div className="mx-auto max-w-3xl">
+            <p className="text-[11px] font-black tracking-[0.18em] text-blue-600">COMPANY PROFILE</p>
+            <div className="mt-4 flex items-start gap-4">
+              <label className="relative grid h-20 w-20 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+                {form.avatarUrl ? <img src={form.avatarUrl} alt={displayAccountName(form)} className="h-full w-full object-cover" /> : <Building2 size={28} className="text-slate-400" />}
+                <span className="absolute bottom-1 right-1 grid h-7 w-7 place-items-center rounded-full bg-white text-blue-600 shadow"><Plus size={15} /></span>
+                <input className="hidden" type="file" accept="image/*" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  readFileAsDataUrl(file, (url) => update('avatarUrl', url));
+                }} />
+              </label>
+              <div className="min-w-0 flex-1">
+                <input className="w-full border-0 bg-transparent text-2xl font-black outline-none placeholder:text-slate-300" placeholder="会社名を入力" value={form.company} onChange={(event) => update('company', event.target.value)} />
+                <input className="mt-2 w-full border-0 bg-transparent text-sm font-bold text-slate-500 outline-none placeholder:text-slate-300" placeholder="一言で会社の魅力を表すコピー" value={form.title} onChange={(event) => update('title', event.target.value)} />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[form.industry || '業界未設定', form.location || '地域未設定', form.stage || 'フェーズ未設定'].map((item) => <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700" key={item}>{item}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="mx-auto grid max-w-3xl gap-4 p-4">
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h2 className="text-base font-black">基本情報</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">投資家が最初に確認する会社情報です。</p>
+            <div className="mt-4 grid gap-3">
+              <Input label="アカウント名" value={form.accountName} onChange={(value) => update('accountName', value)} />
+              <Input label="代表者名" value={form.name} onChange={(value) => update('name', value)} />
+              <div className="grid grid-cols-2 gap-2"><Select label="設立年" value={form.foundedYear} options={foundedYears} onChange={(value) => update('foundedYear', value)} /><Select label="設立月" value={form.foundedMonth} options={foundedMonths} onChange={(value) => update('foundedMonth', value)} /></div>
+              <div className="grid grid-cols-2 gap-2"><Select label="業界" value={form.industry} options={industries} onChange={(value) => update('industry', value)} /><Select label="地域" value={form.location} options={locations} onChange={(value) => update('location', value)} /></div>
+              <div className="grid grid-cols-2 gap-2"><Select label="従業員数" value={form.employeeSize} options={employeeSizes} onChange={(value) => update('employeeSize', value)} /><Select label="年商規模" value={form.revenueScale} options={revenueScales} onChange={(value) => update('revenueScale', value)} /></div>
+            </div>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h2 className="text-base font-black">ストーリー</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">Wantedlyの会社紹介のように、想いと事業内容が伝わる文章にしてください。</p>
+            <label className="mt-4 grid gap-1 text-[11px] font-bold text-slate-600">会社紹介・事業の背景<textarea className="field min-h-36 resize-none leading-7" placeholder="なぜこの事業を始めたのか、どんな課題を解決するのかを書いてください。" value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
+            <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">実績・トラクション<textarea className="field min-h-28 resize-none leading-7" placeholder="導入実績、受賞歴、提携、成長実績など" value={form.achievements} onChange={(event) => update('achievements', event.target.value)} /></label>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h2 className="text-base font-black">資金調達・KPI</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">投資判断に必要な数字を見やすく整理します。</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Select label="フェーズ" value={form.stage} options={stages} onChange={(value) => update('stage', value)} />
+              <Input label="調達希望額" value={form.fundingGoal} onChange={(value) => update('fundingGoal', value)} />
+              <Input label="月次売上" value={form.monthlyRevenue} onChange={(value) => update('monthlyRevenue', value)} />
+              <Input label="成長率" value={form.growthRate} onChange={(value) => update('growthRate', value)} />
+              <Input label="導入社数" value={form.customerCount} onChange={(value) => update('customerCount', value)} />
+            </div>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h2 className="text-base font-black">認証・連絡設定</h2>
+            {currentAccount && (
+              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+                <p className="text-xs font-black text-slate-700">ログイン情報</p>
+                <div className="mt-3 grid gap-3">
+                  <Input label="メールアドレス" value={form.email} onChange={(value) => update('email', value)} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button className="secondary min-h-10 text-[11px]" onClick={requestEmailChange}>確認メールを送る</button>
+                    <button className="primary min-h-10 text-[11px]" onClick={confirmEmailChange}>認証を確認</button>
+                  </div>
+                  <Input label="電話番号" value={form.phone} onChange={(value) => update('phone', value)} />
+                  <button className="secondary min-h-10 text-[11px]" onClick={savePhoneOnly}>電話番号だけ変更</button>
+                  {contactMessage && <p className="text-xs font-bold leading-5 text-slate-500">{contactMessage}</p>}
+                </div>
+              </div>
+            )}
+            <div className="mt-4 grid gap-3">
+              <Select label="本人確認種別" value={form.businessType} options={['corporation', 'sole']} displayMap={{ corporation: '法人', sole: '個人事業主' }} onChange={(value) => update('businessType', value)} />
+              {form.businessType === 'corporation' ? <Input label="法人番号" value={form.corporateNumber} onChange={(value) => update('corporateNumber', value)} /> : <label className="grid gap-1 text-[11px] font-bold text-slate-600">運転免許証の写真<input className="field" type="file" accept="image/*" onChange={(event) => update('licenseFileName', event.target.files?.[0]?.name || '')} />{form.licenseFileName && <span className="text-slate-500">{form.licenseFileName}</span>}</label>}
+              <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.emailNotificationsEnabled} onChange={(event) => update('emailNotificationsEnabled', event.target.checked)} />メール通知を受け取る</label>
+              <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.hideSocialGraph} onChange={(event) => update('hideSocialGraph', event.target.checked)} />フォロー・フォロワーリストを非表示にする</label>
+            </div>
+          </section>
+
+          <button className="primary sticky bottom-20 z-20 w-full shadow-xl lg:bottom-6" onClick={save}>プロフィールを保存する</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="p-4">
       <div className="rounded-2xl border border-slate-100 p-4">
@@ -1530,19 +1620,8 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.hideSocialGraph} onChange={(event) => update('hideSocialGraph', event.target.checked)} />フォロー・フォロワーリストを他のユーザーに非表示にする</label>
           <Select label="本人確認種別" value={form.businessType} options={['corporation', 'sole']} displayMap={{ corporation: '法人', sole: '個人事業主' }} onChange={(value) => update('businessType', value)} />
           {form.businessType === 'corporation' ? <Input label="法人番号" value={form.corporateNumber} onChange={(value) => update('corporateNumber', value)} /> : <label className="grid gap-1 text-[11px] font-bold text-slate-600">運転免許証の写真<input className="field" type="file" accept="image/*" onChange={(event) => update('licenseFileName', event.target.files?.[0]?.name || '')} />{form.licenseFileName && <span className="text-slate-500">{form.licenseFileName}</span>}</label>}
-          {form.role === 'entrepreneur' ? (
-            <>
-              <Input label="調達希望額" value={form.fundingGoal} onChange={(value) => update('fundingGoal', value)} />
-              <Input label="月次売上" value={form.monthlyRevenue} onChange={(value) => update('monthlyRevenue', value)} />
-              <Input label="成長率" value={form.growthRate} onChange={(value) => update('growthRate', value)} />
-              <Input label="導入社数" value={form.customerCount} onChange={(value) => update('customerCount', value)} />
-            </>
-          ) : (
-            <>
-              <Input label="投資可能額" value={form.investmentRange} onChange={(value) => update('investmentRange', value)} />
-              <Input label="支援できること" value={form.supportAreas} onChange={(value) => update('supportAreas', value)} />
-            </>
-          )}
+          <Input label="投資可能額" value={form.investmentRange} onChange={(value) => update('investmentRange', value)} />
+          <Input label="支援できること" value={form.supportAreas} onChange={(value) => update('supportAreas', value)} />
           <label className="grid gap-1 text-[11px] font-bold text-slate-600">自己紹介<textarea className="field min-h-24 resize-none" value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
         </div>
         <button className="primary mt-4 w-full" onClick={save}>保存する</button>
