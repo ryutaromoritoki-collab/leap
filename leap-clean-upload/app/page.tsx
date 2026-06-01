@@ -944,13 +944,13 @@ export default function LeapApp() {
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} onAuthenticated={syncAuthenticatedAccount} />}
           {page === 'mypage' && (
-            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
           {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} setMessages={setMessages} setNotices={setNotices} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
           {page === 'matching' && <MatchingPage accounts={visibleAccounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
@@ -1065,9 +1065,9 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
         {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
       </div>}
       {posts.length === 0 ? (
-        <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
+        <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-black">
           {posts.map((post) => {
             const author = accounts.find((account) => account.id === post.authorId);
             return <PostCard key={post.id} post={post} author={author} currentAccount={currentAccount} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />;
@@ -1143,8 +1143,8 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
         <button className={`py-1.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
-        <div className={tab === 'unread' ? 'px-3 py-0' : 'px-3 py-3'}>
-          <div className={`rounded-2xl bg-slate-50 px-4 py-4 ${tab === 'unread' ? 'rounded-t-none' : ''}`}>
+        <div className={tab === 'unread' ? 'px-0 py-0' : 'px-3 py-3'}>
+          <div className={`${tab === 'unread' ? 'rounded-none px-3 py-2' : 'rounded-2xl px-4 py-4'} bg-slate-50`}>
             <p className="text-sm font-black text-slate-700">{tab === 'unread' ? '未読通知はありません' : '通知はまだありません'}</p>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">フォロー、コメント、面談申込、メッセージが届くと表示されます。</p>
           </div>
@@ -1413,7 +1413,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
   );
 }
 
-function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+function MyPage({ currentAccount, accounts, posts, setPage, openComposer, reactToPost, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   const [socialModal, setSocialModal] = useState<'following' | 'followers' | null>(null);
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
@@ -1434,7 +1434,7 @@ function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startE
         <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
       </div>
       <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
+        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : <div className="divide-y divide-black">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
       </div>
       {socialModal && (
         <Modal title={socialModal === 'following' ? 'フォロー中' : 'フォロワー'} onClose={() => setSocialModal(null)}>
@@ -1909,16 +1909,16 @@ function AdminStat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl border border-slate-100 p-4"><span className="text-[11px] font-black text-slate-500">{label}</span><b className="mt-2 block text-xl">{value}</b></div>;
 }
 
-function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, startEditPost, hidePost, deletePost }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, reactToPost, startEditPost, hidePost, deletePost }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   const [tab, setTab] = useState<'overview' | 'achievements' | 'posts'>('overview');
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
       <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} compact={tab !== 'overview'} />
       <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-3 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
-        <button className={`py-3 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
-        <button className={`py-3 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
+        <button className={`py-2 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
+        <button className={`py-2 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
+        <button className={`py-2 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
       </div>
       {tab === 'overview' && (
         <div className="px-4 py-3">
@@ -1935,13 +1935,13 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
         </div>
       )}
       {tab === 'achievements' && (
-        <div className="p-4">
+        <div className="px-3 py-2">
           <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} />
         </div>
       )}
       {tab === 'posts' && (
-        <div className="divide-y divide-slate-100">
-          {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
+        <div className="divide-y divide-black">
+          {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
         </div>
       )}
     </div>
@@ -1989,10 +1989,10 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   return (
-    <article className={`relative px-4 py-4 ${post.isHidden ? 'bg-slate-50' : ''}`}>
+    <article className={`relative px-4 py-3 ${post.isHidden ? 'bg-slate-50' : ''}`}>
       <div className="flex w-full gap-3 text-left">
         <button className="flex min-w-0 flex-1 gap-3 text-left" onClick={() => author && openProfile(author)}>
-        {author ? <Avatar account={author} /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
+        {author ? <Avatar account={author} size="feed" /> : <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100"><UserRound size={20} /></span>}
         <span className="min-w-0 flex-1">
           <b className="block truncate text-sm">{displayAccountName(author)} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
           <span className="text-[11px] text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
@@ -2012,12 +2012,12 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
       {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
       {post.imageUrl && <button className="mt-3 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
       {post.attachmentName && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
-      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black">
-        <button className={`rounded-xl border py-2 ${liked ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-100 text-rose-600'}`} onClick={() => reactToPost(post.id, 'like')}><Heart className="mx-auto mb-1" size={16} />応援 {post.likes}</button>
-        <button className={`rounded-xl border py-2 ${saved ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-emerald-600'}`} onClick={() => reactToPost(post.id, 'save')}><Bookmark className="mx-auto mb-1" size={16} />保存 {post.saves}</button>
-        <button className={`rounded-xl border py-2 ${meetingRequested ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-100 text-blue-600'}`} onClick={() => reactToPost(post.id, 'meeting')}><UsersRound className="mx-auto mb-1" size={16} />面談 {post.meetings}</button>
+      <div className="mt-2 flex items-center gap-5 text-[10px] font-bold text-black">
+        <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={13} />応援 {post.likes}</button>
+        <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={13} />保存 {post.saves}</button>
+        <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={13} />面談 {post.meetings}</button>
+        <span className="ml-auto">閲覧 {post.views}</span>
       </div>
-      <p className="mt-2 text-right text-[10px] text-slate-400">閲覧 {post.views} 回</p>
       {previewImage && (
         <Modal title={post.imageName || '投稿画像'} onClose={() => setPreviewImage(false)}>
           <img className="max-h-[70vh] w-full rounded-2xl object-contain" src={post.imageUrl} alt={post.imageName || '投稿画像'} />
@@ -2065,14 +2065,14 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
   const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
   const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
   return (
-    <section className={compact ? 'border-b border-slate-100 px-4 py-3' : 'rounded-3xl border border-slate-100 p-4'}>
-      <div className="flex items-start gap-4">
-        <Avatar account={account} size="lg" />
+    <section className={compact ? 'border-b border-slate-100 px-3 py-1.5' : 'rounded-3xl border border-slate-100 p-4'}>
+      <div className={`flex items-start ${compact ? 'gap-2' : 'gap-4'}`}>
+        <Avatar account={account} size={compact ? 'md' : 'lg'} />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xl font-black">{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={16} />} {account.isBot && <span className="align-middle rounded-full bg-indigo-50 px-2 py-1 text-[10px] text-indigo-700">AI運用</span>}</h2>
-          <p className="mt-1 text-xs text-slate-500">@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
-          <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
-          {account.verified && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700"><CheckCircle2 size={13} />本人確認済み</span>}
+          <h2 className={`truncate font-black ${compact ? 'text-sm' : 'text-xl'}`}>{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={compact ? 13 : 16} />} {account.isBot && <span className="align-middle rounded-full bg-indigo-50 px-2 py-1 text-[10px] text-indigo-700">AI運用</span>}</h2>
+          <p className={`${compact ? 'mt-0 text-[11px]' : 'mt-1 text-xs'} text-slate-500`}>@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
+          {!compact && <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>}
+          {!compact && account.verified && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700"><CheckCircle2 size={13} />本人確認済み</span>}
           {isMine && account.identityStatus === 'resubmit' && <span className="mt-2 inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">本人確認資料の再提出が必要です</span>}
         </div>
       </div>
@@ -2124,7 +2124,21 @@ function KpiGrid({ account }: { account: Account }) {
   return <div className="mt-3 grid grid-cols-3 gap-2">{items.map(([label, value]) => <div className="rounded-2xl border border-slate-100 p-3" key={label}><span className="text-[10px] font-bold text-slate-500">{label}</span><b className="mt-2 block break-words text-xs">{value || '未入力'}</b></div>)}</div>;
 }
 
-function EmptyState({ icon, title, body, action, onAction }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void }) {
+function EmptyState({ icon, title, body, action, onAction, compact }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void; compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="px-3 py-2 text-left">
+        <div className="flex items-center gap-3 rounded-none bg-slate-50 px-3 py-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-black">{title}</h2>
+            <p className="mt-0.5 text-xs leading-5 text-slate-500">{body}</p>
+          </div>
+          {action && <button className="primary min-h-9 shrink-0 px-4 py-2 text-[11px]" onClick={onAction}>{action}</button>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="grid min-h-52 place-items-center p-5 text-center">
       <div>
@@ -2147,21 +2161,23 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
   );
 }
 
-function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'lg'; active?: boolean }) {
-  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : 'h-11 w-11 text-sm';
+function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'feed' | 'lg'; active?: boolean }) {
+  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : size === 'feed' ? 'h-14 w-14 text-base' : 'h-11 w-11 text-sm';
   const label = account.avatarLabel || displayAccountName(account).slice(0, 1) || 'L';
   return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-3">
-      <div className="w-full max-w-[430px] rounded-[26px] bg-white p-5 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-contain bg-black/40 p-3">
+      <div className="my-3 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[430px] flex-col rounded-[26px] bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between p-5 pb-3">
           <h2 className="text-base font-black">{title}</h2>
           <button className="grid h-9 w-9 place-items-center rounded-full bg-slate-100" onClick={onClose}><X size={18} /></button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+          {children}
+        </div>
       </div>
     </div>
   );
