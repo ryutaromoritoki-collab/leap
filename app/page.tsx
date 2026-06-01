@@ -929,11 +929,11 @@ export default function LeapApp() {
 
   return (
     <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
-      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:overflow-hidden lg:rounded-[28px]">
+      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:grid-rows-[auto_minmax(0,1fr)] lg:overflow-hidden lg:rounded-[28px]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} />
 
-        <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:pb-6">
+        <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {page === 'feed' && (
             <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -1001,13 +1001,13 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
   const compact = page === 'feed' || page === 'notifications';
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
-      <div className={`flex items-center justify-between px-4 ${compact ? 'h-10' : 'h-14'}`}>
-        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
+    <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
+      <div className={`flex items-center justify-between px-3 ${compact ? 'h-8' : 'h-14'}`}>
+        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={compact ? 18 : 20} /> : <BriefcaseBusiness size={compact ? 17 : 20} />}
         </button>
-        <h1 className="text-sm font-black">{title[page]}</h1>
-        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={20} /></button>
+        <h1 className={`${compact ? 'text-xs' : 'text-sm'} font-black`}>{title[page]}</h1>
+        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 18 : 20} /></button>
       </div>
       {menuOpen && (
         <div className="absolute right-3 top-12 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
@@ -1055,7 +1055,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
           ['entrepreneurs', '起業家'],
-        ].map(([key, label]) => <button key={key} className={`py-2.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
+        ].map(([key, label]) => <button key={key} className={`py-1.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
       </div>
       {feedTab !== 'following' && <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-3 py-2">
         <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
@@ -1139,8 +1139,8 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
   return (
     <div>
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-2.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
-        <button className={`py-2.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
+        <button className={`py-1.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
+        <button className={`py-1.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
         <div className={tab === 'unread' ? 'px-3 py-0' : 'px-3 py-3'}>
@@ -1241,9 +1241,9 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
         <button className={`py-3 ${mode === 'meeting' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('meeting')}>面談メッセージ</button>
       </div>
       <div className="relative border-b border-slate-100">
-        <button className="absolute left-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white shadow-sm lg:grid" onClick={() => partnerScrollerRef.current?.scrollBy({ left: -220, behavior: 'smooth' })} aria-label="左へスクロール"><ChevronLeft size={16} /></button>
-        <button className="absolute right-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white shadow-sm lg:grid" onClick={() => partnerScrollerRef.current?.scrollBy({ left: 220, behavior: 'smooth' })} aria-label="右へスクロール"><ChevronLeft size={16} className="rotate-180" /></button>
-        <div ref={partnerScrollerRef} className="min-w-0 overflow-x-auto px-4 py-3 [scrollbar-width:thin] lg:px-12">
+        <button className="absolute left-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => partnerScrollerRef.current?.scrollBy({ left: -240, behavior: 'smooth' })} aria-label="左へスクロール"><ChevronLeft size={18} /></button>
+        <button className="absolute right-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => partnerScrollerRef.current?.scrollBy({ left: 240, behavior: 'smooth' })} aria-label="右へスクロール"><ChevronLeft size={18} className="rotate-180" /></button>
+        <div ref={partnerScrollerRef} className="min-w-0 overflow-x-auto px-14 py-3 [scrollbar-width:thin]">
           <div className="flex w-max min-w-full gap-3">
         {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{displayAccountName(partner)}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
           </div>
