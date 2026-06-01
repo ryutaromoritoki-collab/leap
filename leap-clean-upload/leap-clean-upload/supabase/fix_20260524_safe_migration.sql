@@ -1,0 +1,229 @@
+alter table public.users add column if not exists available_roles public.user_role[] not null default '{}';
+alter table public.users add column if not exists phone text;
+alter table public.users add column if not exists notification_email_enabled boolean not null default true;
+alter table public.users add column if not exists last_login_at timestamptz;
+
+update public.users
+set available_roles = array[role]
+where available_roles = '{}';
+
+alter table public.entrepreneur_profiles add column if not exists payment_status text not null default 'paid';
+alter table public.entrepreneur_profiles add column if not exists account_name text;
+alter table public.entrepreneur_profiles add column if not exists employee_size text;
+alter table public.entrepreneur_profiles add column if not exists annual_revenue_scale text;
+alter table public.entrepreneur_profiles add column if not exists total_investment_amount numeric not null default 0;
+alter table public.entrepreneur_profiles add column if not exists payment_transfer_name text;
+alter table public.entrepreneur_profiles add column if not exists payment_plan_id text;
+alter table public.entrepreneur_profiles add column if not exists payment_plan_label text;
+alter table public.entrepreneur_profiles add column if not exists payment_plan_months int;
+alter table public.entrepreneur_profiles add column if not exists payment_plan_amount numeric;
+alter table public.entrepreneur_profiles add column if not exists payment_requested_at timestamptz;
+alter table public.entrepreneur_profiles add column if not exists paid_at timestamptz;
+alter table public.entrepreneur_profiles add column if not exists subscription_ends_at timestamptz;
+alter table public.entrepreneur_profiles add column if not exists meeting_ticket_balance int not null default 0;
+alter table public.entrepreneur_profiles add column if not exists meeting_ticket_plan text;
+alter table public.entrepreneur_profiles add column if not exists meeting_ticket_requested_count int not null default 0;
+alter table public.entrepreneur_profiles add column if not exists meeting_ticket_requested_amount numeric;
+alter table public.entrepreneur_profiles add column if not exists meeting_ticket_payment_status text not null default 'unpaid';
+alter table public.entrepreneur_profiles add column if not exists meeting_ticket_transfer_name text;
+alter table public.entrepreneur_profiles alter column is_hidden set default false;
+alter table public.entrepreneur_profiles alter column payment_status set default 'paid';
+
+update public.entrepreneur_profiles
+set is_hidden = false,
+    payment_status = 'paid'
+where true;
+
+alter table public.investor_profiles add column if not exists account_name text;
+alter table public.investor_profiles add column if not exists founded_month text;
+alter table public.investor_profiles add column if not exists employee_size text;
+alter table public.investor_profiles add column if not exists annual_revenue_scale text;
+alter table public.investor_profiles add column if not exists investor_type text;
+alter table public.investor_profiles add column if not exists corporate_number text;
+alter table public.investor_profiles add column if not exists license_file_path text;
+alter table public.investor_profiles add column if not exists total_investment_amount numeric not null default 0;
+alter table public.investor_profiles add column if not exists document_type text;
+alter table public.investor_profiles add column if not exists document_file_path text;
+alter table public.investor_profiles add column if not exists document_status text not null default 'unsubmitted';
+alter table public.investor_profiles add column if not exists document_submitted_at timestamptz;
+
+alter table public.meeting_requests add column if not exists ticket_plan text;
+alter table public.meeting_requests add column if not exists ticket_count int not null default 1;
+alter table public.meeting_requests add column if not exists ticket_amount numeric not null default 11000;
+alter table public.meeting_requests add column if not exists ticket_payment_status text not null default 'unpaid';
+alter table public.meeting_requests add column if not exists confirmed_at timestamptz;
+alter table public.meeting_requests add column if not exists final_meeting_at timestamptz;
+alter table public.meeting_requests add column if not exists meeting_admin_report text;
+
+alter table public.progress_posts add column if not exists post_type text not null default 'progress';
+alter table public.progress_posts add column if not exists title text;
+alter table public.progress_posts add column if not exists body text;
+alter table public.progress_posts add column if not exists view_count int not null default 0;
+
+create table if not exists public.post_views (
+  post_id uuid not null references public.progress_posts(id) on delete cascade,
+  viewer_id uuid not null references public.users(id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (post_id, viewer_id)
+);
+
+alter table public.post_views enable row level security;
+
+do $$ begin
+  create policy "views owner/admin read" on public.post_views
+    for select using (viewer_id = auth.uid() or public.is_admin());
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create policy "views logged insert" on public.post_views
+    for insert with check (viewer_id = auth.uid());
+exception
+  when duplicate_object then null;
+end $$;
+
+grant select, insert, update, delete on public.post_views to authenticated;
+
+create or replace function public.increment_post_view(post_id_input uuid)
+returns int language plpgsql security definer set search_path = public as $$
+declare
+  next_count int;
+begin
+  if auth.uid() is null then
+    select coalesce(view_count, 0) into next_count
+    from public.progress_posts
+    where id = post_id_input;
+    return coalesce(next_count, 0);
+  end if;
+
+  insert into public.post_views (post_id, viewer_id)
+  values (post_id_input, auth.uid())
+  on conflict do nothing;
+
+  select count(*)::int
+  into next_count
+  from public.post_views
+  where post_id = post_id_input;
+
+  update public.progress_posts
+  set view_count = next_count
+  where id = post_id_input;
+
+  return coalesce(next_count, 0);
+end;
+$$;
+
+insert into storage.buckets (id, name, public)
+values ('compliance-documents', 'compliance-documents', false)
+on conflict (id) do nothing;
+
+create table if not exists public.contact_suspicions (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid references public.users(id) on delete set null,
+  receiver_id uuid references public.users(id) on delete set null,
+  body text not null,
+  reason text not null,
+  status text not null default 'open',
+  created_at timestamptz not null default now()
+);
+
+alter table public.contact_suspicions enable row level security;
+
+do $$ begin
+  create policy "contact suspicions logged insert" on public.contact_suspicions
+    for insert with check (auth.uid() is not null);
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create policy "contact suspicions admin read" on public.contact_suspicions
+    for select using (public.is_admin());
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create policy "contact suspicions admin update" on public.contact_suspicions
+    for update using (public.is_admin());
+exception
+  when duplicate_object then null;
+end $$;
+
+create or replace function public.notify_admin_contact_inquiry()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.notifications (user_id, type, body)
+  select
+    id,
+    'admin_contact_inquiry',
+    '運営相談が届きました: ' || coalesce(new.category, '問い合わせ')
+  from public.users
+  where role = 'admin' and is_suspended = false;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists contact_inquiry_admin_notification on public.contact_inquiries;
+create trigger contact_inquiry_admin_notification
+after insert on public.contact_inquiries
+for each row execute function public.notify_admin_contact_inquiry();
+
+create table if not exists public.automated_reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  reminder_type text not null,
+  day_offset int not null,
+  sent_at timestamptz not null default now(),
+  unique(user_id, reminder_type, day_offset)
+);
+
+alter table public.automated_reminders enable row level security;
+
+grant select, insert, update, delete on public.contact_suspicions to authenticated;
+grant select, insert, update, delete on public.automated_reminders to authenticated;
+
+do $$ begin
+  create policy "compliance documents owner upload" on storage.objects
+    for insert with check (bucket_id = 'compliance-documents' and auth.uid()::text = (storage.foldername(name))[1]);
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create policy "compliance documents owner read" on storage.objects
+    for select using (bucket_id = 'compliance-documents' and (auth.uid()::text = (storage.foldername(name))[1] or public.is_admin()));
+exception
+  when duplicate_object then null;
+end $$;
+
+create or replace function public.run_automated_reminders()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  day_value int;
+  user_row record;
+begin
+  foreach day_value in array array[3, 7, 14, 30, 90] loop
+    for user_row in
+      select u.id
+      from public.users u
+      join public.investor_profiles ip on ip.user_id = u.id
+      where ip.corporate_number is null
+        and ip.license_file_path is null
+        and u.created_at <= now() - make_interval(days => day_value)
+        and not exists (
+          select 1 from public.automated_reminders ar
+          where ar.user_id = u.id and ar.reminder_type = 'investor_document' and ar.day_offset = day_value
+        )
+    loop
+      insert into public.contact_inquiries (user_id, category, body)
+      values (user_row.id, 'system_message', '投資家確認情報の提出をお願いします。法人は法人番号、個人事業主は運転免許証の写真をご提出ください。');
+      insert into public.automated_reminders (user_id, reminder_type, day_offset)
+      values (user_row.id, 'investor_document', day_value)
+      on conflict do nothing;
+    end loop;
+  end loop;
+end;
+$$;

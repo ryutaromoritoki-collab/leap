@@ -1,0 +1,133 @@
+export type UserRole = 'entrepreneur' | 'investor' | 'admin';
+
+export type AppUser = {
+  id: string;
+  email: string | null;
+  role: UserRole;
+  available_roles: UserRole[] | null;
+  profile_completed: boolean;
+  is_suspended: boolean;
+  notification_email_enabled: boolean;
+  following_visible: boolean;
+  followers_visible: boolean;
+  phone: string | null;
+  last_login_at: string | null;
+};
+
+export type EntrepreneurProfile = {
+  id: string;
+  user_id: string;
+  account_name: string | null;
+  company_name: string;
+  founder_name: string;
+  location: string | null;
+  industry: string | null;
+  founded_month: string | null;
+  employee_count: number | null;
+  employee_size: string | null;
+  annual_revenue_scale: string | null;
+  avatar_url: string | null;
+  tagline: string | null;
+  overview: string | null;
+  problem: string | null;
+  solution: string | null;
+  target_customer: string | null;
+  business_model: string | null;
+  advantage: string | null;
+  current_phase: string | null;
+  fundraising_amount: number | null;
+  fund_usage: string | null;
+  investor_support: string | null;
+  verified_identity: boolean;
+  verified_corporate: boolean;
+  verified_interview: boolean;
+  verified_revenue: boolean;
+  is_fast_growing: boolean;
+  is_hidden: boolean;
+  payment_status: 'unpaid' | 'pending_review' | 'paid';
+  payment_transfer_name: string | null;
+  payment_plan_id: string | null;
+  payment_plan_label: string | null;
+  payment_plan_months: number | null;
+  payment_plan_amount: number | null;
+  payment_requested_at: string | null;
+  paid_at: string | null;
+  subscription_ends_at: string | null;
+  total_investment_amount: number | null;
+  meeting_ticket_balance: number | null;
+  meeting_ticket_plan: string | null;
+  meeting_ticket_requested_count: number | null;
+  meeting_ticket_requested_amount: number | null;
+  meeting_ticket_payment_status: string | null;
+  meeting_ticket_transfer_name: string | null;
+};
+
+export type InvestorProfile = {
+  id: string;
+  user_id: string;
+  account_name: string | null;
+  full_name: string;
+  company_name: string | null;
+  position: string | null;
+  location: string | null;
+  founded_month: string | null;
+  employee_size: string | null;
+  annual_revenue_scale: string | null;
+  avatar_url: string | null;
+  investor_type: string | null;
+  corporate_number: string | null;
+  license_file_path: string | null;
+  total_investment_amount: number | null;
+  investment_fields: string | null;
+  investable_amount: number | null;
+  interested_phases: string | null;
+  past_investments: string | null;
+  support_areas: string | null;
+  purpose: string[] | null;
+  document_type: string | null;
+  document_file_path: string | null;
+  document_status: string | null;
+  document_submitted_at: string | null;
+};
+
+export type StartupKpi = {
+  id: string;
+  entrepreneur_id: string;
+  kpi_month: string;
+  monthly_revenue: number | null;
+  customer_count: number | null;
+  mau: number | null;
+  retention_rate: number | null;
+  gross_margin: number | null;
+};
+
+export type ProgressPost = {
+  id: string;
+  entrepreneur_id: string;
+  user_id: string;
+  did_today: string;
+  metric_change: string | null;
+  issue: string | null;
+  next_action: string | null;
+  post_type: string | null;
+  title: string | null;
+  body: string | null;
+  related_kpi: string | null;
+  tags: string[] | null;
+  visibility: string;
+  view_count: number | null;
+  like_count?: number;
+  comment_count?: number;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  is_hidden: boolean;
+  created_at: string;
+  entrepreneur_profiles?: EntrepreneurProfile;
+};
+
+export type UserBlock = {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+};
