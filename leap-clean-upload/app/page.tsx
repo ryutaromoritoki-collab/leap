@@ -417,7 +417,7 @@ function withAdminAccount(accounts: Account[]): Account[] {
 }
 
 async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number; failed?: number }> {
-  const recipients = Array.isArray(to) ? to.filter(Boolean) : [to].filter(Boolean);
+  const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map((email) => email.trim().toLowerCase()).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))));
   if (recipients.length === 0) return { ok: false, error: '送信先メールアドレスがありません。' };
   try {
     const response = await fetch('/api/send-direct-email', {
@@ -431,6 +431,11 @@ async function sendDirectEmail(to: string | string[], subject: string, body: str
   } catch {
     return { ok: false, error: 'メール送信APIに接続できませんでした。' };
   }
+}
+
+function canReceiveBroadcastEmail(account: Account) {
+  const email = account.email.trim().toLowerCase();
+  return !account.isBot && !account.isDeleted && account.emailNotificationsEnabled !== false && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.endsWith('.local');
 }
 
 function readFileAsDataUrl(file: File, onDone: (url: string) => void) {
@@ -1684,6 +1689,8 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   const hiddenPosts = posts.filter((post) => post.isHidden);
   const pendingMeetings = meetingApplications.filter((application) => application.status === 'pending');
   const activeUsers = accounts.filter((account) => account.email.trim().toLowerCase() !== adminEmail && !account.isDeleted);
+  const broadcastEmailRecipients = Array.from(new Set(activeUsers.filter(canReceiveBroadcastEmail).map((account) => account.email.trim().toLowerCase())));
+  const skippedEmailRecipients = activeUsers.length - broadcastEmailRecipients.length;
   function approveTicket(account: Account) {
     const count = Number(account.ticketRequestPlan.replace('枚', '')) || 1;
     setAccounts(accounts.map((item) => item.id === account.id ? { ...item, ticketBalance: item.ticketBalance + count, ticketRequestStatus: 'none', ticketRequestPlan: '', ticketTransferName: '' } : item));
@@ -1718,20 +1725,21 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   }
   async function sendBroadcastEmail() {
     if (!broadcastEmailBody.trim()) return;
-    const recipients = Array.from(new Set(activeUsers.filter((account) => account.email.includes('@')).map((account) => account.email.trim())));
+    const recipients = broadcastEmailRecipients;
     if (recipients.length === 0) {
-      setBroadcastEmailStatus('送信対象のメールアドレスがありません。登録メールアドレスを確認してください。');
+      setBroadcastEmailStatus('送信対象のメールアドレスがありません。実在するメールアドレス・メール通知オン・削除されていないユーザーのみ送信対象です。');
       return;
     }
-    setBroadcastEmailStatus('送信中です...');
+    setBroadcastEmailStatus(`${recipients.length}件へ送信中です...`);
     const result = await sendDirectEmail(recipients, broadcastSubject || 'Leap運営からのお知らせ', broadcastEmailBody);
     if (result.ok) {
       const failedText = result.failed ? `（${result.failed}件は失敗）` : '';
-      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。${failedText}${result.error ? `\n${result.error}` : ''}`);
+      const skippedText = skippedEmailRecipients > 0 ? `\n${skippedEmailRecipients}件はメール未設定・通知オフ・bot等のため送信対象外です。` : '';
+      setBroadcastEmailStatus(`${result.sent ?? recipients.length}件へ一斉メールを送信しました。${failedText}${skippedText}${result.error ? `\n${result.error}` : ''}`);
       setBroadcastEmailBody('');
       return;
     }
-    setBroadcastEmailStatus(`一斉メール送信に失敗しました：${result.error || '原因不明のエラー'}`);
+    setBroadcastEmailStatus(`一斉メール送信に失敗しました：${result.error || '原因不明のエラー'}\n\n確認項目：VercelのRESEND_API_KEYがre_から始まる値か、NOTIFICATION_FROM_EMAILがResendで認証済みドメインのメールかを確認してください。`);
     return;
   }
   return (
@@ -1793,8 +1801,9 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <button className="primary mt-3 w-full" onClick={sendBroadcastMessage}>全ユーザーへメッセージ送信</button>
         <Input label="メール件名" value={broadcastSubject} onChange={setBroadcastSubject} />
         <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">登録メールアドレスへの一斉DM<textarea className="field min-h-24 resize-none" value={broadcastEmailBody} onChange={(event) => setBroadcastEmailBody(event.target.value)} /></label>
-        <button className="secondary mt-3 w-full" onClick={sendBroadcastEmail}>登録メールアドレスへ一斉メール送信</button>
-        {broadcastEmailStatus && <p className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-6 text-slate-600">{broadcastEmailStatus}</p>}
+        <p className="mt-2 rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-5 text-blue-700">送信対象：{broadcastEmailRecipients.length}件 / 対象外：{skippedEmailRecipients}件。実在するメールアドレスで、通知オンのユーザーだけに送信します。</p>
+        <button className="secondary mt-3 w-full disabled:opacity-50" disabled={broadcastEmailRecipients.length === 0 || !broadcastEmailBody.trim()} onClick={sendBroadcastEmail}>登録メールアドレスへ一斉メール送信</button>
+        {broadcastEmailStatus && <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-6 text-slate-600">{broadcastEmailStatus}</p>}
       </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">投稿管理</h2>
