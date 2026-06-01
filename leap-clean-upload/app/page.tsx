@@ -38,6 +38,7 @@ type FeedTab = 'following' | 'recommended' | 'investors' | 'entrepreneurs';
 type Visibility = 'public' | 'followers' | 'investors' | 'entrepreneurs' | 'draft';
 type BusinessType = 'corporation' | 'sole';
 type MessageKind = 'direct' | 'meeting';
+type IdentityStatus = 'none' | 'submitted' | 'verified' | 'resubmit';
 
 type Account = {
   id: string;
@@ -49,6 +50,7 @@ type Account = {
   businessType: BusinessType;
   corporateNumber: string;
   licenseFileName: string;
+  identityStatus: IdentityStatus;
   accountName: string;
   name: string;
   company: string;
@@ -177,6 +179,7 @@ const emptyAccount: Account = {
   businessType: 'corporation',
   corporateNumber: '',
   licenseFileName: '',
+  identityStatus: 'none',
   accountName: '',
   name: '',
   company: '',
@@ -346,9 +349,12 @@ function saveLocal<T>(key: string, value: T) {
 }
 
 function normalizeAccount(account: Account): Account {
+  const hasIdentityMaterial = Boolean(account.corporateNumber || account.licenseFileName);
+  const identityStatus = account.identityStatus || (account.verified ? 'verified' : hasIdentityMaterial ? 'submitted' : 'none');
   return {
     ...emptyAccount,
     ...account,
+    identityStatus,
     followingIds: Array.isArray(account.followingIds) ? account.followingIds : [],
     followerIds: Array.isArray(account.followerIds) ? account.followerIds : [],
     hideSocialGraph: Boolean(account.hideSocialGraph),
@@ -361,6 +367,7 @@ function normalizeAccount(account: Account): Account {
     age: account.age || '',
     gender: account.gender || '',
     ticketTransferName: account.ticketTransferName || '',
+    verified: identityStatus === 'verified' || identityStatus === 'submitted',
   };
 }
 
@@ -1476,7 +1483,9 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
     flash('電話番号を変更しました');
   }
   function save() {
-    const next: Account = { ...form, id: form.id || crypto.randomUUID(), avatarLabel: form.avatarLabel || (form.accountName || form.name || 'L').slice(0, 1), verified: Boolean(form.corporateNumber || form.licenseFileName) };
+    const hasIdentityMaterial = Boolean(form.corporateNumber || form.licenseFileName);
+    const nextIdentityStatus: IdentityStatus = hasIdentityMaterial ? (form.identityStatus === 'verified' ? 'verified' : 'submitted') : 'none';
+    const next: Account = { ...form, id: form.id || crypto.randomUUID(), avatarLabel: form.avatarLabel || (form.accountName || form.name || 'L').slice(0, 1), identityStatus: nextIdentityStatus, verified: hasIdentityMaterial };
     if (currentAccount && next.email.trim().toLowerCase() !== currentAccount.email.trim().toLowerCase()) {
       setContactMessage('メールアドレスは確認メールの認証後に変更されます。先に「確認メールを送る」を押してください。');
       next.email = currentAccount.email;
@@ -1547,6 +1556,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">認証・連絡設定</h2>
+            {form.identityStatus === 'resubmit' && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold leading-6 text-rose-700">本人確認資料に不備があります。法人の場合は法人番号、個人事業主の場合は運転免許証の写真を再提出してください。</p>}
             {currentAccount && (
               <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
                 <p className="text-xs font-black text-slate-700">ログイン情報</p>
@@ -1623,6 +1633,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           <label className="grid gap-1 text-[11px] font-bold text-slate-600">実績<textarea className="field min-h-20 resize-none" placeholder="受賞歴、導入実績、投資実績、支援実績など" value={form.achievements} onChange={(event) => update('achievements', event.target.value)} /></label>
           <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.emailNotificationsEnabled} onChange={(event) => update('emailNotificationsEnabled', event.target.checked)} />コメント・面談希望・運営連絡などのメール通知を受け取る</label>
           <label className="flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-600"><input type="checkbox" checked={form.hideSocialGraph} onChange={(event) => update('hideSocialGraph', event.target.checked)} />フォロー・フォロワーリストを他のユーザーに非表示にする</label>
+          {form.identityStatus === 'resubmit' && <p className="rounded-2xl bg-rose-50 p-3 text-xs font-bold leading-6 text-rose-700">本人確認資料に不備があります。再提出してください。</p>}
           <Select label="本人確認種別" value={form.businessType} options={['corporation', 'sole']} displayMap={{ corporation: '法人', sole: '個人事業主' }} onChange={(value) => update('businessType', value)} />
           {form.businessType === 'corporation' ? <Input label="法人番号" value={form.corporateNumber} onChange={(value) => update('corporateNumber', value)} /> : <label className="grid gap-1 text-[11px] font-bold text-slate-600">運転免許証の写真<input className="field" type="file" accept="image/*" onChange={(event) => update('licenseFileName', event.target.files?.[0]?.name || '')} />{form.licenseFileName && <span className="text-slate-500">{form.licenseFileName}</span>}</label>}
           <Input label="投資可能額" value={form.investmentRange} onChange={(value) => update('investmentRange', value)} />
@@ -1689,6 +1700,7 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
   const hiddenPosts = posts.filter((post) => post.isHidden);
   const pendingMeetings = meetingApplications.filter((application) => application.status === 'pending');
   const activeUsers = accounts.filter((account) => account.email.trim().toLowerCase() !== adminEmail && !account.isDeleted);
+  const identitySubmissions = activeUsers.filter((account) => account.corporateNumber || account.licenseFileName || account.identityStatus === 'resubmit');
   const broadcastEmailRecipients = Array.from(new Set(activeUsers.filter(canReceiveBroadcastEmail).map((account) => account.email.trim().toLowerCase())));
   const skippedEmailRecipients = activeUsers.length - broadcastEmailRecipients.length;
   function approveTicket(account: Account) {
@@ -1709,6 +1721,19 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
     setAccounts(accounts.map((item) => item.id === account.id ? { ...item, isDeleted: true, isHidden: true } : item));
     setPosts(posts.filter((post) => post.authorId !== account.id));
     void sendDirectEmail(account.email, 'Leap: アカウント削除のお知らせ', '運営によりアカウントが削除されました。');
+  }
+  function approveIdentity(account: Account) {
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, verified: true, identityStatus: 'verified' } : item));
+    setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: '本人確認資料が承認されました', createdAt: new Date().toISOString(), unread: true }, ...list]);
+  }
+  function removeIdentityMark(account: Account) {
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, verified: false, identityStatus: 'none' } : item));
+    setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: '本人確認済みマークが解除されました', createdAt: new Date().toISOString(), unread: true }, ...list]);
+  }
+  function requestIdentityResubmission(account: Account) {
+    setAccounts(accounts.map((item) => item.id === account.id ? { ...item, verified: false, identityStatus: 'resubmit', corporateNumber: '', licenseFileName: '' } : item));
+    setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: '本人確認資料に不備があります。プロフィール編集から再提出してください。', createdAt: new Date().toISOString(), unread: true }, ...list]);
+    if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: 本人確認資料の再提出をお願いします', '本人確認資料に不備がありました。プロフィール編集画面から、法人の場合は法人番号、個人事業主の場合は運転免許証の写真を再提出してください。');
   }
   function sendBroadcastMessage() {
     if (!broadcastMessage.trim()) return;
@@ -1751,6 +1776,35 @@ function AdminPage({ accounts, posts, meetingApplications, setAccounts, setPosts
         <AdminStat label="チケット申請" value={`${pendingTickets.length}件`} />
         <AdminStat label="面談申請" value={`${pendingMeetings.length}件`} />
       </div>
+      <section className="mt-5 rounded-2xl border border-slate-100 p-4">
+        <h2 className="text-sm font-black">本人確認資料確認</h2>
+        {identitySubmissions.length === 0 ? <p className="mt-3 text-sm text-slate-500">確認できる本人確認資料はまだありません。</p> : (
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {identitySubmissions.map((account) => (
+              <div key={account.id} className="rounded-2xl bg-slate-50 p-3">
+                <button className="flex w-full items-center gap-3 text-left" onClick={() => openProfile(account)}>
+                  <Avatar account={account} />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-sm">{displayAccountName(account)} {account.verified && <CheckCircle2 className="inline text-blue-600" size={14} />}</b>
+                    <span className="block truncate text-xs text-slate-500">{account.company || '会社名未設定'} / {account.role === 'entrepreneur' ? '起業家' : '投資家'}</span>
+                  </span>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${account.identityStatus === 'resubmit' ? 'bg-rose-50 text-rose-700' : account.verified ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>{account.identityStatus === 'resubmit' ? '再提出依頼中' : account.verified ? '本人確認済み' : '提出済み'}</span>
+                </button>
+                <div className="mt-3 rounded-2xl bg-white p-3 text-xs font-bold leading-6 text-slate-600">
+                  <p>本人確認種別：{account.businessType === 'corporation' ? '法人' : '個人事業主'}</p>
+                  {account.businessType === 'corporation' ? <p>法人番号：{account.corporateNumber || '未提出'}</p> : <p>運転免許証：{account.licenseFileName || '未提出'}</p>}
+                  <p>登録メール：{account.email || '未登録'}</p>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button className="rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-black text-white" onClick={() => approveIdentity(account)}>承認</button>
+                  <button className="secondary min-h-9 text-[11px]" onClick={() => removeIdentityMark(account)}>マーク解除</button>
+                  <button className="rounded-xl border border-rose-100 px-3 py-2 text-[11px] font-black text-rose-600" onClick={() => requestIdentityResubmission(account)}>再提出依頼</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
       <section className="mt-5 rounded-2xl border border-slate-100 p-4">
         <h2 className="text-sm font-black">面談申請一覧</h2>
         {meetingApplications.length === 0 ? <p className="mt-3 text-sm text-slate-500">面談申請はまだありません。</p> : (
@@ -1987,6 +2041,8 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
           <h2 className="truncate text-xl font-black">{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={16} />} {account.isBot && <span className="align-middle rounded-full bg-indigo-50 px-2 py-1 text-[10px] text-indigo-700">AI運用</span>}</h2>
           <p className="mt-1 text-xs text-slate-500">@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
           <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
+          {account.verified && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700"><CheckCircle2 size={13} />本人確認済み</span>}
+          {isMine && account.identityStatus === 'resubmit' && <span className="mt-2 inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">本人確認資料の再提出が必要です</span>}
         </div>
       </div>
       {!compact && (
