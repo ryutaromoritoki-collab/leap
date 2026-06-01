@@ -2,14 +2,24 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+function cleanEnv(value: string | undefined) {
+  return (value ?? '').trim().replace(/^['"]|['"]$/g, '').replace(/^Bearer\s+/i, '').replace(/^Value\s+/i, '').trim();
+}
+
 export async function POST(request: Request) {
-  const resendApiKey = (process.env.RESEND_API_KEY ?? '').trim().replace(/^Bearer\s+/i, '').replace(/^Value\s+/i, '');
-  const fromEmail = process.env.NOTIFICATION_FROM_EMAIL ?? 'Leap <no-reply@leap-club.jp>';
+  const resendApiKey = cleanEnv(process.env.RESEND_API_KEY);
+  const fromEmail = cleanEnv(process.env.NOTIFICATION_FROM_EMAIL) || 'Leap <no-reply@leap-club.jp>';
   const { to, subject, body } = await request.json().catch(() => ({ to: '', subject: '', body: '' }));
-  const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map((email) => typeof email === 'string' ? email.trim() : '').filter((email) => email.includes('@'))));
+  const recipients = Array.from(new Set((Array.isArray(to) ? to : [to]).map((email) => typeof email === 'string' ? email.trim().toLowerCase() : '').filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))));
 
   if (!resendApiKey) {
     return NextResponse.json({ error: 'RESEND_API_KEYをVercelに設定してください。' }, { status: 500 });
+  }
+  if (!resendApiKey.startsWith('re_')) {
+    return NextResponse.json({ error: 'RESEND_API_KEYの形式が正しくありません。ResendのAPI Keysで発行した「re_」から始まるキーだけを設定してください。' }, { status: 500 });
+  }
+  if (!fromEmail.includes('@')) {
+    return NextResponse.json({ error: 'NOTIFICATION_FROM_EMAILの形式が正しくありません。例：Leap <no-reply@leap-club.jp>' }, { status: 500 });
   }
   if (recipients.length === 0 || !subject || !body) {
     return NextResponse.json({ error: 'to、subject、bodyは必須です。' }, { status: 400 });
@@ -43,7 +53,7 @@ export async function POST(request: Request) {
       } catch {
         message = raw;
       }
-      errors.push({ email: recipient, error: message });
+      errors.push({ email: recipient, error: `HTTP ${response.status}: ${message}` });
     }
   }
   if (errors.length > 0) {
