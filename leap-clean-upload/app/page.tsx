@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Bell,
@@ -1057,13 +1057,13 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           ['entrepreneurs', '起業家'],
         ].map(([key, label]) => <button key={key} className={`py-2.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
       </div>
-      <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-3 py-2">
+      {feedTab !== 'following' && <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-3 py-2">
         <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
           <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
           投稿する
         </button>
         {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
-      </div>
+      </div>}
       {posts.length === 0 ? (
         <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
@@ -1143,8 +1143,8 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
         <button className={`py-2.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
-        <div className="px-3 py-3">
-          <div className="rounded-2xl bg-slate-50 px-4 py-4">
+        <div className={tab === 'unread' ? 'px-3 py-0' : 'px-3 py-3'}>
+          <div className={`rounded-2xl bg-slate-50 px-4 py-4 ${tab === 'unread' ? 'rounded-t-none' : ''}`}>
             <p className="text-sm font-black text-slate-700">{tab === 'unread' ? '未読通知はありません' : '通知はまだありません'}</p>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">フォロー、コメント、面談申込、メッセージが届くと表示されます。</p>
           </div>
@@ -1181,6 +1181,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
   const [meetingTime, setMeetingTime] = useState('');
   const [attachment, setAttachment] = useState<{ name: string; url: string; type: 'image' | 'file' } | undefined>();
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+  const partnerScrollerRef = useRef<HTMLDivElement | null>(null);
   const directPartners = accounts.filter((account) => account.id !== currentAccount?.id);
   const approvedPartnerIds = new Set(messages.filter((message) => message.kind === 'meeting' || message.meetingStatus === 'approved').map((message) => message.senderId === currentAccount?.id ? message.recipientId || message.partnerId : message.senderId || message.partnerId));
   const unreadMessageIds = new Set(messages.filter((message) => {
@@ -1239,9 +1240,13 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
         <button className={`py-3 ${mode === 'direct' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('direct')}>個別メッセージ</button>
         <button className={`py-3 ${mode === 'meeting' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('meeting')}>面談メッセージ</button>
       </div>
-      <div className="min-w-0 overflow-x-auto border-b border-slate-100 px-4 py-3 [scrollbar-width:thin]">
-        <div className="flex w-max min-w-full gap-3">
+      <div className="relative border-b border-slate-100">
+        <button className="absolute left-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white shadow-sm lg:grid" onClick={() => partnerScrollerRef.current?.scrollBy({ left: -220, behavior: 'smooth' })} aria-label="左へスクロール"><ChevronLeft size={16} /></button>
+        <button className="absolute right-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white shadow-sm lg:grid" onClick={() => partnerScrollerRef.current?.scrollBy({ left: 220, behavior: 'smooth' })} aria-label="右へスクロール"><ChevronLeft size={16} className="rotate-180" /></button>
+        <div ref={partnerScrollerRef} className="min-w-0 overflow-x-auto px-4 py-3 [scrollbar-width:thin] lg:px-12">
+          <div className="flex w-max min-w-full gap-3">
         {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{displayAccountName(partner)}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
+          </div>
         </div>
       </div>
       {!activePartner ? (
@@ -1409,12 +1414,21 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
 }
 
 function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  const [socialModal, setSocialModal] = useState<'following' | 'followers' | null>(null);
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
   }
+  const normalized = normalizeAccount(currentAccount);
+  const followingAccounts = normalized.followingIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean) as Account[];
+  const followerAccounts = normalized.followerIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean) as Account[];
+  const modalAccounts = socialModal === 'following' ? followingAccounts : followerAccounts;
   return (
     <div className="p-4">
       <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-lg">{followingAccounts.length}</span>フォロー一覧を見る</button>
+        <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-lg">{followerAccounts.length}</span>フォロワー一覧を見る</button>
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button className="secondary" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>
         <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
@@ -1422,6 +1436,23 @@ function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startE
       <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
         {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
       </div>
+      {socialModal && (
+        <Modal title={socialModal === 'following' ? 'フォロー中' : 'フォロワー'} onClose={() => setSocialModal(null)}>
+          {modalAccounts.length === 0 ? <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">まだメンバーはいません。</p> : (
+            <div className="grid max-h-[60vh] gap-2 overflow-y-auto">
+              {modalAccounts.map((account) => (
+                <div key={account.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3">
+                  <Avatar account={account} />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-sm">{displayAccountName(account)}</b>
+                    <span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.company || '会社名未設定'}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

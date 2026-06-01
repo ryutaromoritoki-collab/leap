@@ -6,6 +6,10 @@ function cleanEnv(value: string | undefined) {
   return (value ?? '').trim().replace(/^['"]|['"]$/g, '').replace(/^Bearer\s+/i, '').replace(/^Value\s+/i, '').trim();
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function POST(request: Request) {
   const resendApiKey = cleanEnv(process.env.RESEND_API_KEY);
   const fromEmail = cleanEnv(process.env.NOTIFICATION_FROM_EMAIL) || 'Leap <no-reply@leap-club.jp>';
@@ -27,7 +31,9 @@ export async function POST(request: Request) {
 
   let sent = 0;
   const errors: Array<{ email: string; error: string }> = [];
-  for (const recipient of recipients) {
+  for (let index = 0; index < recipients.length; index += 1) {
+    if (index > 0) await wait(650);
+    const recipient = recipients[index];
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
