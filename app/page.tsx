@@ -1065,7 +1065,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
         {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
       </div>}
       {posts.length === 0 ? (
-        <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
+        <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
         <div className="divide-y divide-slate-100">
           {posts.map((post) => {
@@ -1143,8 +1143,8 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
         <button className={`py-1.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
-        <div className={tab === 'unread' ? 'px-3 py-0' : 'px-3 py-3'}>
-          <div className={`rounded-2xl bg-slate-50 px-4 py-4 ${tab === 'unread' ? 'rounded-t-none' : ''}`}>
+        <div className={tab === 'unread' ? 'px-0 py-0' : 'px-3 py-3'}>
+          <div className={`${tab === 'unread' ? 'rounded-none px-3 py-2' : 'rounded-2xl px-4 py-4'} bg-slate-50`}>
             <p className="text-sm font-black text-slate-700">{tab === 'unread' ? '未読通知はありません' : '通知はまだありません'}</p>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">フォロー、コメント、面談申込、メッセージが届くと表示されます。</p>
           </div>
@@ -2124,7 +2124,21 @@ function KpiGrid({ account }: { account: Account }) {
   return <div className="mt-3 grid grid-cols-3 gap-2">{items.map(([label, value]) => <div className="rounded-2xl border border-slate-100 p-3" key={label}><span className="text-[10px] font-bold text-slate-500">{label}</span><b className="mt-2 block break-words text-xs">{value || '未入力'}</b></div>)}</div>;
 }
 
-function EmptyState({ icon, title, body, action, onAction }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void }) {
+function EmptyState({ icon, title, body, action, onAction, compact }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void; compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="px-3 py-2 text-left">
+        <div className="flex items-center gap-3 rounded-none bg-slate-50 px-3 py-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-black">{title}</h2>
+            <p className="mt-0.5 text-xs leading-5 text-slate-500">{body}</p>
+          </div>
+          {action && <button className="primary min-h-9 shrink-0 px-4 py-2 text-[11px]" onClick={onAction}>{action}</button>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="grid min-h-52 place-items-center p-5 text-center">
       <div>
