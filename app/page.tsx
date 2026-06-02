@@ -386,6 +386,13 @@ function displayPostAuthorName(account?: Account | null): string {
   return name || '名前未設定';
 }
 
+function scrollContentToTop() {
+  requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  });
+}
+
 function replaceAccountIds(text: string, accounts: Account[]): string {
   return accounts.reduce((body, account) => body.replaceAll(account.id, displayAccountName(account)), text);
 }
@@ -938,7 +945,7 @@ export default function LeapApp() {
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
 
-        <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
+        <section data-app-scroll className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {page === 'feed' && (
             <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -1007,17 +1014,17 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
   const compact = page === 'feed' || page === 'notifications';
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
-      <div className={`grid grid-cols-[40px_1fr_72px] items-center px-3 ${compact ? 'h-8' : 'h-14'}`}>
-        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={compact ? 18 : 20} /> : <BriefcaseBusiness size={compact ? 17 : 20} />}
+      <div className={`grid grid-cols-[40px_1fr_72px] items-center px-3 ${compact ? 'h-7' : 'h-14'}`}>
+        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={compact ? 17 : 20} /> : <BriefcaseBusiness size={compact ? 16 : 20} />}
         </button>
         <h1 className={`text-center ${compact ? 'text-xs' : 'text-sm'} font-black`}>{title[page]}</h1>
         <div className="flex items-center justify-end gap-1">
-          <button className={`relative grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} aria-label="通知" onClick={() => setPage('notifications')}>
-            <Bell size={compact ? 17 : 19} />
+          <button className={`relative grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
+            <Bell size={compact ? 16 : 19} />
             {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
           </button>
-          <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 18 : 20} /></button>
+          <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 17 : 20} /></button>
         </div>
       </div>
       {menuOpen && (
@@ -1066,7 +1073,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
           ['entrepreneurs', '起業家'],
-        ].map(([key, label]) => <button key={key} className={`py-1 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
+        ].map(([key, label]) => <button key={key} className={`py-0.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => { setFeedTab(key as FeedTab); scrollContentToTop(); }}>{label}</button>)}
       </div>
       {feedTab !== 'following' && <div className="flex gap-2.5 overflow-x-auto border-b border-slate-100 px-3 py-1.5">
         <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
@@ -1150,8 +1157,8 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
   return (
     <div>
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-1.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
-        <button className={`py-1.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
+        <button className={`py-0.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('all'); scrollContentToTop(); }}>すべて</button>
+        <button className={`py-0.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('unread'); scrollContentToTop(); }}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
         <div className={tab === 'unread' ? 'px-0 py-0' : 'px-3 py-3'}>
@@ -2144,14 +2151,14 @@ function KpiGrid({ account }: { account: Account }) {
 function EmptyState({ icon, title, body, action, onAction, compact }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void; compact?: boolean }) {
   if (compact) {
     return (
-      <div className="px-3 py-2 text-left">
-        <div className="flex items-center gap-3 rounded-none bg-slate-50 px-3 py-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
+      <div className="px-0 py-0 text-left">
+        <div className="flex items-center gap-2.5 rounded-none bg-slate-50 px-3 py-2">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-black">{title}</h2>
-            <p className="mt-0.5 text-xs leading-5 text-slate-500">{body}</p>
+            <h2 className="text-[13px] font-black">{title}</h2>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{body}</p>
           </div>
-          {action && <button className="primary min-h-9 shrink-0 px-4 py-2 text-[11px]" onClick={onAction}>{action}</button>}
+          {action && <button className="primary min-h-8 shrink-0 px-3 py-1.5 text-[10px]" onClick={onAction}>{action}</button>}
         </div>
       </div>
     );
