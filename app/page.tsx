@@ -381,6 +381,11 @@ function displayAccountName(account?: Account | null): string {
   return name || 'アカウント未設定';
 }
 
+function displayPostAuthorName(account?: Account | null): string {
+  const name = account?.name?.trim();
+  return name || '名前未設定';
+}
+
 function replaceAccountIds(text: string, accounts: Account[]): string {
   return accounts.reduce((body, account) => body.replaceAll(account.id, displayAccountName(account)), text);
 }
@@ -1988,17 +1993,34 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const liked = currentAccount ? actions.likes?.includes(currentAccount.id) : false;
   const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
+  const authorName = displayPostAuthorName(author);
   return (
     <article className={`relative px-4 py-3 ${post.isHidden ? 'bg-slate-50' : ''}`}>
-      <div className="flex w-full gap-3 text-left">
-        <button className="flex min-w-0 flex-1 gap-3 text-left" onClick={() => author && openProfile(author)}>
-        {author ? <Avatar account={author} size="feed" /> : <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100"><UserRound size={20} /></span>}
-        <span className="min-w-0 flex-1">
-          <b className="block truncate text-sm">{displayAccountName(author)} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
-          <span className="text-[11px] text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
-        </span>
+      <div className="flex w-full items-start gap-3 text-left">
+        <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
+          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100"><UserRound size={20} /></span>}
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} className="text-slate-400" /></button>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <button className="min-w-0 flex-1 text-left" onClick={() => author && openProfile(author)}>
+              <b className="block truncate text-[13px] font-black leading-5">{authorName} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
+              <span className="block text-[10px] leading-4 text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
+            </button>
+            <button className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} className="text-slate-400" /></button>
+          </div>
+
+          <p className="mt-1 whitespace-pre-line text-[13px] leading-6">{post.body}</p>
+          {post.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+          {post.imageUrl && <button className="mt-2 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
+          {post.attachmentName && <div className="mt-2 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
+          <div className="mt-2 flex items-center gap-4 text-[10px] font-bold text-black">
+            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={13} />応援 {post.likes}</button>
+            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={13} />保存 {post.saves}</button>
+            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={13} />面談 {post.meetings}</button>
+            <span className="ml-auto">閲覧 {post.views}</span>
+          </div>
+        </div>
       </div>
       {menuOpen && isOwner && (
         <div className="absolute right-4 top-12 z-20 w-40 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
@@ -2008,16 +2030,6 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
         </div>
       )}
       {menuOpen && !isOwner && <div className="absolute right-4 top-12 z-20 rounded-2xl border border-slate-100 bg-white p-3 text-xs font-bold text-slate-500 shadow-xl">投稿者のみ操作できます</div>}
-      <p className="mt-3 whitespace-pre-line text-sm leading-7">{post.body}</p>
-      {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
-      {post.imageUrl && <button className="mt-3 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
-      {post.attachmentName && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
-      <div className="mt-2 flex items-center gap-5 text-[10px] font-bold text-black">
-        <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={13} />応援 {post.likes}</button>
-        <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={13} />保存 {post.saves}</button>
-        <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={13} />面談 {post.meetings}</button>
-        <span className="ml-auto">閲覧 {post.views}</span>
-      </div>
       {previewImage && (
         <Modal title={post.imageName || '投稿画像'} onClose={() => setPreviewImage(false)}>
           <img className="max-h-[70vh] w-full rounded-2xl object-contain" src={post.imageUrl} alt={post.imageName || '投稿画像'} />
