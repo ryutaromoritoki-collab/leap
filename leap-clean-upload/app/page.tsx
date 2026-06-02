@@ -386,6 +386,13 @@ function displayPostAuthorName(account?: Account | null): string {
   return name || '名前未設定';
 }
 
+function scrollContentToTop() {
+  requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  });
+}
+
 function replaceAccountIds(text: string, accounts: Account[]): string {
   return accounts.reduce((body, account) => body.replaceAll(account.id, displayAccountName(account)), text);
 }
@@ -936,9 +943,9 @@ export default function LeapApp() {
     <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
       <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:grid-rows-[auto_minmax(0,1fr)] lg:overflow-hidden lg:rounded-[28px]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
 
-        <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
+        <section data-app-scroll className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {page === 'feed' && (
             <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -988,7 +995,7 @@ export default function LeapApp() {
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void> }) {
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -1007,12 +1014,18 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
   const compact = page === 'feed' || page === 'notifications';
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
-      <div className={`flex items-center justify-between px-3 ${compact ? 'h-8' : 'h-14'}`}>
-        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={compact ? 18 : 20} /> : <BriefcaseBusiness size={compact ? 17 : 20} />}
+      <div className={`grid grid-cols-[40px_1fr_72px] items-center px-3 ${compact ? 'h-7' : 'h-14'}`}>
+        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={compact ? 17 : 20} /> : <BriefcaseBusiness size={compact ? 16 : 20} />}
         </button>
-        <h1 className={`${compact ? 'text-xs' : 'text-sm'} font-black`}>{title[page]}</h1>
-        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-7 w-7' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 18 : 20} /></button>
+        <h1 className={`text-center ${compact ? 'text-xs' : 'text-sm'} font-black`}>{title[page]}</h1>
+        <div className="flex items-center justify-end gap-1">
+          <button className={`relative grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
+            <Bell size={compact ? 16 : 19} />
+            {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
+          </button>
+          <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 17 : 20} /></button>
+        </div>
       </div>
       {menuOpen && (
         <div className="absolute right-3 top-12 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
@@ -1055,14 +1068,14 @@ function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPa
 function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   return (
     <div>
-      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
+      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[10px] font-bold text-slate-500">
         {[
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
           ['entrepreneurs', '起業家'],
-        ].map(([key, label]) => <button key={key} className={`py-1.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
+        ].map(([key, label]) => <button key={key} className={`py-0.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => { setFeedTab(key as FeedTab); scrollContentToTop(); }}>{label}</button>)}
       </div>
-      {feedTab !== 'following' && <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-3 py-2">
+      {feedTab !== 'following' && <div className="flex gap-2.5 overflow-x-auto border-b border-slate-100 px-3 py-1.5">
         <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
           <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
           投稿する
@@ -1144,8 +1157,8 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
   return (
     <div>
       <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-1.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
-        <button className={`py-1.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
+        <button className={`py-0.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('all'); scrollContentToTop(); }}>すべて</button>
+        <button className={`py-0.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('unread'); scrollContentToTop(); }}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
         <div className={tab === 'unread' ? 'px-0 py-0' : 'px-3 py-3'}>
@@ -1995,29 +2008,29 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   const authorName = displayPostAuthorName(author);
   return (
-    <article className={`relative px-4 py-3 ${post.isHidden ? 'bg-slate-50' : ''}`}>
-      <div className="flex w-full items-start gap-3 text-left">
+    <article className={`relative px-3 py-2 ${post.isHidden ? 'bg-slate-50' : ''}`}>
+      <div className="flex w-full items-start gap-2.5 text-left">
         <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
-          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-14 w-14 place-items-center rounded-full bg-slate-100"><UserRound size={20} /></span>}
+          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-1.5">
             <button className="min-w-0 flex-1 text-left" onClick={() => author && openProfile(author)}>
               <b className="block truncate text-[13px] font-black leading-5">{authorName} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
               <span className="block text-[10px] leading-4 text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
             </button>
-            <button className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} className="text-slate-400" /></button>
+            <button className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={16} className="text-slate-400" /></button>
           </div>
 
-          <p className="mt-1 whitespace-pre-line text-[13px] leading-6">{post.body}</p>
-          {post.tags.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
-          {post.imageUrl && <button className="mt-2 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
-          {post.attachmentName && <div className="mt-2 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
-          <div className="mt-2 flex items-center gap-4 text-[10px] font-bold text-black">
-            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={13} />応援 {post.likes}</button>
-            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={13} />保存 {post.saves}</button>
-            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={13} />面談 {post.meetings}</button>
+          <p className="mt-0.5 whitespace-pre-line text-[13px] leading-5">{post.body}</p>
+          {post.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[10px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+          {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
+          {post.attachmentName && <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-slate-50 p-2 text-[11px]"><Paperclip size={14} />{post.attachmentName}</div>}
+          <div className="mt-1.5 flex items-center gap-3 text-[9px] font-bold text-black">
+            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={12} />応援 {post.likes}</button>
+            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={12} />保存 {post.saves}</button>
+            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={12} />面談 {post.meetings}</button>
             <span className="ml-auto">閲覧 {post.views}</span>
           </div>
         </div>
@@ -2043,13 +2056,12 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   const tabs = [
     ['feed', 'フィード', Home],
     ['search', '検索', Search],
-    ['notifications', '通知', Bell],
     ['messages', 'メッセージ', Mail],
     ['mypage', 'マイページ', UserRound],
   ] as const;
   return (
-    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-6 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
-      {tabs.slice(0, 3).map(([key, label, Icon]) => (
+    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
+      {tabs.slice(0, 2).map(([key, label, Icon]) => (
         <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
           <Icon size={18} />
           <span>{label}</span>
@@ -2059,7 +2071,7 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
         <Plus size={18} />
         <span>投稿</span>
       </button>
-      {tabs.slice(3).map(([key, label, Icon]) => (
+      {tabs.slice(2).map(([key, label, Icon]) => (
           <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
             <Icon size={18} />
             <span>{label}</span>
@@ -2139,14 +2151,14 @@ function KpiGrid({ account }: { account: Account }) {
 function EmptyState({ icon, title, body, action, onAction, compact }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void; compact?: boolean }) {
   if (compact) {
     return (
-      <div className="px-3 py-2 text-left">
-        <div className="flex items-center gap-3 rounded-none bg-slate-50 px-3 py-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
+      <div className="px-0 py-0 text-left">
+        <div className="flex items-center gap-2.5 rounded-none bg-slate-50 px-3 py-2">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-black">{title}</h2>
-            <p className="mt-0.5 text-xs leading-5 text-slate-500">{body}</p>
+            <h2 className="text-[13px] font-black">{title}</h2>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{body}</p>
           </div>
-          {action && <button className="primary min-h-9 shrink-0 px-4 py-2 text-[11px]" onClick={onAction}>{action}</button>}
+          {action && <button className="primary min-h-8 shrink-0 px-3 py-1.5 text-[10px]" onClick={onAction}>{action}</button>}
         </div>
       </div>
     );
@@ -2174,7 +2186,7 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
 }
 
 function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'feed' | 'lg'; active?: boolean }) {
-  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : size === 'feed' ? 'h-14 w-14 text-base' : 'h-11 w-11 text-sm';
+  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : size === 'feed' ? 'h-12 w-12 text-sm' : 'h-11 w-11 text-sm';
   const label = account.avatarLabel || displayAccountName(account).slice(0, 1) || 'L';
   return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
 }
