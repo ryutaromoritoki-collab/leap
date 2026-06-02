@@ -388,8 +388,10 @@ function displayPostAuthorName(account?: Account | null): string {
 
 function scrollContentToTop() {
   requestAnimationFrame(() => {
-    document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
-    window.scrollTo({ top: 0 });
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0 });
+    });
   });
 }
 
@@ -1011,20 +1013,19 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
     admin: '管理者画面',
   };
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
-  const compact = page === 'feed' || page === 'notifications';
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
-      <div className={`grid grid-cols-[40px_1fr_72px] items-center px-3 ${compact ? 'h-7' : 'h-14'}`}>
-        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={compact ? 17 : 20} /> : <BriefcaseBusiness size={compact ? 16 : 20} />}
+      <div className="grid h-14 grid-cols-[40px_1fr_72px] items-center px-3">
+        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
         </button>
-        <h1 className={`text-center ${compact ? 'text-xs' : 'text-sm'} font-black`}>{title[page]}</h1>
+        <h1 className="text-center text-sm font-black">{title[page]}</h1>
         <div className="flex items-center justify-end gap-1">
-          <button className={`relative grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
-            <Bell size={compact ? 16 : 19} />
+          <button className="relative grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
+            <Bell size={19} />
             {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
           </button>
-          <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 17 : 20} /></button>
+          <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={20} /></button>
         </div>
       </div>
       {menuOpen && (
@@ -1586,7 +1587,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">ストーリー</h2>
-            <p className="mt-1 text-xs font-bold text-slate-500">Wantedlyの会社紹介のように、想いと事業内容が伝わる文章にしてください。</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">あなたの会社の想いと事業内容が伝わる文章にしてください。</p>
             <label className="mt-4 grid gap-1 text-[11px] font-bold text-slate-600">会社紹介・事業の背景<textarea className="field min-h-36 resize-none leading-7" placeholder={'例）私たちは、〇〇業界で起きている「〇〇」という課題を解決するために事業を始めました。\n\n現在は〇〇向けに〇〇を提供しており、利用者は〇〇をより簡単に、早く、安全に行えるようになります。\n\nこの事業で目指しているのは、〇〇な社会をつくることです。今後は〇〇を強化し、〇〇領域まで展開していきます。'} value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
             <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">実績・トラクション<textarea className="field min-h-28 resize-none leading-7" placeholder={'例）現在の導入社数は〇社、月間売上は〇万円です。\n\n直近では〇〇を達成し、前月比〇％で成長しています。\n\n主な実績として、〇〇への導入、〇〇との提携、〇〇賞の受賞があります。投資家の方には、〇〇の支援を期待しています。'} value={form.achievements} onChange={(event) => update('achievements', event.target.value)} /></label>
           </section>
