@@ -388,8 +388,10 @@ function displayPostAuthorName(account?: Account | null): string {
 
 function scrollContentToTop() {
   requestAnimationFrame(() => {
-    document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
-    window.scrollTo({ top: 0 });
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0 });
+    });
   });
 }
 
@@ -1011,20 +1013,19 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
     admin: '管理者画面',
   };
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
-  const compact = page === 'feed' || page === 'notifications';
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
-      <div className={`grid grid-cols-[40px_1fr_72px] items-center px-3 ${compact ? 'h-7' : 'h-14'}`}>
-        <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={compact ? 17 : 20} /> : <BriefcaseBusiness size={compact ? 16 : 20} />}
+      <div className="grid h-14 grid-cols-[40px_1fr_72px] items-center px-3">
+        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
         </button>
-        <h1 className={`text-center ${compact ? 'text-xs' : 'text-sm'} font-black`}>{title[page]}</h1>
+        <h1 className="text-center text-sm font-black">{title[page]}</h1>
         <div className="flex items-center justify-end gap-1">
-          <button className={`relative grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
-            <Bell size={compact ? 16 : 19} />
+          <button className="relative grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
+            <Bell size={19} />
             {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
           </button>
-          <button className={`grid place-items-center rounded-full hover:bg-slate-50 ${compact ? 'h-6 w-6' : 'h-9 w-9'}`} aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={compact ? 17 : 20} /></button>
+          <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={20} /></button>
         </div>
       </div>
       {menuOpen && (
