@@ -387,12 +387,18 @@ function displayPostAuthorName(account?: Account | null): string {
 }
 
 function scrollContentToTop() {
+  const scroll = () => {
+    document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  };
+  scroll();
   requestAnimationFrame(() => {
+    scroll();
     requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
-      window.scrollTo({ top: 0 });
+      scroll();
     });
   });
+  setTimeout(scroll, 80);
 }
 
 function replaceAccountIds(text: string, accounts: Account[]): string {
@@ -1067,9 +1073,13 @@ function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPa
 }
 
 function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  useEffect(() => {
+    scrollContentToTop();
+  }, [feedTab]);
+
   return (
     <div>
-      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[10px] font-bold text-slate-500">
+      <div className="sticky top-0 z-20 grid grid-cols-3 border-b border-slate-100 bg-white text-center text-[10px] font-bold text-slate-500">
         {[
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
@@ -1149,6 +1159,10 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const ownNotices = notices.filter((notice) => !notice.userId || notice.userId === currentAccount?.id);
   const visibleNotices = tab === 'unread' ? ownNotices.filter((notice) => notice.unread) : ownNotices;
+  useEffect(() => {
+    scrollContentToTop();
+  }, [tab]);
+
   function openNotice(notice: Notice) {
     const readNotice = { ...notice, unread: false };
     setNotices(notices.map((item) => item.id === notice.id ? readNotice : item));
@@ -1157,7 +1171,7 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
 
   return (
     <div>
-      <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
+      <div className="sticky top-0 z-20 grid grid-cols-2 border-b border-slate-100 bg-white text-center text-[11px] font-bold">
         <button className={`py-0.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('all'); scrollContentToTop(); }}>すべて</button>
         <button className={`py-0.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('unread'); scrollContentToTop(); }}>未読</button>
       </div>
