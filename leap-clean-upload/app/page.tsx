@@ -949,7 +949,7 @@ export default function LeapApp() {
 
   return (
     <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
-      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:grid-rows-[auto_minmax(0,1fr)] lg:overflow-hidden lg:rounded-[28px]">
+      <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
 
