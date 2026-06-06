@@ -962,18 +962,6 @@ export default function LeapApp() {
 
   function requestMeeting(account: Account) {
     if (!requireAccount()) return;
-    if (account.isBot) {
-      const body = 'お問い合わせありがとうございます。参考アカウントのため、面談は受け付けていません。公開プロフィールや投稿に関する質問にはメッセージで回答します。';
-      setMessages((list) => [
-        { id: crypto.randomUUID(), partnerId: account.id, senderId: account.id, recipientId: currentAccount!.id, kind: 'direct', body, createdAt: new Date().toISOString(), mine: false, meetingStatus: 'rejected' },
-        ...list,
-      ]);
-      setSelectedAccountId(account.id);
-      setMessageMode('direct');
-      setPage('messages');
-      flash('この参考アカウントは面談を受け付けていません');
-      return;
-    }
     const body = `${displayAccountName(currentAccount) || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
     setMessages((list) => [
       { id: crypto.randomUUID(), partnerId: account.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body: '面談申請を送信しました。相手が承認すると面談メッセージに移行できます。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'requested' },
@@ -1463,7 +1451,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
         <div className="overflow-y-auto px-4 py-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{displayAccountName(activePartner)}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
-            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{activePartner.isBot ? '面談不可' : outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
+            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
           </div>
           {mode === 'direct' && incomingRequested && !hasApproved && <div className="mb-3 grid grid-cols-2 gap-2"><button className="primary" onClick={() => approveMeeting(activePartner)}>承認</button><button className="secondary text-rose-600" onClick={() => rejectMeeting(activePartner)}>非承認</button></div>}
           {mode === 'direct' && outgoingRequested && !hasApproved && <p className="mb-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold text-blue-700">相手の承認待ちです。</p>}
@@ -2293,7 +2281,6 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
       {!compact && (
         <>
           <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
-          {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはLeapの投稿・検索・メッセージ体験を確認するための参考アカウントです。面談は受け付けていません。</p>}
           <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
           <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{visibleFollowings.length}</b> フォロー</span><span><b>{visibleFollowers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
           {canShowSocialGraph ? (
