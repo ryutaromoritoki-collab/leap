@@ -236,8 +236,49 @@ const adminAccount: Account = {
 
 const aiPersonNames = ['山田 太郎', '佐藤 花子', '鈴木 健一', '田中 明', '伊藤 真央', '高橋 優', '渡辺 航', '中村 葵', '小林 直樹', '加藤 美咲', '吉田 悠斗', '山本 紗季', '井上 蓮', '木村 彩乃', '林 大輔', '清水 結衣', '斎藤 陽菜', '山崎 匠', '森 里奈', '池田 蒼', '橋本 凛', '石川 翔', '前田 菜月', '藤田 亮', '岡田 美月', '後藤 悠真', '長谷川 栞', '村上 智也', '近藤 愛', '遠藤 颯'];
 const aiInvestorNames = ['松本 拓也', '藤原 玲奈', '青木 大地', '石井 美穂', '坂本 悠介', '西村 沙織', '福田 直人', '太田 佳奈', '三浦 健太', '原田 杏奈', '中川 智', '小川 真由', '岡本 裕也', '松田 千尋', '中島 亮介', '平野 彩', '上田 航平', '森田 奈緒', '内田 諒', '柴田 優香', '酒井 慎', '宮本 由衣', '横山 大輔', '安藤 萌', '島田 啓太', '片山 香織', '大野 翔太', '栗原 梨央', '西田 司', '杉山 美里'];
-const aiCompanyWords = ['NextFlow', 'GreenBridge', 'RetailMind', 'CareSync', 'FinPulse', 'HRWave', 'LogiCore', 'EduLift', 'MedLink', 'LegalBase'];
+const aiCompanyWords = [
+  'NextFlow', 'GreenBridge', 'RetailMind', 'CareSync', 'FinPulse', 'HRWave', 'LogiCore', 'EduLift', 'MedLink', 'LegalBase',
+  'BuildVista', 'AgriNest', 'TravelMesh', 'FoodLoop', 'MediNote', 'SkillBridge', 'SalesPilot', 'FactoryOne', 'LocalGrid', 'PayNest',
+  'ClinicPath', 'CarbonWorks', 'StudyPort', 'WorkShift', 'CraftBank', 'HomeLogi', 'EventHub', 'RiskScope', 'Wellnest', 'DataHarbor',
+];
+const aiInvestorFirms = [
+  'Future Ventures', 'Seed Partners', 'Bridge Capital', 'Growth Angels', 'Impact Studio', 'North Star Capital', 'Blue Lake Partners', 'Tokyo Founders Fund', 'Orbit Ventures', 'Anchor Capital',
+  'MIRAI Seed', 'River Growth', 'Launch Gate', 'First Check Partners', 'Sakura Capital', 'Horizon Angels', 'Next Stage Ventures', 'Basecamp Capital', 'Urban Innovation Fund', 'DeepTech Partners',
+  'Local Impact Fund', 'FinEdge Capital', 'Health Bridge VC', 'Retail Innovation Partners', 'EduNext Fund', 'Climate Seed Lab', 'DX Growth Studio', 'Founders Orbit', 'Prime Angel Group', 'CrossBorder Ventures',
+];
 const aiIndustries = ['AI / SaaS', 'FinTech', 'ヘルスケア', 'HRTech', '物流DX', '教育', 'Climate Tech', '小売DX', 'リーガルテック', 'クリエイター支援'];
+const aiBusinessDomains = [
+  '商談後の顧客フォローを自動化するSaaS',
+  '中小企業のCO2排出量を可視化するクラウド',
+  '小売店舗の在庫と発注を予測するシステム',
+  '介護事業所の記録と請求をつなぐ業務ツール',
+  '個人事業主向けの資金繰り管理サービス',
+  '採用候補者との接点を管理するHRプラットフォーム',
+  '配送計画と倉庫作業を最適化する物流DX',
+  '社会人学習の進捗を可視化する学習支援サービス',
+  'クリニックの予約と問診を一体化するサービス',
+  '契約レビューを効率化するリーガルSaaS',
+  '建設現場の写真管理と報告書作成を支援するアプリ',
+  '農家の収穫予測と販売計画を支えるツール',
+  '宿泊施設の予約単価を改善する分析サービス',
+  '飲食店のフードロスを減らす仕入れ管理ツール',
+  '医療チーム内の申し送りを標準化するSaaS',
+  'リスキリング研修を企業内で運用するサービス',
+  '営業チームの提案資料を自動生成するツール',
+  '製造ラインの異常検知を行うモニタリングSaaS',
+  '自治体と地域事業者の情報共有を支える基盤',
+  '請求と入金確認を効率化する決済管理サービス',
+  'クリニックの来院導線を改善する患者向けアプリ',
+  'サプライチェーンの環境負荷を見える化するSaaS',
+  '学校外学習の成果を記録するポートフォリオ',
+  'シフト作成と勤怠管理を統合する店舗向けツール',
+  '職人と発注者をつなぐ受発注プラットフォーム',
+  '住宅設備メンテナンスの日程調整サービス',
+  'イベント運営の受付と導線を管理するアプリ',
+  '中小企業の与信とリスクを可視化する分析サービス',
+  '従業員の健康状態と面談記録を管理するツール',
+  '社内データを横断検索するナレッジ基盤',
+];
 const aiFounderStories = [
   '現場の非効率をなくし、少人数でも大きな成果を出せる仕組みをつくっています。今は顧客の声を起点に、毎週プロダクト改善を重ねています。',
   '業界に残る手作業や属人的な判断を、使いやすいソフトウェアで置き換えることを目指しています。導入後の定着率を最重要指標にしています。',
@@ -250,18 +291,18 @@ const aiInvestorStories = [
   '初期の熱量と市場の広がりを大切にしています。投資検討では、継続率、紹介率、顧客単価の変化を中心に確認しています。',
 ];
 const aiPostThemes = [
-  '顧客ヒアリングを追加で実施し、導入前に不安になりやすい点を整理しました。次はオンボーディング資料を改善して、継続率の変化を見ていきます。',
-  '今週は既存ユーザーの利用ログを見直し、初回設定でつまずく箇所を減らしました。小さな改善ですが、利用開始率に効いてきそうです。',
-  '営業資料を更新し、導入後の成果が伝わる構成に変えました。来週は商談後のフォローを短くして、意思決定までの時間を縮めます。',
-  'プロダクトの主要導線を整理し、問い合わせの多かった項目を画面上で確認できるようにしました。次は数値の変化を見て優先順位を決めます。',
-  'チームで週次レビューを行い、伸びている施策と止める施策を分けました。限られたリソースを、成長率が高いチャネルに集中させます。',
+  '新規導入前の不安点を分解し、初回説明で伝える順番を変えました。次は導入後7日目の利用率を追って、どこでつまずくかを確認します。',
+  '既存ユーザーの操作ログを見直し、最初に触られる機能と使われない機能を分けました。来週は使われていない機能を削る判断も含めて整理します。',
+  '商談資料を数字中心から導入後の現場変化が伝わる構成に変えました。反応が良かったため、次回から事例ページにも反映します。',
+  '問い合わせが多かった画面に補足テキストを追加しました。サポート工数が下がるかを見ながら、セルフオンボーディングに寄せていきます。',
+  '週次レビューで、伸びているチャネルに営業時間を寄せることを決めました。小さな施策を続けるより、勝ち筋に集中します。',
 ];
 const aiInvestorPostThemes = [
-  '今週は初期SaaSの継続率を中心に見ています。売上の伸びだけでなく、解約理由をどれだけ早く学習できているかが重要だと感じます。',
-  '面白い事業ほど、初期の数字にまだ粗さがあります。だからこそ、顧客課題の深さと創業者の改善速度をセットで確認しています。',
-  'AI領域は機能差だけでは差別化しにくくなっています。導入後の業務フローにどこまで入り込めているかを見たいです。',
-  '投資検討では、月次売上、継続率、紹介発生率の3つをよく見ます。特に紹介が自然に起きているプロダクトは強いです。',
-  '市場が大きいだけではなく、最初の顧客が強く使い続ける理由があるかを重視しています。投稿からその変化が見えると判断しやすいです。',
+  '初期SaaSでは、売上の伸び方よりも解約理由の解像度を重視しています。学習速度が見える投稿は継続して追いやすいです。',
+  '顧客課題が深い事業は、最初の数字が小さくても前進が見えます。今週は導入後の利用頻度と紹介発生の有無を中心に見ています。',
+  'AI領域は機能差が短期間で埋まりやすいため、業務フローの中にどれだけ入り込めているかを確認しています。',
+  '投資検討では、月次売上、継続率、顧客単価の変化をセットで見ています。特に単価が上がる理由が説明できる会社は強いです。',
+  '市場規模だけではなく、最初の顧客がなぜ使い続けるのかを見ています。投稿から仮説検証の過程が見えると判断しやすいです。',
 ];
 
 function aiAvatarDataUri(label: string, index: number) {
@@ -301,7 +342,7 @@ function createAiAccounts(): Account[] {
     email: `ai-entrepreneur-${index + 1}@leap.local`,
     phone: '',
     emailVerified: true,
-    accountName: `ai_founder_${String(index + 1).padStart(2, '0')}`,
+    accountName: `${aiCompanyWords[index]}株式会社`,
     name,
     company: `${aiCompanyWords[index % aiCompanyWords.length]}株式会社`,
     title: '代表取締役',
@@ -312,7 +353,7 @@ function createAiAccounts(): Account[] {
     foundedMonth: `${(index % 12) + 1}月`,
     employeeSize: employeeSizes[index % employeeSizes.length],
     revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
-    bio: aiFounderStories[index % aiFounderStories.length],
+    bio: `${aiFounderStories[index % aiFounderStories.length]}\n\n現在は「${aiBusinessDomains[index % aiBusinessDomains.length]}」を提供し、現場の声をもとにプロダクトと導入体験を改善しています。`,
     achievements: `${accountAchievementTitle(index)}\n・週次のKPIレビューを継続\n・顧客ヒアリングを累計${35 + index * 4}件実施\n・導入後オンボーディング改善を毎月実施`,
     avatarLabel: name.slice(0, 1),
     avatarUrl: aiAvatarDataUri(name.slice(0, 1), index),
@@ -330,9 +371,9 @@ function createAiAccounts(): Account[] {
     email: `ai-investor-${index + 1}@leap.local`,
     phone: '',
     emailVerified: true,
-    accountName: `ai_investor_${String(index + 1).padStart(2, '0')}`,
+    accountName: aiInvestorFirms[index],
     name,
-    company: `${['Future Ventures', 'Seed Partners', 'Bridge Capital', 'Growth Angels', 'Impact Studio'][index % 5]}`,
+    company: aiInvestorFirms[index],
     title: index % 3 === 0 ? 'パートナー' : '投資担当',
     industry: aiIndustries[index % aiIndustries.length],
     location: locations[(index + 12) % locations.length],
@@ -377,12 +418,27 @@ function createAiPosts(accounts: Account[]): Post[] {
     const theme = account.role === 'entrepreneur'
       ? aiPostThemes[(accountIndex + postIndex) % aiPostThemes.length]
       : aiInvestorPostThemes[(accountIndex + postIndex) % aiInvestorPostThemes.length];
+    const domain = aiBusinessDomains[accountIndex % aiBusinessDomains.length];
+    const entrepreneurBodies = [
+      `${account.company}では「${domain}」の導入初期体験を見直しました。${theme}\n\n月間売上は${account.monthlyRevenue}、導入社数は${account.customerCount}。数字の伸びよりも、まずは使い続けてもらえる理由を増やします。`,
+      `今日は${domain}の利用企業から、現場で一番時間がかかっている作業を聞きました。想定より手前の工程で詰まっていたので、次の改善は入力前の準備画面に寄せます。\n\n成長率は${account.growthRate}。焦らず、継続利用につながる改善を優先します。`,
+      `今週の${account.company}は、営業後のフォロー文面を業界別に分けました。${theme}\n\n導入社数は${account.customerCount}まで増えましたが、まだオンボーディングのばらつきがあるので、来週はテンプレートを整理します。`,
+      `${domain}のデモ画面を更新しました。顧客から「最初に何を見ればいいか分かりにくい」と言われたため、成果が出る順番に導線を並べ替えました。\n\n現在の月間売上は${account.monthlyRevenue}、次は商談化率を追います。`,
+      `チームで${account.company}のKPIレビューを行いました。${theme}\n\n資金調達では、短期の売上だけでなく、顧客の定着と紹介の流れを説明できる状態にしていきます。`,
+    ];
+    const investorBodies = [
+      `${account.company}の投資メモです。${theme}\n\n今週は${account.industry}領域で、導入後の継続率と顧客単価の変化が見える会社を中心に確認しています。`,
+      `${account.industry}領域では、初期の売上よりも「誰が、なぜ、使い続けるか」を見ています。投稿で学習の過程が見える会社は、面談前の理解が進みやすいです。`,
+      `最近見ている案件では、創業者が顧客の言葉をどうプロダクトに戻しているかを重視しています。${theme}`,
+      `投資判断で大事にしているのは、数字の伸びとその理由がセットで語れることです。${account.investmentRange}の範囲で、初期の勝ち筋が見える会社を追っています。`,
+      `${account.company}では、${account.supportAreas}の支援余地がある会社を優先して見ています。投稿に課題と次の打ち手が書かれていると、支援イメージが作りやすいです。`,
+    ];
     return {
       id: `ai-post-${account.id}-${postIndex + 1}`,
       authorId: account.id,
       body: account.role === 'entrepreneur'
-        ? `${account.company}の進捗です。${theme}\n\n現在の月間売上は${account.monthlyRevenue}、成長率は${account.growthRate}、導入社数は${account.customerCount}です。`
-        : `${account.industry}領域の投資メモです。${theme}`,
+        ? entrepreneurBodies[postIndex % entrepreneurBodies.length]
+        : investorBodies[postIndex % investorBodies.length],
       tags: account.role === 'entrepreneur' ? ['進捗', account.industry] : ['投資観点', account.industry],
       visibility: 'public' as const,
       attachmentName: '',
