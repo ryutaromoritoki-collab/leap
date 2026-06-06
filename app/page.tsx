@@ -413,32 +413,79 @@ function recentWeekdayDate(accountIndex: number, postIndex: number) {
   return date.toISOString();
 }
 
+function createEntrepreneurPostBody(account: Account, accountIndex: number, postIndex: number) {
+  const domain = aiBusinessDomains[accountIndex % aiBusinessDomains.length];
+  const theme = aiPostThemes[(accountIndex + postIndex) % aiPostThemes.length];
+  const focus = ['初回導入', '商談後フォロー', '継続利用', '単価改善', '紹介発生', 'サポート削減'][accountIndex % 6];
+  const nextAction = ['画面文言を短くする', '導入事例を追加する', '利用ログを深掘りする', '営業資料を業界別に分ける', 'オンボーディング動画を撮る', '解約理由を分類する'][(accountIndex + postIndex) % 6];
+  switch ((accountIndex * 5 + postIndex) % 12) {
+    case 0:
+      return `今日の進捗メモ。\n\n${account.company}では「${domain}」の${focus}を見直しました。${theme}\n\n次は${nextAction}予定です。`;
+    case 1:
+      return `数字から見ると、今月は月間売上${account.monthlyRevenue}、導入社数${account.customerCount}。\n\n伸びている一方で、最初の設定で止まるユーザーがまだいます。今週はそこだけに絞って改善します。`;
+    case 2:
+      return `顧客ヒアリングで刺さった一言。\n「便利そう」より「明日から使えそう」と言われた時の方が受注に近い。\n\n${domain}は、機能説明より導入後の業務イメージを先に見せる方針に変えます。`;
+    case 3:
+      return `今週やったこと\n・${focus}のボトルネック確認\n・既存顧客への使い方ヒアリング\n・営業資料の1ページ目を差し替え\n\n小さい修正ですが、商談の温度感が少し変わりました。`;
+    case 4:
+      return `${account.company}の課題共有です。\n\n${domain}は説明すれば価値が伝わるのですが、説明前に離脱する人がいます。次はファーストビューで「誰の何を減らすのか」が伝わるようにします。`;
+    case 5:
+      return `KPI更新。\n成長率：${account.growthRate}\n導入社数：${account.customerCount}\n月間売上：${account.monthlyRevenue}\n\n数字は悪くないですが、問い合わせ対応の属人化が見えてきました。サポート導線を整えます。`;
+    case 6:
+      return `今日はプロダクトより営業プロセスの日でした。\n\n${domain}の商談で、導入決裁者と実際に使う人の見ているポイントが違うことが分かりました。資料を2種類に分けます。`;
+    case 7:
+      return `小さな勝ち。\n既存顧客から「社内で紹介したい」と言ってもらえました。\n\nまだ再現性はありませんが、${focus}の改善が効いている可能性があります。紹介が出た理由を聞き切ります。`;
+    case 8:
+      return `反省。\n今週は機能追加に寄りすぎました。\n\n${account.company}に今必要なのは多機能化ではなく、初回利用の迷いを減らすこと。来週は新機能を止めて、既存導線を磨きます。`;
+    case 9:
+      return `投資家の方に見てほしいポイント。\n\n${domain}は市場規模よりも、現場で毎週使われるかが重要です。今は導入後2週間の利用頻度を一番追っています。`;
+    case 10:
+      return `今週の意思決定：${nextAction}。\n\n理由はシンプルで、商談では興味を持たれるのに利用開始で止まるからです。受注数より先に、利用開始率を上げます。`;
+    default:
+      return `${account.company}の近況です。\n\n${theme}\n\n${domain}を必要としている会社に、もっと短い時間で価値が伝わるように磨き込みます。`;
+  }
+}
+
+function createInvestorPostBody(account: Account, accountIndex: number, postIndex: number) {
+  const theme = aiInvestorPostThemes[(accountIndex + postIndex) % aiInvestorPostThemes.length];
+  const lens = ['継続率', '顧客単価', '紹介発生率', '導入スピード', '創業者の学習速度', '市場の切実さ'][accountIndex % 6];
+  const sector = account.industry || aiIndustries[accountIndex % aiIndustries.length];
+  switch ((accountIndex * 7 + postIndex) % 12) {
+    case 0:
+      return `${account.company}の投資メモ。\n\n今日は${sector}領域で${lens}が見える会社を中心に確認しています。${theme}`;
+    case 1:
+      return `初期案件を見る時、最初に確認するのは売上の大きさではなく「なぜ今伸びているのか」です。\n\n${sector}では特に${lens}の説明があると追いやすいです。`;
+    case 2:
+      return `面談前に見たい投稿\n・顧客が誰か\n・今週何を学んだか\n・数字がなぜ変わったか\n\nこの3つがあると、初回面談の質がかなり上がります。`;
+    case 3:
+      return `最近の関心は${sector}。\n\n派手な機能より、現場の作業が本当に減っているかを見ています。プロダクトの説明より、導入後の変化が知りたいです。`;
+    case 4:
+      return `投資レンジは${account.investmentRange}。\n今週は、初期顧客の熱量が高い会社を優先して見ています。\n\n数字が小さくても、使われ方が濃い事業は追い続けたいです。`;
+    case 5:
+      return `支援できること：${account.supportAreas}。\n\n投稿で課題が具体的に書かれていると、投資前でも何を手伝えるか考えやすいです。`;
+    case 6:
+      return `メモ：${lens}が伸びている会社は、投稿の粒度も具体的なことが多い。\n\nやったことだけでなく、なぜそう判断したかが見えると強いです。`;
+    case 7:
+      return `${sector}の案件で見落としがちなのは、導入後の運用負荷。\n\n売れるかだけでなく、使い続けるために誰が何をするのかを見ています。`;
+    case 8:
+      return `今週のチェック項目は3つ。\n1. 顧客課題の頻度\n2. 導入後の継続理由\n3. 次の打ち手の具体性\n\n${theme}`;
+    case 9:
+      return `創業者の投稿で好きなのは、うまくいった話より「外した仮説」の共有です。\n\n学習の速さが見えるので、継続して見たくなります。`;
+    case 10:
+      return `${account.company}では、${sector}の中でも最初の顧客が強く使っている会社を探しています。\n\n大きな市場より、まず濃い利用。そこから広がるかを見ます。`;
+    default:
+      return `投資検討の観点を少し共有します。\n\n${theme}\n\n投稿に数字と背景がセットであると、判断材料としてかなり使いやすいです。`;
+  }
+}
+
 function createAiPosts(accounts: Account[]): Post[] {
   return accounts.flatMap((account, accountIndex) => Array.from({ length: 5 }, (_, postIndex) => {
-    const theme = account.role === 'entrepreneur'
-      ? aiPostThemes[(accountIndex + postIndex) % aiPostThemes.length]
-      : aiInvestorPostThemes[(accountIndex + postIndex) % aiInvestorPostThemes.length];
-    const domain = aiBusinessDomains[accountIndex % aiBusinessDomains.length];
-    const entrepreneurBodies = [
-      `${account.company}では「${domain}」の導入初期体験を見直しました。${theme}\n\n月間売上は${account.monthlyRevenue}、導入社数は${account.customerCount}。数字の伸びよりも、まずは使い続けてもらえる理由を増やします。`,
-      `今日は${domain}の利用企業から、現場で一番時間がかかっている作業を聞きました。想定より手前の工程で詰まっていたので、次の改善は入力前の準備画面に寄せます。\n\n成長率は${account.growthRate}。焦らず、継続利用につながる改善を優先します。`,
-      `今週の${account.company}は、営業後のフォロー文面を業界別に分けました。${theme}\n\n導入社数は${account.customerCount}まで増えましたが、まだオンボーディングのばらつきがあるので、来週はテンプレートを整理します。`,
-      `${domain}のデモ画面を更新しました。顧客から「最初に何を見ればいいか分かりにくい」と言われたため、成果が出る順番に導線を並べ替えました。\n\n現在の月間売上は${account.monthlyRevenue}、次は商談化率を追います。`,
-      `チームで${account.company}のKPIレビューを行いました。${theme}\n\n資金調達では、短期の売上だけでなく、顧客の定着と紹介の流れを説明できる状態にしていきます。`,
-    ];
-    const investorBodies = [
-      `${account.company}の投資メモです。${theme}\n\n今週は${account.industry}領域で、導入後の継続率と顧客単価の変化が見える会社を中心に確認しています。`,
-      `${account.industry}領域では、初期の売上よりも「誰が、なぜ、使い続けるか」を見ています。投稿で学習の過程が見える会社は、面談前の理解が進みやすいです。`,
-      `最近見ている案件では、創業者が顧客の言葉をどうプロダクトに戻しているかを重視しています。${theme}`,
-      `投資判断で大事にしているのは、数字の伸びとその理由がセットで語れることです。${account.investmentRange}の範囲で、初期の勝ち筋が見える会社を追っています。`,
-      `${account.company}では、${account.supportAreas}の支援余地がある会社を優先して見ています。投稿に課題と次の打ち手が書かれていると、支援イメージが作りやすいです。`,
-    ];
     return {
       id: `ai-post-${account.id}-${postIndex + 1}`,
       authorId: account.id,
       body: account.role === 'entrepreneur'
-        ? entrepreneurBodies[postIndex % entrepreneurBodies.length]
-        : investorBodies[postIndex % investorBodies.length],
+        ? createEntrepreneurPostBody(account, accountIndex, postIndex)
+        : createInvestorPostBody(account, accountIndex, postIndex),
       tags: account.role === 'entrepreneur' ? ['進捗', account.industry] : ['投資観点', account.industry],
       visibility: 'public' as const,
       attachmentName: '',
