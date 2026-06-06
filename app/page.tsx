@@ -1252,13 +1252,13 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
       </div>
       {feedTab !== 'following' && (
         <div className="relative border-b border-slate-100">
-          <button className="absolute left-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-slate-200 lg:grid" onClick={() => accountScrollerRef.current?.scrollBy({ left: -280, behavior: 'smooth' })} aria-label="左へスクロール">
+          <button className="absolute left-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => accountScrollerRef.current?.scrollBy({ left: -240, behavior: 'smooth' })} aria-label="左へスクロール">
             <ChevronLeft size={18} />
           </button>
-          <button className="absolute right-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-white text-slate-900 shadow-md ring-1 ring-slate-200 lg:grid" onClick={() => accountScrollerRef.current?.scrollBy({ left: 280, behavior: 'smooth' })} aria-label="右へスクロール">
+          <button className="absolute right-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => accountScrollerRef.current?.scrollBy({ left: 240, behavior: 'smooth' })} aria-label="右へスクロール">
             <ChevronLeft size={18} className="rotate-180" />
           </button>
-          <div ref={accountScrollerRef} className="flex gap-2.5 overflow-x-auto scroll-smooth px-3 py-1.5 [scrollbar-width:none] lg:px-12 [&::-webkit-scrollbar]:hidden">
+          <div ref={accountScrollerRef} className="flex gap-2.5 overflow-x-auto scroll-smooth px-14 py-1.5 [scrollbar-width:thin]">
             <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
               <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
               投稿する
