@@ -1096,7 +1096,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
       {posts.length === 0 ? (
         <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
-        <div className="divide-y divide-black">
+        <div className="divide-y divide-[#e5e7eb]">
           {posts.map((post) => {
             const author = accounts.find((account) => account.id === post.authorId);
             return <PostCard key={post.id} post={post} author={author} currentAccount={currentAccount} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />;
@@ -1467,7 +1467,7 @@ function MyPage({ currentAccount, accounts, posts, setPage, openComposer, reactT
         <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
       </div>
       <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : <div className="divide-y divide-black">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
+        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : <div className="divide-y divide-[#e5e7eb]">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
       </div>
       {socialModal && (
         <Modal title={socialModal === 'following' ? 'フォロー中' : 'フォロワー'} onClose={() => setSocialModal(null)}>
@@ -1973,7 +1973,7 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
         </div>
       )}
       {tab === 'posts' && (
-        <div className="divide-y divide-black">
+        <div className="divide-y divide-[#e5e7eb]">
           {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
         </div>
       )}
@@ -2023,29 +2023,29 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   const authorName = displayPostAuthorName(author);
   return (
-    <article className={`relative px-3 py-2 ${post.isHidden ? 'bg-slate-50' : ''}`}>
-      <div className="flex w-full items-start gap-2.5 text-left">
+    <article className={`relative px-4 py-3 ${post.isHidden ? 'bg-slate-50' : ''}`}>
+      <div className="flex w-full items-start gap-3 text-left">
         <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
           {author ? <Avatar account={author} size="feed" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1.5">
+          <div className="flex items-start gap-2">
             <button className="min-w-0 flex-1 text-left" onClick={() => author && openProfile(author)}>
-              <b className="block truncate text-[13px] font-black leading-5">{authorName} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
-              <span className="block text-[10px] leading-4 text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
+              <b className="block truncate text-[15px] font-bold leading-5 text-[#0f1419]">{authorName} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">AI運用</span>}</b>
+              <span className="block text-[13px] leading-5 text-[#536471]">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
             </button>
-            <button className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={16} className="text-slate-400" /></button>
+            <button className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} className="text-[#536471]" /></button>
           </div>
 
-          <p className="mt-0.5 whitespace-pre-line text-[13px] leading-5">{post.body}</p>
-          {post.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[10px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
-          {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
-          {post.attachmentName && <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-slate-50 p-2 text-[11px]"><Paperclip size={14} />{post.attachmentName}</div>}
-          <div className="mt-1.5 flex items-center gap-3 text-[9px] font-bold text-black">
-            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={12} />応援 {post.likes}</button>
-            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={12} />保存 {post.saves}</button>
-            <button className="inline-flex items-center gap-1 text-black" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={12} />面談 {post.meetings}</button>
+          <p className="mt-1 whitespace-pre-line text-[15px] leading-[1.55] text-[#0f1419]">{post.body}</p>
+          {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{post.tags.map((tag) => <span className="text-[14px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+          {post.imageUrl && <button className="mt-2.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
+          {post.attachmentName && <div className="mt-2.5 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-[13px]"><Paperclip size={15} />{post.attachmentName}</div>}
+          <div className="mt-2.5 flex items-center gap-5 text-[13px] font-medium text-[#536471]">
+            <button className="inline-flex items-center gap-1.5 text-[#0f1419]" onClick={() => reactToPost(post.id, 'like')} aria-pressed={liked}><Heart size={18} />応援 {post.likes}</button>
+            <button className="inline-flex items-center gap-1.5 text-[#0f1419]" onClick={() => reactToPost(post.id, 'save')} aria-pressed={saved}><Bookmark size={18} />保存 {post.saves}</button>
+            <button className="inline-flex items-center gap-1.5 text-[#0f1419]" onClick={() => reactToPost(post.id, 'meeting')} aria-pressed={meetingRequested}><UsersRound size={18} />面談 {post.meetings}</button>
             <span className="ml-auto">閲覧 {post.views}</span>
           </div>
         </div>
@@ -2201,7 +2201,7 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
 }
 
 function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'feed' | 'lg'; active?: boolean }) {
-  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : size === 'feed' ? 'h-12 w-12 text-sm' : 'h-11 w-11 text-sm';
+  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : size === 'feed' ? 'h-10 w-10 text-sm' : 'h-11 w-11 text-sm';
   const label = account.avatarLabel || displayAccountName(account).slice(0, 1) || 'L';
   return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
 }
