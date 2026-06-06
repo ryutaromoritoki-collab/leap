@@ -1236,6 +1236,7 @@ function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPa
 }
 
 function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  const accountScrollerRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     scrollContentToTop();
   }, [feedTab]);
@@ -1249,13 +1250,23 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           ['entrepreneurs', '起業家'],
         ].map(([key, label]) => <button key={key} className={`py-0.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => { setFeedTab(key as FeedTab); scrollContentToTop(); }}>{label}</button>)}
       </div>
-      {feedTab !== 'following' && <div className="flex gap-2.5 overflow-x-auto border-b border-slate-100 px-3 py-1.5">
-        <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
-          <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
-          投稿する
-        </button>
-        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span></button>)}
-      </div>}
+      {feedTab !== 'following' && (
+        <div className="relative border-b border-slate-100">
+          <button className="absolute left-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => accountScrollerRef.current?.scrollBy({ left: -240, behavior: 'smooth' })} aria-label="左へスクロール">
+            <ChevronLeft size={18} />
+          </button>
+          <button className="absolute right-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => accountScrollerRef.current?.scrollBy({ left: 240, behavior: 'smooth' })} aria-label="右へスクロール">
+            <ChevronLeft size={18} className="rotate-180" />
+          </button>
+          <div ref={accountScrollerRef} className="flex gap-2.5 overflow-x-auto scroll-smooth px-14 py-1.5 [scrollbar-width:thin]">
+            <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
+              <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
+              投稿する
+            </button>
+            {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span></button>)}
+          </div>
+        </div>
+      )}
       {posts.length === 0 ? (
         <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
