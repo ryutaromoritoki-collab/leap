@@ -2612,12 +2612,6 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
           <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
           <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
           <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{visibleFollowings.length}</b> フォロー</span><span><b>{visibleFollowers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
-          {canShowSocialGraph ? (
-            <div className="mt-3 grid gap-3 text-xs text-slate-600">
-              <SocialList title="フォロー" accounts={visibleFollowings} />
-              <SocialList title="フォロワー" accounts={visibleFollowers} />
-            </div>
-          ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
         </>
       )}
     </section>
