@@ -70,6 +70,11 @@ type Account = {
   workStyleSpeed?: string;
   workStyleTeam?: string;
   workStyleRisk?: string;
+  profileImageName?: string;
+  profileImageUrl?: string;
+  dealDetails?: string;
+  businessPlanName?: string;
+  businessPlanUrl?: string;
   avatarLabel: string;
   avatarUrl: string;
   fundingGoal: string;
@@ -206,6 +211,11 @@ const emptyAccount: Account = {
   workStyleSpeed: '3',
   workStyleTeam: '3',
   workStyleRisk: '3',
+  profileImageName: '',
+  profileImageUrl: '',
+  dealDetails: '',
+  businessPlanName: '',
+  businessPlanUrl: '',
   avatarLabel: '',
   avatarUrl: '',
   fundingGoal: '',
@@ -1790,6 +1800,20 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">ストーリー</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">あなたの会社の想いと事業内容が伝わる文章にしてください。</p>
+            <label className="mt-4 grid gap-2 text-[11px] font-bold text-slate-600">
+              会社紹介画像
+              {form.profileImageUrl && <img src={form.profileImageUrl} alt={form.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" />}
+              <span className="secondary relative min-h-11 overflow-hidden">
+                画像を選択
+                <input className="absolute inset-0 opacity-0" type="file" accept="image/*" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  update('profileImageName', file.name);
+                  readFileAsDataUrl(file, (url) => update('profileImageUrl', url));
+                }} />
+              </span>
+              {form.profileImageName && <span className="truncate text-xs text-slate-500">{form.profileImageName}</span>}
+            </label>
             <label className="mt-4 grid gap-1 text-[11px] font-bold text-slate-600">会社紹介・事業の背景<textarea className="field min-h-36 resize-none leading-7" placeholder={'例）私たちは、〇〇業界で起きている「〇〇」という課題を解決するために事業を始めました。\n\n現在は〇〇向けに〇〇を提供しており、利用者は〇〇をより簡単に、早く、安全に行えるようになります。\n\nこの事業で目指しているのは、〇〇な社会をつくることです。今後は〇〇を強化し、〇〇領域まで展開していきます。'} value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
             <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">実績・トラクション<textarea className="field min-h-28 resize-none leading-7" placeholder={'例）現在の導入社数は〇社、月間売上は〇万円です。\n\n直近では〇〇を達成し、前月比〇％で成長しています。\n\n主な実績として、〇〇への導入、〇〇との提携、〇〇賞の受賞があります。投資家の方には、〇〇の支援を期待しています。'} value={form.achievements} onChange={(event) => update('achievements', event.target.value)} /></label>
           </section>
@@ -1829,6 +1853,20 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
               <Input label="成長率" value={form.growthRate} onChange={(value) => update('growthRate', value)} />
               <Input label="導入社数" value={form.customerCount} onChange={(value) => update('customerCount', value)} />
             </div>
+            <label className="mt-4 grid gap-1 text-[11px] font-bold text-slate-600">案件詳細<textarea className="field min-h-32 resize-none leading-7" placeholder={'例）現在の調達目的、投資家に見てほしいポイント、資金用途、今後12ヶ月の計画、面談で相談したいことを書いてください。'} value={form.dealDetails || ''} onChange={(event) => update('dealDetails', event.target.value)} /></label>
+            <label className="mt-3 grid gap-2 text-[11px] font-bold text-slate-600">
+              事業計画書・ピッチ資料
+              <span className="secondary relative min-h-11 overflow-hidden">
+                ファイルを選択
+                <input className="absolute inset-0 opacity-0" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  update('businessPlanName', file.name);
+                  readFileAsDataUrl(file, (url) => update('businessPlanUrl', url));
+                }} />
+              </span>
+              {form.businessPlanName && <span className="truncate rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">{form.businessPlanName}</span>}
+            </label>
           </section>
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -2169,6 +2207,7 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
       {tab === 'overview' && (
         <div className="px-4 py-3">
           <KpiGrid account={account} />
+          {account.profileImageUrl && <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" />}
           <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
           {account.role === 'entrepreneur' && (
             <>
@@ -2215,14 +2254,15 @@ function DealPage({ account, requestMeeting }: { account: Account; requestMeetin
     <div className="p-4">
       <h2 className="text-lg font-black">{account.company || account.accountName || '案件詳細'}</h2>
       <div className="mt-2 flex flex-wrap gap-2">{[account.industry, account.stage, account.location].filter(Boolean).map((tag) => <span className="pill" key={tag}>{tag}</span>)}</div>
-      <DashboardCard />
+      {account.profileImageUrl ? <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" /> : <DashboardCard />}
       <h3 className="mt-5 text-sm font-black">ハイライト</h3>
       <KpiGrid account={account} />
+      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} />
       <h3 className="mt-5 text-sm font-black">関連情報</h3>
       <InfoRows rows={[['調達希望額', account.fundingGoal || '未入力'], ['月次売上', account.monthlyRevenue || '未入力'], ['成長率', account.growthRate || '未入力'], ['導入社数', account.customerCount || '未入力'], ['地域', account.location || '未入力'], ['フェーズ', account.stage || '未入力']]} />
       <div className="mt-4 rounded-2xl border border-slate-100 p-4">
-        <p className="text-sm font-black">ピッチ資料</p>
-        <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>
+        <p className="text-sm font-black">事業計画書・ピッチ資料</p>
+        {account.businessPlanUrl ? <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={account.businessPlanUrl} download={account.businessPlanName || 'business-plan'}><Paperclip size={15} />{account.businessPlanName || '資料をダウンロード'}</a> : <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>}
       </div>
       <button className="primary mt-4 w-full" onClick={requestMeeting}>面談を申し込む</button>
     </div>
