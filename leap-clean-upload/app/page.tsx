@@ -1800,7 +1800,6 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
                 <h2 className="text-base font-black">会社ページ構成</h2>
                 <p className="mt-1 text-xs font-bold text-slate-500">採用・資本提携どちらにも伝わるように、想い、文化、チームを整理します。</p>
               </div>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-blue-700">Wantedly風</span>
             </div>
             <div className="mt-4 grid gap-3">
               <label className="grid gap-1 text-[11px] font-bold text-slate-600">ミッション・実現したい未来<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）私たちは、〇〇を通じて、誰もが〇〇できる社会をつくります。\n\nこの市場で変えたい常識、届けたい価値、10年後に実現したい世界を書いてください。'} value={form.mission || ''} onChange={(event) => update('mission', event.target.value)} /></label>
@@ -1858,7 +1857,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
             </div>
           </section>
 
-          <button className="primary sticky bottom-20 z-20 w-full shadow-xl lg:bottom-6" onClick={save}>プロフィールを保存する</button>
+          <button className="primary w-full shadow-sm" onClick={save}>プロフィールを保存する</button>
         </div>
       </div>
     );
