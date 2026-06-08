@@ -444,14 +444,13 @@ function accountAchievementTitle(index: number) {
 }
 
 function recentWeekdayDate(accountIndex: number, postIndex: number) {
-  const date = new Date();
-  let daysBack = postIndex;
-  const day = date.getDay();
-  if (day === 0) daysBack += 2;
-  if (day === 6) daysBack += 1;
-  date.setDate(date.getDate() - daysBack);
-  while (date.getDay() === 0 || date.getDay() === 6) date.setDate(date.getDate() - 1);
-  date.setHours(9 + ((accountIndex * 3 + postIndex * 2) % 11), (accountIndex * 17 + postIndex * 11) % 60, 0, 0);
+  const now = new Date();
+  const date = new Date(now);
+  const minutesInDay = 24 * 60;
+  const scheduledMinutes = (accountIndex * 37 + postIndex * 113) % minutesInDay;
+  date.setHours(Math.floor(scheduledMinutes / 60), scheduledMinutes % 60, 0, 0);
+  if (date.getTime() > now.getTime()) date.setDate(date.getDate() - 1);
+  date.setDate(date.getDate() - postIndex);
   return date.toISOString();
 }
 
@@ -1793,9 +1792,48 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
   const followingAccounts = normalized.followingIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean) as Account[];
   const followerAccounts = normalized.followerIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean) as Account[];
   const modalAccounts = socialModal === 'following' ? followingAccounts : followerAccounts;
+  const setupItems = [
+    { label: '会社名・肩書きを登録', done: Boolean(currentAccount.company && currentAccount.title), action: '編集する', onClick: () => setPage('profileEdit') },
+    { label: '会社の想いと事業内容を書く', done: Boolean(currentAccount.bio && currentAccount.mission), action: 'ストーリーを書く', onClick: () => setPage('profileEdit') },
+    { label: '実績・KPI・案件詳細を整理', done: Boolean(currentAccount.achievements && currentAccount.dealDetails), action: '数字を入力', onClick: () => setPage('profileEdit') },
+    { label: '最初の投稿で近況を共有', done: posts.length > 0, action: '投稿する', onClick: openComposer },
+    { label: 'ブログで会社紹介を公開', done: blogs.length > 0, action: 'ブログを書く', onClick: openBlogComposer },
+  ];
+  const completedSetup = setupItems.filter((item) => item.done).length;
+  const nextSetup = setupItems.find((item) => !item.done);
+  const completionRate = Math.round((completedSetup / setupItems.length) * 100);
   return (
     <div className="p-4">
       <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} />
+      <section className="mt-4 rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-black tracking-[0.12em] text-blue-600">NEXT ACTION</p>
+            <h2 className="mt-1 text-lg font-black text-slate-950">次にやること</h2>
+            <p className="mt-1 text-xs font-bold leading-5 text-slate-500">登録後にまず整えるべき項目です。投資家が判断しやすいプロフィールに近づきます。</p>
+          </div>
+          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white text-sm font-black text-blue-600 shadow-sm ring-1 ring-blue-100">{completionRate}%</div>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-blue-100">
+          <div className="h-full rounded-full bg-blue-600" style={{ width: `${completionRate}%` }} />
+        </div>
+        {nextSetup ? (
+          <button className="mt-4 flex w-full items-center justify-between rounded-2xl bg-[#101828] px-4 py-3 text-left text-sm font-black text-white" onClick={nextSetup.onClick}>
+            <span>{nextSetup.label}</span>
+            <span className="text-xs opacity-80">{nextSetup.action}</span>
+          </button>
+        ) : (
+          <div className="mt-4 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-700">プロフィールの基本準備は完了しています。次は継続投稿で成長を見せましょう。</div>
+        )}
+        <div className="mt-3 grid gap-2">
+          {setupItems.map((item) => (
+            <button key={item.label} className="flex items-center justify-between rounded-2xl bg-white px-3 py-2 text-left text-xs font-bold shadow-sm ring-1 ring-slate-100" onClick={item.onClick}>
+              <span className={item.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{item.label}</span>
+              <span className={`rounded-full px-2 py-1 text-[10px] font-black ${item.done ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{item.done ? '完了' : item.action}</span>
+            </button>
+          ))}
+        </div>
+      </section>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-lg">{followingAccounts.length}</span>フォロー一覧を見る</button>
         <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-lg">{followerAccounts.length}</span>フォロワー一覧を見る</button>
