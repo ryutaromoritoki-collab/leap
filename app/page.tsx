@@ -1943,6 +1943,18 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
     setCurrentAccountId(next.id);
     setPage('mypage');
   }
+  const profileSteps = [
+    { label: '会社名・代表者・肩書き', done: Boolean(form.company && form.name && form.title) },
+    { label: '業界・地域・フェーズ', done: Boolean(form.industry && form.location && form.stage) },
+    { label: '会社紹介画像', done: Boolean(form.profileImageUrl || form.avatarUrl) },
+    { label: 'なにをやっているのか', done: Boolean(form.bio) },
+    { label: 'なぜやるのか', done: Boolean(form.mission) },
+    { label: 'どうやっているのか', done: Boolean(form.culture) },
+    { label: '実績・KPI・案件詳細', done: Boolean(form.achievements && form.dealDetails) },
+    { label: '本人確認', done: Boolean(form.corporateNumber || form.licenseFileName) },
+  ];
+  const profileStepCount = profileSteps.filter((step) => step.done).length;
+  const profileCompletion = Math.round((profileStepCount / profileSteps.length) * 100);
   if (form.role === 'entrepreneur') {
     return (
       <div className="bg-[#f7f9fb] pb-20">
@@ -1971,6 +1983,28 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
         </section>
 
         <div className="mx-auto grid max-w-3xl gap-4 p-4">
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black tracking-[0.16em] text-blue-600">PROFILE SETUP</p>
+                <h2 className="mt-1 text-base font-black">会社ページ完成度</h2>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">上から順に埋めるだけで、会社紹介、事業内容、実績、本人確認まで整います。</p>
+              </div>
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-blue-50 text-sm font-black text-blue-600 ring-1 ring-blue-100">{profileCompletion}%</div>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${profileCompletion}%` }} />
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {profileSteps.map((step) => (
+                <div key={step.label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2 text-xs font-bold">
+                  <span className={step.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{step.label}</span>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${step.done ? 'bg-emerald-50 text-emerald-600' : 'bg-white text-blue-600 ring-1 ring-blue-100'}`}>{step.done ? '完了' : '未入力'}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">基本情報</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">投資家が最初に確認する会社情報です。</p>
@@ -2392,18 +2426,24 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
         <button className={`py-2 ${tab === 'blogs' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('blogs')}>ブログ</button>
       </div>
       {tab === 'overview' && (
-        <div className="px-4 py-3">
-          <KpiGrid account={account} />
-          {account.profileImageUrl && <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" />}
-          <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
+        <div className="bg-[#f7f9fb] px-4 py-4">
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black">会社のハイライト</h3>
+              <span className="text-[10px] font-black text-blue-600">GROWTH</span>
+            </div>
+            <KpiGrid account={account} />
+          </section>
+          {account.profileImageUrl && <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-[22px] object-cover shadow-sm ring-1 ring-slate-100" />}
+          <TextBlock title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。'} />
           {account.role === 'entrepreneur' && (
             <>
-              <TextBlock title="ミッション" body={account.mission || 'ミッションは未入力です。'} />
-              <TextBlock title="カルチャー" body={account.culture || 'カルチャーは未入力です。'} />
-              <TextBlock title="チーム" body={account.teamIntro || 'チーム紹介は未入力です。'} />
+              <TextBlock title="なぜやるのか" body={account.mission || '創業の背景や実現したい未来はまだ登録されていません。'} />
+              <TextBlock title="どうやっているのか" body={account.culture || '大切にしている価値観や事業の進め方はまだ登録されていません。'} />
+              <TextBlock title="メンバー" body={account.teamIntro || 'チーム紹介はまだ登録されていません。'} />
               <section className="mt-5">
-                <h3 className="text-sm font-black">働き方タイプ</h3>
-                <div className="mt-2 grid gap-2 rounded-2xl border border-slate-100 p-3 text-xs font-bold text-slate-600">
+                <h3 className="text-sm font-black">組織の特徴</h3>
+                <div className="mt-2 grid gap-2 rounded-[20px] bg-white p-4 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between"><span>意思決定スピード</span><b className="text-blue-600">Lv.{account.workStyleSpeed || '3'}</b></div>
                   <div className="flex items-center justify-between"><span>チームの進め方</span><b className="text-blue-600">Lv.{account.workStyleTeam || '3'}</b></div>
                   <div className="flex items-center justify-between"><span>リスクの取り方</span><b className="text-blue-600">Lv.{account.workStyleRisk || '3'}</b></div>
@@ -2594,24 +2634,54 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const visibleFollowings = isMine ? followings : followings.filter((item) => item.role !== 'investor');
   const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
-  const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
+  const profileLead = account.title || account.bio || '会社の想いと事業内容はまだ登録されていません。';
+  const coverStyle = account.profileImageUrl
+    ? { backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.52)), url(${account.profileImageUrl})` }
+    : undefined;
   return (
-    <section className={compact ? 'border-b border-slate-100 px-3 py-1.5' : 'rounded-3xl border border-slate-100 p-4'}>
-      <div className={`flex items-start ${compact ? 'gap-2' : 'gap-4'}`}>
-        <Avatar account={account} size={compact ? 'md' : 'lg'} />
-        <div className="min-w-0 flex-1">
-          <h2 className={`truncate font-black ${compact ? 'text-sm' : 'text-xl'}`}>{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={compact ? 13 : 16} />}</h2>
-          <p className={`${compact ? 'mt-0 text-[11px]' : 'mt-1 text-xs'} text-slate-500`}>@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
-          {!compact && <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>}
-          {!compact && account.verified && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700"><CheckCircle2 size={13} />本人確認済み</span>}
-          {isMine && account.identityStatus === 'resubmit' && <span className="mt-2 inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">本人確認資料の再提出が必要です</span>}
+    <section className={compact ? 'border-b border-slate-100 bg-white px-3 py-2' : 'overflow-hidden border-b border-slate-100 bg-white'}>
+      {compact ? (
+        <div className="flex items-center gap-2">
+          <Avatar account={account} size="md" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-black">{account.company || account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={13} />}</h2>
+            <p className="truncate text-[11px] font-bold text-slate-500">@{account.accountName || 'account'} / {account.title || account.stage || 'プロフィール未設定'}</p>
+          </div>
         </div>
-      </div>
-      {!compact && (
+      ) : (
         <>
-          <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
-          <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-          <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{visibleFollowings.length}</b> フォロー</span><span><b>{visibleFollowers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
+          <div className="h-32 bg-gradient-to-br from-blue-600 via-blue-500 to-emerald-300 bg-cover bg-center sm:h-48" style={coverStyle}>
+            <div className="flex h-full items-start justify-between p-4">
+              <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm">{account.role === 'investor' ? 'INVESTOR PROFILE' : 'COMPANY PROFILE'}</span>
+              {account.verified && <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm"><CheckCircle2 size={13} />本人確認済み</span>}
+            </div>
+          </div>
+          <div className="px-4 pb-5">
+            <div className="-mt-11 flex items-end justify-between gap-3">
+              <div className="rounded-3xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
+                <Avatar account={account} size="lg" />
+              </div>
+              {isMine && (
+                <button className="secondary mb-1 min-h-10 px-4 text-xs" onClick={() => setPage('profileEdit')}>プロフィールを編集</button>
+              )}
+            </div>
+            <div className="mt-4">
+              <h2 className="text-2xl font-black tracking-tight text-slate-950">{account.company || account.name || account.accountName || 'プロフィール未設定'}</h2>
+              <p className="mt-1 text-sm font-bold text-slate-600">{account.name || '名前未設定'} / {account.title || '肩書き未設定'}</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">@{account.accountName || 'account'}　{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}</p>
+              <p className="mt-4 whitespace-pre-line text-[15px] font-bold leading-7 text-slate-800">{profileLead}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[account.industry, account.stage, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600" key={item}>{item}</span>)}
+              </div>
+              <div className="mt-4 grid grid-cols-4 rounded-2xl border border-slate-100 bg-slate-50/60 text-center text-xs font-bold text-slate-500">
+                <span className="p-3"><b className="block text-base text-slate-950">{posts.length}</b>投稿</span>
+                <span className="p-3"><b className="block text-base text-slate-950">{visibleFollowings.length}</b>フォロー</span>
+                <span className="p-3"><b className="block text-base text-slate-950">{visibleFollowers.length}</b>フォロワー</span>
+                <span className="p-3"><b className="block text-base text-slate-950">{account.role === 'entrepreneur' ? account.ticketBalance : '-'}</b>{account.role === 'entrepreneur' && isMine ? 'チケット' : '確認'}</span>
+              </div>
+              {isMine && account.identityStatus === 'resubmit' && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">本人確認資料の再提出が必要です</p>}
+            </div>
+          </div>
         </>
       )}
     </section>
