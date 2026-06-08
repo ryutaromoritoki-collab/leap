@@ -444,14 +444,13 @@ function accountAchievementTitle(index: number) {
 }
 
 function recentWeekdayDate(accountIndex: number, postIndex: number) {
-  const date = new Date();
-  let daysBack = postIndex;
-  const day = date.getDay();
-  if (day === 0) daysBack += 2;
-  if (day === 6) daysBack += 1;
-  date.setDate(date.getDate() - daysBack);
-  while (date.getDay() === 0 || date.getDay() === 6) date.setDate(date.getDate() - 1);
-  date.setHours(9 + ((accountIndex * 3 + postIndex * 2) % 11), (accountIndex * 17 + postIndex * 11) % 60, 0, 0);
+  const now = new Date();
+  const date = new Date(now);
+  const minutesInDay = 24 * 60;
+  const scheduledMinutes = (accountIndex * 37 + postIndex * 113) % minutesInDay;
+  date.setHours(Math.floor(scheduledMinutes / 60), scheduledMinutes % 60, 0, 0);
+  if (date.getTime() > now.getTime()) date.setDate(date.getDate() - 1);
+  date.setDate(date.getDate() - postIndex);
   return date.toISOString();
 }
 
