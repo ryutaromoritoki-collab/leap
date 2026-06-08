@@ -625,7 +625,8 @@ async function loadCloudState(): Promise<LeapCloudState | null> {
   const supabase = createSupabaseBrowserClient();
   if (!supabase) return null;
   const { data, error } = await supabase.from('app_state').select('data').eq('key', 'leap-main').maybeSingle();
-  if (error || !data?.data) return null;
+  if (error) throw new Error(error.message);
+  if (!data?.data) return null;
   const cloud = data.data as LeapCloudState;
   return { ...cloud, accounts: (cloud.accounts ?? []).map(normalizeAccount), posts: cloud.posts ?? [], blogs: cloud.blogs ?? [], messages: cloud.messages ?? [], meetingApplications: cloud.meetingApplications ?? [], notices: cloud.notices ?? [] };
 }
@@ -633,7 +634,8 @@ async function loadCloudState(): Promise<LeapCloudState | null> {
 async function saveCloudState(state: LeapCloudState) {
   const supabase = createSupabaseBrowserClient();
   if (!supabase) return;
-  await supabase.from('app_state').upsert({ key: 'leap-main', data: state, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  const { error } = await supabase.from('app_state').upsert({ key: 'leap-main', data: state, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw new Error(error.message);
 }
 
 function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
@@ -736,6 +738,7 @@ export default function LeapApp() {
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
+  const [cloudError, setCloudError] = useState('');
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
   const [authenticatedEmail, setAuthenticatedEmail] = useState('');
   const [systemPostActions, setSystemPostActions] = useState<Record<string, Post['actionUserIds']>>({});
@@ -774,6 +777,10 @@ export default function LeapApp() {
         setNotices(merged.notices);
       }
       setCloudReady(true);
+      setCloudError('');
+    }).catch((error) => {
+      setCloudError(`クラウド同期に失敗しています：${error.message}`);
+      setCloudReady(true);
     });
   }, []);
   useEffect(() => {
@@ -788,13 +795,20 @@ export default function LeapApp() {
         setMessages(merged.messages);
         setMeetingApplications(merged.meetingApplications);
         setNotices(merged.notices);
+        setCloudError('');
+      }).catch((error) => {
+        setCloudError(`クラウド同期に失敗しています：${error.message}`);
       });
     }, 8000);
     return () => window.clearInterval(timer);
   }, [accounts, blogs, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
     if (!cloudReady) return;
-    const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices }), 700);
+    const timer = window.setTimeout(() => {
+      saveCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
+        .then(() => setCloudError(''))
+        .catch((error) => setCloudError(`クラウド同期に失敗しています：${error.message}`));
+    }, 700);
     return () => window.clearTimeout(timer);
   }, [accounts, blogs, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
@@ -1250,6 +1264,11 @@ export default function LeapApp() {
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
 
         <section data-app-scroll className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
+          {cloudError && (
+            <div className="m-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800">
+              {cloudError}<br />PC/スマホ連携にはSupabase SQL Editorで `supabase/fix_20260608_app_state_permissions.sql` を実行してください。
+            </div>
+          )}
           {page === 'feed' && (
             <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
