@@ -1452,7 +1452,7 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
       {posts.length === 0 ? (
         <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
-        <div className="divide-y divide-[#111827]">
+        <div className="divide-y divide-[#eff3f4]">
           {posts.map((post) => {
             const author = accounts.find((account) => account.id === post.authorId);
             return <PostCard key={post.id} post={post} author={author} currentAccount={currentAccount} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />;
@@ -1822,55 +1822,82 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
   const nextSetup = setupItems.find((item) => !item.done);
   const completionRate = Math.round((completedSetup / setupItems.length) * 100);
   return (
-    <div className="p-4">
+    <div className="bg-[#f5f8fb]">
       <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} />
-      <section className="mt-4 rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-black tracking-[0.12em] text-blue-600">NEXT ACTION</p>
-            <h2 className="mt-1 text-lg font-black text-slate-950">次にやること</h2>
-            <p className="mt-1 text-xs font-bold leading-5 text-slate-500">登録後にまず整えるべき項目です。投資家が判断しやすいプロフィールに近づきます。</p>
-          </div>
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white text-sm font-black text-blue-600 shadow-sm ring-1 ring-blue-100">{completionRate}%</div>
-        </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-blue-100">
-          <div className="h-full rounded-full bg-blue-600" style={{ width: `${completionRate}%` }} />
-        </div>
-        {nextSetup ? (
-          <button className="mt-4 flex w-full items-center justify-between rounded-2xl bg-[#101828] px-4 py-3 text-left text-sm font-black text-white" onClick={nextSetup.onClick}>
-            <span>{nextSetup.label}</span>
-            <span className="text-xs opacity-80">{nextSetup.action}</span>
-          </button>
-        ) : (
-          <div className="mt-4 rounded-2xl bg-emerald-50 p-3 text-sm font-black text-emerald-700">プロフィールの基本準備は完了しています。次は継続投稿で成長を見せましょう。</div>
-        )}
-        <div className="mt-3 grid gap-2">
-          {setupItems.map((item) => (
-            <button key={item.label} className="flex items-center justify-between rounded-2xl bg-white px-3 py-2 text-left text-xs font-bold shadow-sm ring-1 ring-slate-100" onClick={item.onClick}>
-              <span className={item.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{item.label}</span>
-              <span className={`rounded-full px-2 py-1 text-[10px] font-black ${item.done ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{item.done ? '完了' : item.action}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-lg">{followingAccounts.length}</span>フォロー一覧を見る</button>
-        <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-lg">{followerAccounts.length}</span>フォロワー一覧を見る</button>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <button className="secondary" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>
-        <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
-        <button className="secondary" onClick={openBlogComposer}><FileText size={16} />ブログを書く</button>
-      </div>
-      <section className="mt-5 rounded-2xl border border-slate-100">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <h2 className="text-sm font-black">ブログ</h2>
-          <button className="text-xs font-black text-blue-600" onClick={openBlogComposer}>新規作成</button>
-        </div>
-        {blogs.length === 0 ? <EmptyState icon={<FileText size={28} />} title="ブログはまだありません" body="会社ストーリーや事業ノウハウを長文で発信できます。" /> : <div className="divide-y divide-slate-100">{blogs.map((blog) => <BlogCard key={blog.id} blog={blog} author={currentAccount} currentAccount={currentAccount} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />)}</div>}
-      </section>
-      <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : <div className="divide-y divide-[#e5e7eb]">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
+      <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
+        <main className="grid gap-4">
+          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">COMPANY PAGE</p>
+                <h2 className="mt-1 text-lg font-black tracking-tight">会社ページを育てる</h2>
+                <p className="mt-1 max-w-xl text-xs font-bold leading-5 text-slate-500">Wantedlyの会社紹介のように、事業内容、想い、実績、ストーリーを積み上げるマイページです。</p>
+              </div>
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{completionRate}%</div>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${completionRate}%` }} />
+            </div>
+            {nextSetup ? (
+              <button className="mt-3 flex w-full items-center justify-between rounded-2xl bg-[#101828] px-3 py-2.5 text-left text-xs font-black text-white" onClick={nextSetup.onClick}>
+                <span>{nextSetup.label}</span>
+                <span className="opacity-80">{nextSetup.action}</span>
+              </button>
+            ) : (
+              <div className="mt-3 rounded-2xl bg-emerald-50 p-2.5 text-xs font-black text-emerald-700">基本準備は完了しています。ストーリーと投稿を継続して成長を見せましょう。</div>
+            )}
+          </section>
+
+          <CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} />
+          <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} />
+          <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} />
+
+          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">STORY</p>
+                <h2 className="mt-1 text-base font-black">会社のストーリー</h2>
+              </div>
+              <button className="text-xs font-black text-blue-600" onClick={openBlogComposer}>ストーリーを書く</button>
+            </div>
+            {blogs.length === 0 ? (
+              <EmptyState compact icon={<FileText size={24} />} title="ストーリーはまだありません" body="会社紹介、創業背景、顧客事例、チームの考え方を書けます。" action="書く" onAction={openBlogComposer} />
+            ) : (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">{blogs.slice(0, 4).map((blog) => <MiniBlogCard key={blog.id} blog={blog} />)}</div>
+            )}
+          </section>
+
+          <section className="rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-center justify-between border-b border-[#eff3f4] px-4 py-2.5">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">POSTS</p>
+                <h2 className="text-base font-black">最近の投稿</h2>
+              </div>
+              <button className="text-xs font-black text-blue-600" onClick={openComposer}>投稿する</button>
+            </div>
+            {posts.length === 0 ? <EmptyState compact icon={<FileText size={24} />} title="投稿はまだありません" body="投稿するとここに保存され、フィードにも表示されます。" action="投稿する" onAction={openComposer} /> : <div className="divide-y divide-[#eff3f4]">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
+          </section>
+        </main>
+
+        <aside className="grid gap-4 lg:sticky lg:top-16 lg:self-start">
+          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">ACTIONS</p>
+            <div className="mt-3 grid gap-2">
+              <button className="primary w-full" onClick={() => setPage('profileEdit')}><Settings size={15} />プロフィールを編集</button>
+              <button className="secondary w-full" onClick={openComposer}><Plus size={15} />投稿する</button>
+              <button className="secondary w-full" onClick={openBlogComposer}><FileText size={15} />ブログを書く</button>
+            </div>
+          </section>
+          <CompanyInfoPanel account={currentAccount} />
+          <CultureMap account={currentAccount} />
+          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">NETWORK</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button className="rounded-2xl bg-slate-50 p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-base">{followingAccounts.length}</span>フォロー</button>
+              <button className="rounded-2xl bg-slate-50 p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-base">{followerAccounts.length}</span>フォロワー</button>
+            </div>
+          </section>
+        </aside>
       </div>
       {socialModal && (
         <Modal title={socialModal === 'following' ? 'フォロー中' : 'フォロワー'} onClose={() => setSocialModal(null)}>
@@ -2001,20 +2028,46 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           </div>
         </section>
 
-        <div className="mx-auto grid max-w-3xl gap-4 p-4">
+        <div className="mx-auto grid max-w-6xl gap-4 p-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100 lg:sticky lg:top-14 lg:self-start">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.16em] text-blue-600">EDIT FLOW</p>
+                <h2 className="mt-1 text-base font-black">会社ページ編集</h2>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">左の項目を確認しながら、上から順に入力してください。</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{profileCompletion}%</div>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-blue-600" style={{ width: `${profileCompletion}%` }} />
+              </div>
+            </div>
+            <div className="mt-4 grid gap-1">
+              {profileSteps.map((step, index) => (
+                <div key={step.label} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-[11px] font-bold">
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] ${step.done ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{step.done ? '✓' : index + 1}</span>
+                  <span className={step.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{step.label}</span>
+                </div>
+              ))}
+            </div>
+            <button className="primary mt-4 w-full" onClick={save}>保存する</button>
+          </aside>
+
+          <div className="grid gap-4">
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-black tracking-[0.16em] text-blue-600">PROFILE SETUP</p>
                 <h2 className="mt-1 text-base font-black">会社ページ完成度</h2>
-                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">上から順に埋めるだけで、会社紹介、事業内容、実績、本人確認まで整います。</p>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">会社紹介、事業内容、実績、本人確認まで整えます。</p>
               </div>
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-blue-50 text-sm font-black text-blue-600 ring-1 ring-blue-100">{profileCompletion}%</div>
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{profileCompletion}%</div>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-blue-600" style={{ width: `${profileCompletion}%` }} />
             </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {profileSteps.map((step) => (
                 <div key={step.label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2 text-xs font-bold">
                   <span className={step.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{step.label}</span>
@@ -2135,6 +2188,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           </section>
 
           <button className="primary w-full shadow-sm" onClick={save}>プロフィールを保存する</button>
+          </div>
         </div>
       </div>
     );
