@@ -63,6 +63,13 @@ type Account = {
   employeeSize: string;
   revenueScale: string;
   bio: string;
+  mission?: string;
+  culture?: string;
+  teamIntro?: string;
+  personalityProfile?: string;
+  workStyleSpeed?: string;
+  workStyleTeam?: string;
+  workStyleRisk?: string;
   avatarLabel: string;
   avatarUrl: string;
   fundingGoal: string;
@@ -192,6 +199,13 @@ const emptyAccount: Account = {
   employeeSize: '',
   revenueScale: '',
   bio: '',
+  mission: '',
+  culture: '',
+  teamIntro: '',
+  personalityProfile: '',
+  workStyleSpeed: '3',
+  workStyleTeam: '3',
+  workStyleRisk: '3',
   avatarLabel: '',
   avatarUrl: '',
   fundingGoal: '',
@@ -1781,6 +1795,32 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           </section>
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black">会社ページ構成</h2>
+                <p className="mt-1 text-xs font-bold text-slate-500">採用・資本提携どちらにも伝わるように、想い、文化、チームを整理します。</p>
+              </div>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-blue-700">Wantedly風</span>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">ミッション・実現したい未来<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）私たちは、〇〇を通じて、誰もが〇〇できる社会をつくります。\n\nこの市場で変えたい常識、届けたい価値、10年後に実現したい世界を書いてください。'} value={form.mission || ''} onChange={(event) => update('mission', event.target.value)} /></label>
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">カルチャー・大切にしている価値観<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）顧客の現場から考える、早く試して学ぶ、数字と誠実さを大切にする、など。\n\n普段の意思決定やチームで大切にしている行動を書いてください。'} value={form.culture || ''} onChange={(event) => update('culture', event.target.value)} /></label>
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">チーム紹介<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）代表、開発、営業、CSなど、どんな経験を持つメンバーが集まっているか。\n\nチームの強み、役割分担、これから採用・協力したい人も書けます。'} value={form.teamIntro || ''} onChange={(event) => update('teamIntro', event.target.value)} /></label>
+            </div>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h2 className="text-base font-black">働き方タイプ診断</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">診断結果のように、代表者・チームの意思決定スタイルを投資家へ伝えます。</p>
+            <div className="mt-4 grid gap-4">
+              <RangeInput label="意思決定スピード" left="慎重に検証" right="すぐ試す" value={form.workStyleSpeed || '3'} onChange={(value) => update('workStyleSpeed', value)} />
+              <RangeInput label="チームの進め方" left="個人で深掘り" right="全員で議論" value={form.workStyleTeam || '3'} onChange={(value) => update('workStyleTeam', value)} />
+              <RangeInput label="リスクの取り方" left="堅実に積む" right="大胆に挑む" value={form.workStyleRisk || '3'} onChange={(value) => update('workStyleRisk', value)} />
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">自己理解メモ<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）顧客課題が明確な領域では早く検証します。一方で、資金計画や採用では慎重に意思決定します。\n\n投資家や協業先が一緒に動く時に知っておくとよい特徴を書いてください。'} value={form.personalityProfile || ''} onChange={(event) => update('personalityProfile', event.target.value)} /></label>
+            </div>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">資金調達・KPI</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">投資判断に必要な数字を見やすく整理します。</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -2131,6 +2171,22 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
         <div className="px-4 py-3">
           <KpiGrid account={account} />
           <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
+          {account.role === 'entrepreneur' && (
+            <>
+              <TextBlock title="ミッション" body={account.mission || 'ミッションは未入力です。'} />
+              <TextBlock title="カルチャー" body={account.culture || 'カルチャーは未入力です。'} />
+              <TextBlock title="チーム" body={account.teamIntro || 'チーム紹介は未入力です。'} />
+              <section className="mt-5">
+                <h3 className="text-sm font-black">働き方タイプ</h3>
+                <div className="mt-2 grid gap-2 rounded-2xl border border-slate-100 p-3 text-xs font-bold text-slate-600">
+                  <div className="flex items-center justify-between"><span>意思決定スピード</span><b className="text-blue-600">Lv.{account.workStyleSpeed || '3'}</b></div>
+                  <div className="flex items-center justify-between"><span>チームの進め方</span><b className="text-blue-600">Lv.{account.workStyleTeam || '3'}</b></div>
+                  <div className="flex items-center justify-between"><span>リスクの取り方</span><b className="text-blue-600">Lv.{account.workStyleRisk || '3'}</b></div>
+                  {account.personalityProfile && <p className="whitespace-pre-line border-t border-slate-100 pt-2 leading-6">{account.personalityProfile}</p>}
+                </div>
+              </section>
+            </>
+          )}
           {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
           {!isMine && (
             <div className="mt-4 grid grid-cols-3 gap-2">
@@ -2401,6 +2457,16 @@ function Segmented({ value, onChange }: { value: Role; onChange: (value: Role) =
 
 function Input({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
   return <label className="grid gap-1 text-[11px] font-bold text-slate-600">{label}<input className="field" type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function RangeInput({ label, left, right, value, onChange }: { label: string; left: string; right: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-2 text-[11px] font-bold text-slate-600">
+      <span className="flex items-center justify-between gap-3"><b>{label}</b><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] text-blue-700">Lv.{value || '3'}</span></span>
+      <input className="w-full accent-blue-600" type="range" min="1" max="5" value={value || '3'} onChange={(event) => onChange(event.target.value)} />
+      <span className="flex justify-between text-[10px] text-slate-400"><span>{left}</span><span>{right}</span></span>
+    </label>
+  );
 }
 
 function Select({ label, value, options, onChange, displayMap }: { label: string; value: string; options: string[]; onChange: (value: string) => void; displayMap?: Record<string, string> }) {
