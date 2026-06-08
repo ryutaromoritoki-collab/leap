@@ -123,6 +123,23 @@ type Post = {
   views: number;
 };
 
+type BlogArticle = {
+  id: string;
+  authorId: string;
+  title: string;
+  body: string;
+  tags: string[];
+  visibility: Visibility;
+  imageName: string;
+  imageUrl: string;
+  attachmentName: string;
+  attachmentUrl: string;
+  isHidden: boolean;
+  createdAt: string;
+  updatedAt: string;
+  views: number;
+};
+
 type DirectMessage = {
   id: string;
   partnerId: string;
@@ -141,6 +158,7 @@ type DirectMessage = {
 type LeapCloudState = {
   accounts: Account[];
   posts: Post[];
+  blogs?: BlogArticle[];
   messages: DirectMessage[];
   meetingApplications: MeetingApplication[];
   notices: Notice[];
@@ -610,7 +628,7 @@ async function loadCloudState(): Promise<LeapCloudState | null> {
   const { data, error } = await supabase.from('app_state').select('data').eq('key', 'leap-main').maybeSingle();
   if (error || !data?.data) return null;
   const cloud = data.data as LeapCloudState;
-  return { ...cloud, accounts: (cloud.accounts ?? []).map(normalizeAccount), posts: cloud.posts ?? [], messages: cloud.messages ?? [], meetingApplications: cloud.meetingApplications ?? [], notices: cloud.notices ?? [] };
+  return { ...cloud, accounts: (cloud.accounts ?? []).map(normalizeAccount), posts: cloud.posts ?? [], blogs: cloud.blogs ?? [], messages: cloud.messages ?? [], meetingApplications: cloud.meetingApplications ?? [], notices: cloud.notices ?? [] };
 }
 
 async function saveCloudState(state: LeapCloudState) {
@@ -630,6 +648,7 @@ function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapClou
   return {
     accounts: mergeById(local.accounts.map(normalizeAccount), cloud.accounts.map(normalizeAccount)),
     posts: mergeById(local.posts, cloud.posts),
+    blogs: mergeById(local.blogs ?? [], cloud.blogs ?? []),
     messages: mergeById(local.messages, cloud.messages),
     meetingApplications: mergeById(local.meetingApplications, cloud.meetingApplications),
     notices: mergeById(local.notices, cloud.notices),
@@ -687,6 +706,7 @@ export default function LeapApp() {
   const [currentAccountId, setCurrentAccountId] = useState(() => loadLocal('leap.currentAccountId', ''));
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [posts, setPosts] = useState<Post[]>(() => loadLocal('leap.posts', []));
+  const [blogs, setBlogs] = useState<BlogArticle[]>(() => loadLocal('leap.blogs', []));
   const [messages, setMessages] = useState<DirectMessage[]>(() => loadLocal('leap.messages', []));
   const [meetingApplications, setMeetingApplications] = useState<MeetingApplication[]>(() => loadLocal('leap.meetingApplications', []));
   const [notices, setNotices] = useState<Notice[]>(() => loadLocal('leap.notices', []));
@@ -703,6 +723,16 @@ export default function LeapApp() {
   const [postImageName, setPostImageName] = useState('');
   const [postImageUrl, setPostImageUrl] = useState('');
   const [editingPostId, setEditingPostId] = useState('');
+  const [showBlogComposer, setShowBlogComposer] = useState(false);
+  const [editingBlogId, setEditingBlogId] = useState('');
+  const [blogTitle, setBlogTitle] = useState('');
+  const [blogBody, setBlogBody] = useState('');
+  const [blogTags, setBlogTags] = useState('');
+  const [blogVisibility, setBlogVisibility] = useState<Visibility>('public');
+  const [blogImageName, setBlogImageName] = useState('');
+  const [blogImageUrl, setBlogImageUrl] = useState('');
+  const [blogAttachmentName, setBlogAttachmentName] = useState('');
+  const [blogAttachmentUrl, setBlogAttachmentUrl] = useState('');
   const [messageDraft, setMessageDraft] = useState('');
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -714,6 +744,7 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.accounts', accounts), [accounts]);
   useEffect(() => saveLocal('leap.currentAccountId', currentAccountId), [currentAccountId]);
   useEffect(() => saveLocal('leap.posts', posts), [posts]);
+  useEffect(() => saveLocal('leap.blogs', blogs), [blogs]);
   useEffect(() => saveLocal('leap.messages', messages), [messages]);
   useEffect(() => saveLocal('leap.meetingApplications', meetingApplications), [meetingApplications]);
   useEffect(() => saveLocal('leap.notices', notices), [notices]);
@@ -724,6 +755,7 @@ export default function LeapApp() {
     function syncAcrossTabs(event: StorageEvent) {
       if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
       if (event.key === 'leap.posts') setPosts(loadLocal('leap.posts', []));
+      if (event.key === 'leap.blogs') setBlogs(loadLocal('leap.blogs', []));
       if (event.key === 'leap.messages') setMessages(loadLocal('leap.messages', []));
       if (event.key === 'leap.meetingApplications') setMeetingApplications(loadLocal('leap.meetingApplications', []));
       if (event.key === 'leap.notices') setNotices(loadLocal('leap.notices', []));
@@ -734,9 +766,10 @@ export default function LeapApp() {
   useEffect(() => {
     loadCloudState().then((cloud) => {
       if (cloud) {
-        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }, cloud);
+        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices }, cloud);
         setAccounts(merged.accounts);
         setPosts(merged.posts);
+        setBlogs(merged.blogs ?? []);
         setMessages(merged.messages);
         setMeetingApplications(merged.meetingApplications);
         setNotices(merged.notices);
@@ -749,21 +782,22 @@ export default function LeapApp() {
     const timer = window.setInterval(() => {
       loadCloudState().then((cloud) => {
         if (!cloud) return;
-        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }, cloud);
+        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices }, cloud);
         setAccounts(merged.accounts);
         setPosts(merged.posts);
+        setBlogs(merged.blogs ?? []);
         setMessages(merged.messages);
         setMeetingApplications(merged.meetingApplications);
         setNotices(merged.notices);
       });
     }, 8000);
     return () => window.clearInterval(timer);
-  }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
+  }, [accounts, blogs, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
     if (!cloudReady) return;
-    const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }), 700);
+    const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices }), 700);
     return () => window.clearTimeout(timer);
-  }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
+  }, [accounts, blogs, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
     if (!cloudReady || authBootstrapped) return;
     const supabase = createSupabaseBrowserClient();
@@ -809,6 +843,7 @@ export default function LeapApp() {
   }), posts).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [posts, systemPostActions, systemPosts]);
 
   const visiblePosts = useMemo(() => allPosts.filter((post) => discoverableAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, discoverableAccounts]);
+  const visibleBlogs = useMemo(() => blogs.filter((blog) => discoverableAccounts.some((account) => account.id === blog.authorId) || blog.authorId === currentAccount?.id).filter((blog) => canSeeBlog(blog, currentAccount, currentFollowing)).filter((blog) => blog.visibility !== 'draft' && !blog.isHidden).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [blogs, currentAccount, currentFollowing, discoverableAccounts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'investor');
@@ -984,6 +1019,81 @@ export default function LeapApp() {
     flash('投稿を削除しました');
   }
 
+  function submitBlog() {
+    if (!requireAccount()) return;
+    if (!blogTitle.trim() || !blogBody.trim()) {
+      flash('タイトルと本文を入力してください');
+      return;
+    }
+    const now = new Date().toISOString();
+    const tags = blogTags.split(',').map((tag) => tag.trim()).filter(Boolean);
+    if (editingBlogId) {
+      setBlogs((list) => list.map((blog) => blog.id === editingBlogId ? { ...blog, title: blogTitle.trim(), body: blogBody.trim(), tags, visibility: blogVisibility, imageName: blogImageName, imageUrl: blogImageUrl, attachmentName: blogAttachmentName, attachmentUrl: blogAttachmentUrl, updatedAt: now } : blog));
+      resetBlogComposer();
+      flash('ブログを更新しました');
+      return;
+    }
+    setBlogs((list) => [{
+      id: crypto.randomUUID(),
+      authorId: currentAccount!.id,
+      title: blogTitle.trim(),
+      body: blogBody.trim(),
+      tags,
+      visibility: blogVisibility,
+      imageName: blogImageName,
+      imageUrl: blogImageUrl,
+      attachmentName: blogAttachmentName,
+      attachmentUrl: blogAttachmentUrl,
+      isHidden: false,
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+    }, ...list]);
+    resetBlogComposer();
+    flash(blogVisibility === 'draft' ? 'ブログを下書き保存しました' : 'ブログを公開しました');
+  }
+
+  function resetBlogComposer() {
+    setEditingBlogId('');
+    setBlogTitle('');
+    setBlogBody('');
+    setBlogTags('');
+    setBlogVisibility('public');
+    setBlogImageName('');
+    setBlogImageUrl('');
+    setBlogAttachmentName('');
+    setBlogAttachmentUrl('');
+    setShowBlogComposer(false);
+  }
+
+  function startEditBlog(blog: BlogArticle) {
+    setEditingBlogId(blog.id);
+    setBlogTitle(blog.title);
+    setBlogBody(blog.body);
+    setBlogTags(blog.tags.join(', '));
+    setBlogVisibility(blog.visibility);
+    setBlogImageName(blog.imageName);
+    setBlogImageUrl(blog.imageUrl);
+    setBlogAttachmentName(blog.attachmentName);
+    setBlogAttachmentUrl(blog.attachmentUrl);
+    setShowBlogComposer(true);
+  }
+
+  function hideBlog(blogId: string) {
+    let hidden = false;
+    setBlogs((list) => list.map((blog) => {
+      if (blog.id !== blogId) return blog;
+      hidden = !blog.isHidden;
+      return { ...blog, isHidden: hidden };
+    }));
+    flash(hidden ? 'ブログを非表示にしました' : 'ブログを再公開しました');
+  }
+
+  function deleteBlog(blogId: string) {
+    setBlogs((list) => list.filter((blog) => blog.id !== blogId));
+    flash('ブログを削除しました');
+  }
+
   function requestMeeting(account: Account) {
     if (!requireAccount()) return;
     const body = `${displayAccountName(currentAccount) || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
@@ -1151,13 +1261,13 @@ export default function LeapApp() {
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} onAuthenticated={syncAuthenticatedAccount} />}
           {page === 'mypage' && (
-            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} blogs={blogs.filter((blog) => blog.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} openBlogComposer={() => setShowBlogComposer(true)} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
           {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} setMessages={setMessages} setNotices={setNotices} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} blogs={blogs.filter((blog) => blog.authorId === selectedAccount.id && canSeeBlog(blog, currentAccount, currentFollowing) && (!blog.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />
           )}
           {page === 'matching' && <MatchingPage accounts={visibleAccounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
@@ -1182,6 +1292,36 @@ export default function LeapApp() {
           {postImageUrl && <img src={postImageUrl} alt={postImageName} className="mt-3 aspect-square w-full rounded-2xl object-cover" />}
           <input className="field mt-3" placeholder="添付ファイル名" value={postAttachment} onChange={(event) => setPostAttachment(event.target.value)} />
           <button className="primary mt-4 w-full" onClick={submitPost}>投稿する</button>
+        </Modal>
+      )}
+
+      {showBlogComposer && (
+        <Modal onClose={resetBlogComposer} title={editingBlogId ? 'ブログを編集' : 'ブログを書く'}>
+          <input className="field" placeholder="ブログタイトル" value={blogTitle} onChange={(event) => setBlogTitle(event.target.value)} />
+          <textarea className="field mt-3 min-h-56 resize-none leading-7" placeholder="会社のストーリー、事業の考え方、顧客事例、学び、採用・資本提携につながる長文を書いてください" value={blogBody} onChange={(event) => setBlogBody(event.target.value)} />
+          <Select label="公開範囲" value={blogVisibility} options={Object.values(visibilityLabels)} onChange={(value) => setBlogVisibility((Object.keys(visibilityLabels).find((key) => visibilityLabels[key as Visibility] === value) as Visibility) || 'public')} />
+          <input className="field mt-3" placeholder="タグ。例：会社紹介, SaaS, 資金調達" value={blogTags} onChange={(event) => setBlogTags(event.target.value)} />
+          <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
+            <ImageIcon size={17} />カバー画像を選択
+            <input className="hidden" type="file" accept="image/*" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              setBlogImageName(file.name);
+              readFileAsDataUrl(file, setBlogImageUrl);
+            }} />
+          </label>
+          {blogImageUrl && <img src={blogImageUrl} alt={blogImageName} className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" />}
+          <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
+            <Paperclip size={17} />添付ファイルを選択
+            <input className="hidden" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              setBlogAttachmentName(file.name);
+              readFileAsDataUrl(file, setBlogAttachmentUrl);
+            }} />
+          </label>
+          {blogAttachmentName && <p className="mt-2 truncate rounded-2xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">{blogAttachmentName}</p>}
+          <button className="primary mt-4 w-full" onClick={submitBlog}>{editingBlogId ? 'ブログを更新する' : 'ブログを公開する'}</button>
         </Modal>
       )}
 
@@ -1644,7 +1784,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
   );
 }
 
-function MyPage({ currentAccount, accounts, posts, setPage, openComposer, reactToPost, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer, openBlogComposer, reactToPost, startEditPost, hidePost, deletePost, startEditBlog, hideBlog, deleteBlog }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; blogs: BlogArticle[]; setPage: (page: Page) => void; openComposer: () => void; openBlogComposer: () => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
   const [socialModal, setSocialModal] = useState<'following' | 'followers' | null>(null);
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
@@ -1660,10 +1800,18 @@ function MyPage({ currentAccount, accounts, posts, setPage, openComposer, reactT
         <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-lg">{followingAccounts.length}</span>フォロー一覧を見る</button>
         <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-lg">{followerAccounts.length}</span>フォロワー一覧を見る</button>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-3 gap-2">
         <button className="secondary" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>
         <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
+        <button className="secondary" onClick={openBlogComposer}><FileText size={16} />ブログを書く</button>
       </div>
+      <section className="mt-5 rounded-2xl border border-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <h2 className="text-sm font-black">ブログ</h2>
+          <button className="text-xs font-black text-blue-600" onClick={openBlogComposer}>新規作成</button>
+        </div>
+        {blogs.length === 0 ? <EmptyState icon={<FileText size={28} />} title="ブログはまだありません" body="会社ストーリーや事業ノウハウを長文で発信できます。" /> : <div className="divide-y divide-slate-100">{blogs.map((blog) => <BlogCard key={blog.id} blog={blog} author={currentAccount} currentAccount={currentAccount} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />)}</div>}
+      </section>
       <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
         {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : <div className="divide-y divide-[#e5e7eb]">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
       </div>
@@ -2193,16 +2341,17 @@ function AdminStat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl border border-slate-100 p-4"><span className="text-[11px] font-black text-slate-500">{label}</span><b className="mt-2 block text-xl">{value}</b></div>;
 }
 
-function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, reactToPost, startEditPost, hidePost, deletePost }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
-  const [tab, setTab] = useState<'overview' | 'achievements' | 'posts'>('overview');
+function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, reactToPost, startEditPost, hidePost, deletePost, startEditBlog, hideBlog, deleteBlog }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; blogs: BlogArticle[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
+  const [tab, setTab] = useState<'overview' | 'achievements' | 'posts' | 'blogs'>('overview');
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
       <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} compact={tab !== 'overview'} />
-      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
+      <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold">
         <button className={`py-2 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
         <button className={`py-2 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
         <button className={`py-2 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
+        <button className={`py-2 ${tab === 'blogs' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('blogs')}>ブログ</button>
       </div>
       {tab === 'overview' && (
         <div className="px-4 py-3">
@@ -2245,6 +2394,11 @@ function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, is
           {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
         </div>
       )}
+      {tab === 'blogs' && (
+        <div className="divide-y divide-slate-100">
+          {blogs.length === 0 ? <EmptyState icon={<FileText size={28} />} title="ブログはまだありません" body="公開されたブログがここに表示されます。" /> : blogs.map((blog) => <BlogCard key={blog.id} blog={blog} author={account} currentAccount={currentAccount} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -2279,6 +2433,37 @@ function MatchingPage({ accounts, openProfile, requestMeeting }: { accounts: Acc
         </div>
       )}
     </div>
+  );
+}
+
+function BlogCard({ blog, author, currentAccount, startEditBlog, hideBlog, deleteBlog }: { blog: BlogArticle; author?: Account | null; currentAccount: Account | null; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isOwner = Boolean(currentAccount && currentAccount.id === blog.authorId);
+  return (
+    <article className="bg-white p-4">
+      <div className="flex items-start gap-3">
+        {author && <Avatar account={author} />}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black">{blog.title}</p>
+              <p className="mt-0.5 text-[12px] font-bold text-slate-500">{author ? displayAccountName(author) : '名前未設定'}・{blog.isHidden ? '非表示・' : ''}{visibilityLabels[blog.visibility]}・{formatDate(blog.createdAt)}</p>
+            </div>
+            {isOwner && (
+              <div className="relative">
+                <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} /></button>
+                {menuOpen && <div className="absolute right-0 top-9 z-20 w-36 overflow-hidden rounded-2xl bg-white text-xs font-black shadow-xl ring-1 ring-slate-100"><button className="block w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => startEditBlog(blog)}>編集</button><button className="block w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => hideBlog(blog.id)}>{blog.isHidden ? '再公開' : '非表示'}</button><button className="block w-full px-4 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={() => deleteBlog(blog.id)}>削除</button></div>}
+              </div>
+            )}
+          </div>
+          {blog.imageUrl && <img className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" src={blog.imageUrl} alt={blog.imageName || blog.title} />}
+          <p className="mt-3 whitespace-pre-line text-[14px] leading-7 text-slate-700">{blog.body}</p>
+          {blog.tags.length > 0 && <p className="mt-3 text-[13px] font-black text-blue-600">{blog.tags.map((tag) => `#${tag}`).join(' ')}</p>}
+          {blog.attachmentUrl && <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={blog.attachmentUrl} download={blog.attachmentName || 'blog-attachment'}><Paperclip size={15} />{blog.attachmentName || '添付ファイル'}</a>}
+          <p className="mt-3 text-[11px] font-bold text-slate-400">閲覧 {blog.views}</p>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -2531,6 +2716,16 @@ function canSeePost(post: Post, viewer: Account | null, following: string[]) {
   if (post.visibility === 'followers') return following.includes(post.authorId);
   if (post.visibility === 'investors') return viewer.role === 'investor';
   if (post.visibility === 'entrepreneurs') return viewer.role === 'entrepreneur';
+  return false;
+}
+
+function canSeeBlog(blog: BlogArticle, viewer: Account | null, following: string[]) {
+  if (blog.visibility === 'public') return true;
+  if (!viewer) return false;
+  if (blog.authorId === viewer.id) return true;
+  if (blog.visibility === 'followers') return following.includes(blog.authorId);
+  if (blog.visibility === 'investors') return viewer.role === 'investor';
+  if (blog.visibility === 'entrepreneurs') return viewer.role === 'entrepreneur';
   return false;
 }
 
