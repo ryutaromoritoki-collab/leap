@@ -1263,7 +1263,7 @@ export default function LeapApp() {
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
 
-        <section data-app-scroll className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:row-start-2 lg:pb-6">
+        <section data-app-scroll className="min-h-0 overflow-y-auto pb-14 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {cloudError && (
             <div className="m-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800">
               {cloudError}<br />PC/スマホ連携にはSupabase SQL Editorで `supabase/fix_20260608_app_state_permissions.sql` を実行してください。
@@ -1366,21 +1366,21 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
-      <div className="grid h-14 grid-cols-[40px_1fr_72px] items-center px-3">
-        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
+      <div className="grid h-11 grid-cols-[34px_1fr_62px] items-center px-2">
+        <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={18} /> : <BriefcaseBusiness size={18} />}
         </button>
-        <h1 className="text-center text-sm font-black">{title[page]}</h1>
-        <div className="flex items-center justify-end gap-1">
-          <button className="relative grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
-            <Bell size={19} />
-            {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-600 px-1 text-[9px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
+        <h1 className="text-center text-[13px] font-black">{title[page]}</h1>
+        <div className="flex items-center justify-end gap-0.5">
+          <button className="relative grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
+            <Bell size={17} />
+            {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-rose-600 px-1 text-[8px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
           </button>
-          <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={20} /></button>
+          <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} /></button>
         </div>
       </div>
       {menuOpen && (
-        <div className="absolute right-3 top-12 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
+        <div className="absolute right-2 top-10 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
           {[
             ['feed', 'フィード'],
             ['search', '検索'],
@@ -2732,20 +2732,20 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
     ['mypage', 'マイページ', UserRound],
   ] as const;
   return (
-    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
+    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-1 py-0.5 shadow-[0_-8px_20px_rgba(15,23,42,0.06)] lg:hidden">
       {tabs.slice(0, 2).map(([key, label, Icon]) => (
-        <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
-          <Icon size={18} />
+        <button key={key} className={`grid justify-items-center gap-0.5 rounded-xl px-1 py-1 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
+          <Icon size={17} />
           <span>{label}</span>
         </button>
       ))}
-      <button className="grid justify-items-center gap-1 rounded-2xl bg-[#050816] px-1 py-2 text-[9px] font-bold text-white" onClick={openComposer} aria-label="投稿する">
-        <Plus size={18} />
+      <button className="grid justify-items-center gap-0.5 rounded-xl bg-[#050816] px-1 py-1 text-[9px] font-bold text-white" onClick={openComposer} aria-label="投稿する">
+        <Plus size={17} />
         <span>投稿</span>
       </button>
       {tabs.slice(2).map(([key, label, Icon]) => (
-          <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
-            <Icon size={18} />
+          <button key={key} className={`grid justify-items-center gap-0.5 rounded-xl px-1 py-1 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
+            <Icon size={17} />
             <span>{label}</span>
           </button>
       ))}
