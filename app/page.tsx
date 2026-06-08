@@ -2445,40 +2445,68 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
         <button className={`py-2 ${tab === 'blogs' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('blogs')}>ブログ</button>
       </div>
       {tab === 'overview' && (
-        <div className="bg-[#f7f9fb] px-4 py-4">
-          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black">会社のハイライト</h3>
-              <span className="text-[10px] font-black text-blue-600">GROWTH</span>
-            </div>
-            <KpiGrid account={account} />
-          </section>
-          {account.profileImageUrl && <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-[22px] object-cover shadow-sm ring-1 ring-slate-100" />}
-          <TextBlock title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。'} />
-          {account.role === 'entrepreneur' && (
-            <>
-              <TextBlock title="なぜやるのか" body={account.mission || '創業の背景や実現したい未来はまだ登録されていません。'} />
-              <TextBlock title="どうやっているのか" body={account.culture || '大切にしている価値観や事業の進め方はまだ登録されていません。'} />
-              <TextBlock title="メンバー" body={account.teamIntro || 'チーム紹介はまだ登録されていません。'} />
-              <section className="mt-5">
-                <h3 className="text-sm font-black">組織の特徴</h3>
-                <div className="mt-2 grid gap-2 rounded-[20px] bg-white p-4 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-slate-100">
-                  <div className="flex items-center justify-between"><span>意思決定スピード</span><b className="text-blue-600">Lv.{account.workStyleSpeed || '3'}</b></div>
-                  <div className="flex items-center justify-between"><span>チームの進め方</span><b className="text-blue-600">Lv.{account.workStyleTeam || '3'}</b></div>
-                  <div className="flex items-center justify-between"><span>リスクの取り方</span><b className="text-blue-600">Lv.{account.workStyleRisk || '3'}</b></div>
-                  {account.personalityProfile && <p className="whitespace-pre-line border-t border-slate-100 pt-2 leading-6">{account.personalityProfile}</p>}
+        <div className="bg-[#f5f8fb] px-4 py-5 lg:px-8">
+          <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid gap-5">
+              {account.profileImageUrl && (
+                <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-[28px] object-cover shadow-sm ring-1 ring-slate-100" />
+              )}
+              <CompanyStorySection eyebrow="WHAT WE DO" title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。プロフィール編集から、解決している課題、提供サービス、顧客に届けている価値を記載してください。'} />
+              {account.role === 'entrepreneur' && (
+                <>
+                  <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={account.mission || '創業の背景や、実現したい未来はまだ登録されていません。なぜこの事業を続けるのか、誰のどんな課題を変えたいのかを書いてください。'} />
+                  <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={account.culture || '事業の進め方、大切にしている価値観、顧客との向き合い方はまだ登録されていません。チームらしさが伝わる内容を書くと、投資家が判断しやすくなります。'} />
+                  <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                    <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">MEMBERS</p>
+                    <h3 className="mt-1 text-lg font-black">メンバー</h3>
+                    <div className="mt-4 flex gap-4">
+                      <Avatar account={account} size="lg" />
+                      <div className="min-w-0 flex-1">
+                        <b className="block truncate text-sm">{account.name || '代表者名未設定'}</b>
+                        <span className="text-xs font-bold text-slate-500">{account.title || '肩書き未設定'}</span>
+                        <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">{account.teamIntro || 'チーム紹介はまだ登録されていません。創業メンバーの経験、役割、これから仲間にしたい人を書いてください。'}</p>
+                      </div>
+                    </div>
+                  </section>
+                  <CultureMap account={account} />
+                </>
+              )}
+              <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">STORY</p>
+                    <h3 className="mt-1 text-lg font-black">ストーリー</h3>
+                  </div>
+                  {isMine && <button className="secondary min-h-9 px-3 text-[11px]" onClick={() => setPage('profileEdit')}>編集する</button>}
                 </div>
+                {blogs.length === 0 ? (
+                  <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-bold leading-7 text-slate-500">会社紹介、事業への想い、顧客事例などのブログを書くと、ここに表示されます。</p>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {blogs.slice(0, 2).map((blog) => <MiniBlogCard key={blog.id} blog={blog} />)}
+                  </div>
+                )}
               </section>
-            </>
-          )}
-          {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
-          {!isMine && (
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <button className="secondary" onClick={follow}>{isFollowing ? '解除' : 'フォロー'}</button>
-              <button className="secondary" onClick={message}>メッセージ</button>
-              <button className="primary" onClick={requestMeeting}>面談</button>
             </div>
-          )}
+            <aside className="grid gap-4 lg:sticky lg:top-4 lg:self-start">
+              <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">HIGHLIGHT</p>
+                <h3 className="mt-1 text-lg font-black">会社のハイライト</h3>
+                <KpiGrid account={account} />
+                {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
+              </section>
+              <CompanyInfoPanel account={account} />
+              {!isMine && (
+                <section className="rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="grid gap-2">
+                    <button className="primary w-full" onClick={requestMeeting}>面談を申し込む</button>
+                    <button className="secondary w-full" onClick={message}>メッセージ</button>
+                    <button className="secondary w-full" onClick={follow}>{isFollowing ? 'フォロー解除' : 'フォローする'}</button>
+                  </div>
+                </section>
+              )}
+            </aside>
+          </div>
         </div>
       )}
       {tab === 'achievements' && (
@@ -2497,6 +2525,80 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
         </div>
       )}
     </div>
+  );
+}
+
+function CompanyStorySection({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+  return (
+    <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">{eyebrow}</p>
+      <h3 className="mt-1 text-xl font-black tracking-tight">{title}</h3>
+      <p className="mt-4 whitespace-pre-line text-[15px] font-bold leading-8 text-slate-700">{body}</p>
+    </section>
+  );
+}
+
+function CultureMap({ account }: { account: Account }) {
+  const rows = [
+    ['スピード', '慎重に検証', 'すぐ試す', Number(account.workStyleSpeed || 3)],
+    ['チーム', '個人で深掘り', '全員で議論', Number(account.workStyleTeam || 3)],
+    ['リスク', '堅実に積む', '大胆に挑む', Number(account.workStyleRisk || 3)],
+  ] as const;
+  return (
+    <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">CULTURE MAP</p>
+      <h3 className="mt-1 text-lg font-black">組織の特徴</h3>
+      <div className="mt-4 grid gap-4">
+        {rows.map(([label, left, right, value]) => (
+          <div key={label}>
+            <div className="mb-2 flex items-center justify-between text-[11px] font-black text-slate-500"><span>{left}</span><b className="text-slate-900">{label}</b><span>{right}</span></div>
+            <div className="h-2 rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, Math.max(20, value * 20))}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 whitespace-pre-line text-sm font-bold leading-7 text-slate-600">{account.personalityProfile || '意思決定やチームの特徴はまだ登録されていません。プロフィール編集で、投資家が一緒に動く時に知っておくとよい特徴を書けます。'}</p>
+    </section>
+  );
+}
+
+function CompanyInfoPanel({ account }: { account: Account }) {
+  const rows = [
+    ['会社名', account.company || '未入力'],
+    ['代表者', account.name || '未入力'],
+    ['業界', account.industry || '未入力'],
+    ['地域', account.location || '未入力'],
+    ['設立', account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '未入力'],
+    ['従業員数', account.employeeSize || '未入力'],
+    ['年商規模', account.revenueScale || '未入力'],
+    ['フェーズ', account.stage || '未入力'],
+  ];
+  return (
+    <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">COMPANY INFO</p>
+      <h3 className="mt-1 text-lg font-black">基本情報</h3>
+      <div className="mt-4 divide-y divide-slate-100 text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[82px_1fr] gap-3 py-3">
+            <b className="text-slate-500">{label}</b>
+            <span className="font-bold text-slate-800">{value}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MiniBlogCard({ blog }: { blog: BlogArticle }) {
+  return (
+    <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+      {blog.imageUrl ? <img src={blog.imageUrl} alt={blog.imageName || blog.title} className="aspect-[16/9] w-full object-cover" /> : <div className="aspect-[16/9] bg-gradient-to-br from-blue-50 to-emerald-50" />}
+      <div className="p-3">
+        <b className="line-clamp-2 text-sm">{blog.title || 'タイトル未設定'}</b>
+        <p className="mt-2 line-clamp-2 text-xs font-bold leading-5 text-slate-500">{blog.body}</p>
+      </div>
+    </article>
   );
 }
 
