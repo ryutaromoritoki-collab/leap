@@ -99,6 +99,7 @@ type Account = {
   age: string;
   gender: string;
   verified: boolean;
+  tutorialCompleted: boolean;
 };
 
 type Post = {
@@ -258,6 +259,7 @@ const emptyAccount: Account = {
   age: '',
   gender: '',
   verified: false,
+  tutorialCompleted: false,
 };
 
 const adminAccount: Account = {
@@ -583,6 +585,7 @@ function normalizeAccount(account: Account): Account {
     age: account.age || '',
     gender: account.gender || '',
     ticketTransferName: account.ticketTransferName || '',
+    tutorialCompleted: Boolean(account.tutorialCompleted),
     verified: identityStatus === 'verified' || identityStatus === 'submitted',
   };
 }
@@ -737,6 +740,8 @@ export default function LeapApp() {
   const [messageDraft, setMessageDraft] = useState('');
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
@@ -849,6 +854,11 @@ export default function LeapApp() {
   useEffect(() => {
     if (currentAccount && currentAccount.id !== currentAccountId) setCurrentAccountId(currentAccount.id);
   }, [currentAccount, currentAccountId]);
+  useEffect(() => {
+    if (!currentAccount || currentAccount.isBot || currentAccount.tutorialCompleted || page === 'auth') return;
+    setTutorialStep(0);
+    setShowTutorial(true);
+  }, [currentAccount?.id, currentAccount?.isBot, currentAccount?.tutorialCompleted, page]);
   const systemPosts = useMemo(() => createAiPosts(aiAccounts), []);
   const allPosts = useMemo(() => mergeById(systemPosts.map((post) => {
     const actionUserIds = systemPostActions[post.id] ?? post.actionUserIds;
@@ -1246,6 +1256,23 @@ export default function LeapApp() {
     setPage('tickets');
   }
 
+  function finishTutorial(nextPage?: Page) {
+    if (currentAccount) {
+      setAccounts((list) => list.map((account) => account.id === currentAccount.id ? { ...normalizeAccount(account), tutorialCompleted: true } : account));
+    }
+    setShowTutorial(false);
+    if (nextPage) {
+      setPage(nextPage);
+      scrollContentToTop();
+    }
+  }
+
+  function reopenTutorial() {
+    setTutorialStep(0);
+    setShowTutorial(true);
+    setMenuOpen(false);
+  }
+
   async function logout() {
     const supabase = createSupabaseBrowserClient();
     if (supabase) await supabase.auth.signOut();
@@ -1261,7 +1288,7 @@ export default function LeapApp() {
     <main className="min-h-screen bg-white text-[#101828] lg:p-6">
       <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-none lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px] lg:shadow-sm lg:ring-1 lg:ring-[#eff3f4]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} openTutorial={reopenTutorial} />
 
         <section data-app-scroll className="min-h-0 overflow-y-auto pb-14 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {cloudError && (
@@ -1343,12 +1370,114 @@ export default function LeapApp() {
         </Modal>
       )}
 
+      {showTutorial && currentAccount && (
+        <TutorialModal
+          account={currentAccount}
+          step={tutorialStep}
+          setStep={setTutorialStep}
+          onSkip={() => finishTutorial()}
+          onFinish={(nextPage) => finishTutorial(nextPage)}
+        />
+      )}
+
       {toast && <div className="fixed left-1/2 top-5 z-[70] -translate-x-1/2 rounded-full bg-[#050816] px-5 py-3 text-xs font-black text-white shadow-xl">{toast}</div>}
     </main>
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number }) {
+function TutorialModal({ account, step, setStep, onSkip, onFinish }: { account: Account; step: number; setStep: (step: number) => void; onSkip: () => void; onFinish: (page: Page) => void }) {
+  const isEntrepreneur = account.role === 'entrepreneur';
+  const steps = [
+    {
+      title: 'Leapへようこそ',
+      body: 'Leapでは、投稿・プロフィール・メッセージを通じて、起業家と投資家が自然につながれます。まずは使う順番を短く確認しましょう。',
+      tip: 'この案内は右上の「…」からいつでも見直せます。',
+    },
+    {
+      title: 'プロフィールを整える',
+      body: isEntrepreneur
+        ? '会社の想い、事業内容、実績、案件詳細を入力すると、投資家があなたの事業を判断しやすくなります。'
+        : '投資方針、支援できること、本人確認情報を入力すると、起業家が安心してやり取りできます。',
+      tip: 'プロフィールはマイページ、または右上メニューのプロフィール編集から変更できます。',
+    },
+    {
+      title: '投稿で活動を共有する',
+      body: '投稿ボタンから近況、進捗、学び、募集したいことを気軽に投稿できます。画像やファイルも添付できます。',
+      tip: '公開範囲は、全体公開・フォロワー限定・投資家限定・起業家限定・下書きから選べます。',
+    },
+    {
+      title: 'フィードを見る',
+      body: 'フィードでは、フォロー中・おすすめ・起業家の投稿を切り替えられます。気になる投稿には応援、保存、面談希望ができます。',
+      tip: '自分の投稿の閲覧数は本人だけが確認できます。一定以上見られた投稿は他の人にも閲覧数が表示されます。',
+    },
+    {
+      title: '検索で相手を探す',
+      body: '検索ページでは、アカウント名、会社名、業界、地域などから起業家を探せます。気になる相手はプロフィールを確認しましょう。',
+      tip: 'プロフィール画面からフォローやメッセージ送信ができます。',
+    },
+    {
+      title: 'メッセージと面談',
+      body: '通常メッセージでやり取りし、面談したい場合は面談希望を送ります。双方が進める場合は面談メッセージへ移動します。',
+      tip: '面談日時が決まったら、面談メッセージから運営へ面談日程を申請します。',
+    },
+    {
+      title: '通知を確認する',
+      body: 'フォロー、メッセージ、面談申込、運営からのお知らせは通知で確認できます。未読だけに絞り込むこともできます。',
+      tip: 'メール通知のオン・オフは設定から変更できます。',
+    },
+    {
+      title: '準備完了です',
+      body: isEntrepreneur
+        ? 'まずはプロフィール編集で会社の魅力を整えてから、最初の投稿をしてみましょう。'
+        : 'まずは検索で気になる起業家を探し、プロフィールや投稿を見てみましょう。',
+      tip: '迷ったら、プロフィールを整える、投稿を見る、メッセージする、の順番で使えば大丈夫です。',
+    },
+  ];
+  const current = steps[step] ?? steps[0];
+  const isLast = step >= steps.length - 1;
+  const targetPage: Page = isEntrepreneur ? 'profileEdit' : 'search';
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center">
+      <div className="w-full max-w-[430px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-slate-200">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[10px] font-black text-blue-600">はじめての使い方</p>
+            <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" aria-label="閉じる" onClick={onSkip}><X size={17} /></button>
+          </div>
+          <div className="flex gap-1">
+            {steps.map((_, index) => <span key={index} className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-blue-600' : 'bg-slate-100'}`} />)}
+          </div>
+        </div>
+        <div className="px-5 py-6">
+          <div className="mb-5 grid h-14 w-14 place-items-center rounded-3xl bg-blue-50 text-blue-600">
+            {step === 0 && <CheckCircle2 size={26} />}
+            {step === 1 && <UserRound size={26} />}
+            {step === 2 && <Plus size={26} />}
+            {step === 3 && <Home size={26} />}
+            {step === 4 && <Search size={26} />}
+            {step === 5 && <MessageCircle size={26} />}
+            {step === 6 && <Bell size={26} />}
+            {step >= 7 && <ShieldCheck size={26} />}
+          </div>
+          <h2 className="text-[20px] font-black tracking-tight text-[#101828]">{current.title}</h2>
+          <p className="mt-3 text-[13px] font-bold leading-6 text-slate-600">{current.body}</p>
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-[12px] font-bold leading-5 text-slate-500">{current.tip}</div>
+        </div>
+        <div className="flex items-center gap-2 border-t border-slate-100 p-4">
+          <button className="h-11 rounded-2xl px-4 text-xs font-black text-slate-500 hover:bg-slate-50" onClick={onSkip}>スキップ</button>
+          <div className="flex-1" />
+          {step > 0 && <button className="h-11 rounded-2xl border border-slate-200 px-4 text-xs font-black" onClick={() => setStep(step - 1)}>戻る</button>}
+          <button className="h-11 rounded-2xl bg-[#050816] px-5 text-xs font-black text-white" onClick={() => isLast ? onFinish(targetPage) : setStep(step + 1)}>
+            {isLast ? (isEntrepreneur ? 'プロフィール編集へ' : '検索へ') : '次へ'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount, openTutorial }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number; openTutorial: () => void }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -1390,6 +1519,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             [currentAccount ? 'profileEdit' : 'auth', '設定'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
+          {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={openTutorial}>使い方を見る</button>}
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
         </div>
       )}
@@ -2730,11 +2860,12 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   const authorName = author ? displayAccountName(author) : 'アカウント未設定';
   const secondaryLabel = [post.isHidden ? '非表示' : '', visibilityLabels[post.visibility]].filter(Boolean).join('・');
+  const canShowViews = isOwner || post.views > 1000;
   return (
     <article className={`relative px-3.5 py-2 ${post.isHidden ? 'bg-slate-50' : ''}`}>
       <div className="flex w-full items-start gap-2 text-left">
         <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
-          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
+          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]"><Building2 size={18} strokeWidth={1.8} /></span>}
         </button>
 
         <div className="min-w-0 flex-1">
@@ -2749,7 +2880,7 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
             <button className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} className="text-[#536471]" /></button>
           </div>
 
-          <p className="mt-0.5 whitespace-pre-line text-[13px] leading-[1.3] text-[#0f1419]">{post.body}</p>
+          <p className="mt-0.5 text-[13px] leading-[1.24] text-[#0f1419]">{renderPostBody(post.body)}</p>
           {post.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[12px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
           {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
           {post.attachmentName && <div className="mt-1.5 flex items-center gap-1.5 rounded-2xl bg-slate-50 p-2 text-[11px]"><Paperclip size={13} />{post.attachmentName}</div>}
@@ -2757,7 +2888,7 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
             <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'like')} aria-label="応援" aria-pressed={liked}><Heart size={16} fill={liked ? 'currentColor' : 'none'} />{post.likes}</button>
             <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'save')} aria-label="保存" aria-pressed={saved}><Bookmark size={16} fill={saved ? 'currentColor' : 'none'} />{post.saves}</button>
             <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'meeting')} aria-label="面談" aria-pressed={meetingRequested}><UsersRound size={16} />{post.meetings}</button>
-            <span className="ml-auto text-[10px]">閲覧 {post.views}</span>
+            {canShowViews && <span className="ml-auto text-[10px]">閲覧 {post.views}</span>}
           </div>
         </div>
       </div>
@@ -2776,6 +2907,14 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
       )}
     </article>
   );
+}
+
+function renderPostBody(body: string) {
+  return body.split('\n').map((line, index) => (
+    line.trim()
+      ? <span key={`${index}-${line}`} className="block whitespace-pre-wrap">{line}</span>
+      : <span key={`blank-${index}`} className="block h-[0.55em]" aria-hidden />
+  ));
 }
 
 function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (page: Page) => void; openComposer: () => void }) {
