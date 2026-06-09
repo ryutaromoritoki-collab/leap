@@ -1937,6 +1937,7 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
 
 function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer, openBlogComposer, reactToPost, startEditPost, hidePost, deletePost, startEditBlog, hideBlog, deleteBlog }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; blogs: BlogArticle[]; setPage: (page: Page) => void; openComposer: () => void; openBlogComposer: () => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
   const [socialModal, setSocialModal] = useState<'following' | 'followers' | null>(null);
+  const postsRef = useRef<HTMLElement | null>(null);
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
   }
@@ -1956,51 +1957,57 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
   const completionRate = Math.round((completedSetup / setupItems.length) * 100);
   return (
     <div className="bg-[#f5f8fb]">
-      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover />
+      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover onPostsClick={() => postsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} onFollowingClick={() => setSocialModal('following')} onFollowersClick={() => setSocialModal('followers')} onTicketsClick={() => setPage('tickets')} />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
         <main className="grid gap-4">
-          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">COMPANY PAGE</p>
-                <h2 className="mt-1 text-lg font-black tracking-tight">会社ページを育てる</h2>
-                <p className="mt-1 max-w-xl text-xs font-bold leading-5 text-slate-500">Wantedlyの会社紹介のように、事業内容、想い、実績、ストーリーを積み上げるマイページです。</p>
+          <div className="-mx-3 overflow-x-auto px-3 lg:mx-0 lg:contents lg:overflow-visible lg:px-0">
+            <div className="flex snap-x snap-mandatory gap-3 lg:contents">
+              <div className="h-[190px] min-w-[82vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto">
+                <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">COMPANY PAGE</p>
+                      <h2 className="mt-1 text-lg font-black tracking-tight">会社ページを育てる</h2>
+                      <p className="mt-1 max-w-xl text-xs font-bold leading-5 text-slate-500">Wantedlyの会社紹介のように、事業内容、想い、実績、ストーリーを積み上げるマイページです。</p>
+                    </div>
+                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{completionRate}%</div>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-blue-600" style={{ width: `${completionRate}%` }} />
+                  </div>
+                  {nextSetup ? (
+                    <button className="mt-3 flex w-full items-center justify-between rounded-2xl bg-[#101828] px-3 py-2.5 text-left text-xs font-black text-white" onClick={nextSetup.onClick}>
+                      <span>{nextSetup.label}</span>
+                      <span className="opacity-80">{nextSetup.action}</span>
+                    </button>
+                  ) : (
+                    <div className="mt-3 rounded-2xl bg-emerald-50 p-2.5 text-xs font-black text-emerald-700">基本準備は完了しています。ストーリーと投稿を継続して成長を見せましょう。</div>
+                  )}
+                </section>
               </div>
-              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{completionRate}%</div>
-            </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-blue-600" style={{ width: `${completionRate}%` }} />
-            </div>
-            {nextSetup ? (
-              <button className="mt-3 flex w-full items-center justify-between rounded-2xl bg-[#101828] px-3 py-2.5 text-left text-xs font-black text-white" onClick={nextSetup.onClick}>
-                <span>{nextSetup.label}</span>
-                <span className="opacity-80">{nextSetup.action}</span>
-              </button>
-            ) : (
-              <div className="mt-3 rounded-2xl bg-emerald-50 p-2.5 text-xs font-black text-emerald-700">基本準備は完了しています。ストーリーと投稿を継続して成長を見せましょう。</div>
-            )}
-          </section>
-
-          <CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} />
-          <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} />
-          <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} />
-
-          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">STORY</p>
-                <h2 className="mt-1 text-base font-black">会社のストーリー</h2>
+              <div className="h-[190px] min-w-[82vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto"><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
+              <div className="h-[190px] min-w-[82vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto"><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
+              <div className="h-[190px] min-w-[82vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto"><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div className="h-[190px] min-w-[82vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto">
+                <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">STORY</p>
+                      <h2 className="mt-1 text-base font-black">会社のストーリー</h2>
+                    </div>
+                    <button className="text-xs font-black text-blue-600" onClick={openBlogComposer}>ストーリーを書く</button>
+                  </div>
+                  {blogs.length === 0 ? (
+                    <EmptyState compact icon={<FileText size={24} />} title="ストーリーはまだありません" body="会社紹介、創業背景、顧客事例、チームの考え方を書けます。" action="書く" onAction={openBlogComposer} />
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">{blogs.slice(0, 4).map((blog) => <MiniBlogCard key={blog.id} blog={blog} />)}</div>
+                  )}
+                </section>
               </div>
-              <button className="text-xs font-black text-blue-600" onClick={openBlogComposer}>ストーリーを書く</button>
             </div>
-            {blogs.length === 0 ? (
-              <EmptyState compact icon={<FileText size={24} />} title="ストーリーはまだありません" body="会社紹介、創業背景、顧客事例、チームの考え方を書けます。" action="書く" onAction={openBlogComposer} />
-            ) : (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">{blogs.slice(0, 4).map((blog) => <MiniBlogCard key={blog.id} blog={blog} />)}</div>
-            )}
-          </section>
+          </div>
 
-          <section className="rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
+          <section ref={postsRef} className="rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
             <div className="flex items-center justify-between border-b border-[#eff3f4] px-4 py-2.5">
               <div>
                 <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">POSTS</p>
@@ -2023,13 +2030,6 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
           </section>
           <CompanyInfoPanel account={currentAccount} />
           <CultureMap account={currentAccount} />
-          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">NETWORK</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button className="rounded-2xl bg-slate-50 p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-base">{followingAccounts.length}</span>フォロー</button>
-              <button className="rounded-2xl bg-slate-50 p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-base">{followerAccounts.length}</span>フォロワー</button>
-            </div>
-          </section>
         </aside>
       </div>
       {socialModal && (
@@ -2950,7 +2950,7 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   );
 }
 
-function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false, hideCover = false }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean; hideCover?: boolean }) {
+function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false, hideCover = false, onPostsClick, onFollowingClick, onFollowersClick, onTicketsClick }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean; hideCover?: boolean; onPostsClick?: () => void; onFollowingClick?: () => void; onFollowersClick?: () => void; onTicketsClick?: () => void }) {
   const normalized = normalizeAccount(account);
   const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
@@ -2991,11 +2991,11 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
               <div className="mt-4 flex flex-wrap gap-2">
                 {[account.industry, account.stage, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600" key={item}>{item}</span>)}
               </div>
-              <div className="mt-3 grid grid-cols-4 rounded-2xl border border-slate-100 bg-slate-50/60 text-center text-[10px] font-bold text-slate-500">
-                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{posts.length}</b>投稿</span>
-                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowings.length}</b>フォロー</span>
-                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowers.length}</b>フォロワー</span>
-                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{account.role === 'entrepreneur' ? account.ticketBalance : '-'}</b>{account.role === 'entrepreneur' && isMine ? 'チケット' : '確認'}</span>
+              <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/60 text-center text-[10px] font-bold text-slate-500">
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onPostsClick} disabled={!onPostsClick}><b className="block text-[13px] leading-4 text-slate-950">{posts.length}</b>投稿</button>
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onFollowingClick} disabled={!onFollowingClick}><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowings.length}</b>フォロー</button>
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onFollowersClick} disabled={!onFollowersClick}><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowers.length}</b>フォロワー</button>
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onTicketsClick} disabled={!onTicketsClick}><b className="block text-[13px] leading-4 text-slate-950">{account.role === 'entrepreneur' ? account.ticketBalance : '-'}</b>{account.role === 'entrepreneur' && isMine ? 'チケット' : '確認'}</button>
               </div>
               {isMine && account.identityStatus === 'resubmit' && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">本人確認資料の再提出が必要です</p>}
             </div>
