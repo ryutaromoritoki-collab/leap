@@ -2954,9 +2954,6 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
   const visibleFollowings = isMine ? followings : followings.filter((item) => item.role !== 'investor');
   const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
   const profileLead = account.title || account.bio || '会社の想いと事業内容はまだ登録されていません。';
-  const coverStyle = !hideCover && account.profileImageUrl
-    ? { backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.52)), url(${account.profileImageUrl})` }
-    : undefined;
   return (
     <section className={compact ? 'border-b border-slate-100 bg-white px-3 py-2' : 'overflow-hidden border-b border-slate-100 bg-white'}>
       {compact ? (
@@ -2969,36 +2966,33 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
         </div>
       ) : (
         <>
-          {!hideCover && (
-            <div className="h-32 bg-gradient-to-br from-blue-600 via-blue-500 to-emerald-300 bg-cover bg-center sm:h-48" style={coverStyle}>
-              <div className="flex h-full items-start justify-between p-4">
-                <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm">{account.role === 'investor' ? 'INVESTOR PROFILE' : 'COMPANY PROFILE'}</span>
-                {account.verified && <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm"><CheckCircle2 size={13} />本人確認済み</span>}
-              </div>
-            </div>
-          )}
-          <div className="px-4 pb-5">
-            <div className={`${hideCover ? 'pt-4' : '-mt-11'} flex items-end justify-between gap-3`}>
-              <div className="rounded-3xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
+          <div className="px-4 pb-3 pt-4">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 rounded-3xl bg-white p-1 ring-1 ring-slate-100">
                 <Avatar account={account} size="lg" />
               </div>
+              <div className="min-w-0 flex-1 pt-1">
+                <div className="flex items-center gap-1">
+                  <h2 className="truncate text-lg font-black tracking-tight text-slate-950">{account.company || account.name || account.accountName || 'プロフィール未設定'}</h2>
+                  {account.verified && <CheckCircle2 className="shrink-0 text-blue-600" size={14} />}
+                </div>
+                <p className="mt-0.5 truncate text-xs font-bold text-slate-600">{account.name || '名前未設定'} / {account.title || '肩書き未設定'}</p>
+                <p className="mt-0.5 truncate text-[11px] font-bold text-slate-500">@{account.accountName || 'account'}　{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}</p>
+              </div>
               {isMine && (
-                <button className="secondary mb-1 min-h-10 px-4 text-xs" onClick={() => setPage('profileEdit')}>プロフィールを編集</button>
+                <button className="secondary mt-1 min-h-8 shrink-0 px-3 text-[11px]" onClick={() => setPage('profileEdit')}>編集</button>
               )}
             </div>
-            <div className="mt-4">
-              <h2 className="text-2xl font-black tracking-tight text-slate-950">{account.company || account.name || account.accountName || 'プロフィール未設定'}</h2>
-              <p className="mt-1 text-sm font-bold text-slate-600">{account.name || '名前未設定'} / {account.title || '肩書き未設定'}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">@{account.accountName || 'account'}　{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}</p>
-              <p className="mt-4 whitespace-pre-line text-[15px] font-bold leading-7 text-slate-800">{profileLead}</p>
+            <div className="mt-3">
+              <p className="whitespace-pre-line text-[13px] font-bold leading-5 text-slate-800">{profileLead}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {[account.industry, account.stage, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600" key={item}>{item}</span>)}
               </div>
-              <div className="mt-4 grid grid-cols-4 rounded-2xl border border-slate-100 bg-slate-50/60 text-center text-xs font-bold text-slate-500">
-                <span className="p-3"><b className="block text-base text-slate-950">{posts.length}</b>投稿</span>
-                <span className="p-3"><b className="block text-base text-slate-950">{visibleFollowings.length}</b>フォロー</span>
-                <span className="p-3"><b className="block text-base text-slate-950">{visibleFollowers.length}</b>フォロワー</span>
-                <span className="p-3"><b className="block text-base text-slate-950">{account.role === 'entrepreneur' ? account.ticketBalance : '-'}</b>{account.role === 'entrepreneur' && isMine ? 'チケット' : '確認'}</span>
+              <div className="mt-3 grid grid-cols-4 rounded-2xl border border-slate-100 bg-slate-50/60 text-center text-[10px] font-bold text-slate-500">
+                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{posts.length}</b>投稿</span>
+                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowings.length}</b>フォロー</span>
+                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowers.length}</b>フォロワー</span>
+                <span className="px-1 py-1.5"><b className="block text-[13px] leading-4 text-slate-950">{account.role === 'entrepreneur' ? account.ticketBalance : '-'}</b>{account.role === 'entrepreneur' && isMine ? 'チケット' : '確認'}</span>
               </div>
               {isMine && account.identityStatus === 'resubmit' && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">本人確認資料の再提出が必要です</p>}
             </div>
