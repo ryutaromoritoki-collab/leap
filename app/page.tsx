@@ -1953,7 +1953,7 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
   const completionRate = Math.round((completedSetup / setupItems.length) * 100);
   return (
     <div className="bg-[#f5f8fb]">
-      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} />
+      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
         <main className="grid gap-4">
           <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -2859,7 +2859,8 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   const authorName = author ? displayAccountName(author) : 'アカウント未設定';
-  const secondaryLabel = [post.isHidden ? '非表示' : '', visibilityLabels[post.visibility]].filter(Boolean).join('・');
+  const visibilityText = post.visibility === 'public' ? '' : visibilityLabels[post.visibility];
+  const secondaryLabel = [post.isHidden ? '非表示' : '', visibilityText].filter(Boolean).join('・');
   const canShowViews = isOwner || post.views > 1000;
   return (
     <article className={`relative px-3.5 py-2 ${post.isHidden ? 'bg-slate-50' : ''}`}>
@@ -2946,14 +2947,14 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   );
 }
 
-function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean }) {
+function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false, hideCover = false }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean; hideCover?: boolean }) {
   const normalized = normalizeAccount(account);
   const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const visibleFollowings = isMine ? followings : followings.filter((item) => item.role !== 'investor');
   const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
   const profileLead = account.title || account.bio || '会社の想いと事業内容はまだ登録されていません。';
-  const coverStyle = account.profileImageUrl
+  const coverStyle = !hideCover && account.profileImageUrl
     ? { backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.52)), url(${account.profileImageUrl})` }
     : undefined;
   return (
@@ -2968,14 +2969,16 @@ function ProfileHero({ account, accounts, isMine, posts, setPage, compact = fals
         </div>
       ) : (
         <>
-          <div className="h-32 bg-gradient-to-br from-blue-600 via-blue-500 to-emerald-300 bg-cover bg-center sm:h-48" style={coverStyle}>
-            <div className="flex h-full items-start justify-between p-4">
-              <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm">{account.role === 'investor' ? 'INVESTOR PROFILE' : 'COMPANY PROFILE'}</span>
-              {account.verified && <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm"><CheckCircle2 size={13} />本人確認済み</span>}
+          {!hideCover && (
+            <div className="h-32 bg-gradient-to-br from-blue-600 via-blue-500 to-emerald-300 bg-cover bg-center sm:h-48" style={coverStyle}>
+              <div className="flex h-full items-start justify-between p-4">
+                <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm">{account.role === 'investor' ? 'INVESTOR PROFILE' : 'COMPANY PROFILE'}</span>
+                {account.verified && <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-blue-700 shadow-sm"><CheckCircle2 size={13} />本人確認済み</span>}
+              </div>
             </div>
-          </div>
+          )}
           <div className="px-4 pb-5">
-            <div className="-mt-11 flex items-end justify-between gap-3">
+            <div className={`${hideCover ? 'pt-4' : '-mt-11'} flex items-end justify-between gap-3`}>
               <div className="rounded-3xl bg-white p-1 shadow-sm ring-1 ring-slate-100">
                 <Avatar account={account} size="lg" />
               </div>
