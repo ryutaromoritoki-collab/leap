@@ -742,6 +742,7 @@ export default function LeapApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [darkMode, setDarkMode] = useState(() => loadLocal('leap.darkMode', false));
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
@@ -758,6 +759,7 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.following', following), [following]);
   useEffect(() => saveLocal('leap.savedPosts', savedPosts), [savedPosts]);
   useEffect(() => saveLocal('leap.readMessageIds', readMessageIds), [readMessageIds]);
+  useEffect(() => saveLocal('leap.darkMode', darkMode), [darkMode]);
   useEffect(() => {
     function syncAcrossTabs(event: StorageEvent) {
       if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
@@ -1285,10 +1287,10 @@ export default function LeapApp() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-[#101828] lg:p-6">
+    <main className={`min-h-screen bg-white text-[#101828] lg:p-6 ${darkMode ? 'leap-dark' : ''}`}>
       <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-none lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px] lg:shadow-sm lg:ring-1 lg:ring-[#eff3f4]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} openTutorial={reopenTutorial} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} openTutorial={reopenTutorial} darkMode={darkMode} toggleDarkMode={() => setDarkMode((value) => !value)} />
 
         <section data-app-scroll className="min-h-0 overflow-y-auto pb-14 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {cloudError && (
@@ -1477,7 +1479,7 @@ function TutorialModal({ account, step, setStep, onSkip, onFinish }: { account: 
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount, openTutorial }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number; openTutorial: () => void }) {
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount, openTutorial, darkMode, toggleDarkMode }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number; openTutorial: () => void; darkMode: boolean; toggleDarkMode: () => void }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -1520,6 +1522,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={openTutorial}>使い方を見る</button>}
+          <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { toggleDarkMode(); setMenuOpen(false); }}>{darkMode ? 'ライトモードにする' : 'ダークモードにする'}</button>
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
         </div>
       )}

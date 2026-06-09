@@ -162,3 +162,80 @@ form {
 .text-2xl {
   font-size: 19px !important;
 }
+
+.leap-dark {
+  color-scheme: dark;
+  background: #0b0f19 !important;
+  color: #e5e7eb !important;
+}
+
+.leap-dark [class*="bg-white"],
+.leap-dark [class*="bg-[#f5f8fb]"] {
+  background-color: #0f172a !important;
+}
+
+.leap-dark [class*="bg-white/"],
+.leap-dark [class*="bg-slate-50"],
+.leap-dark [class*="bg-slate-100"],
+.leap-dark [class*="bg-[#f2f4f7]"] {
+  background-color: #111827 !important;
+}
+
+.leap-dark [class*="bg-blue-50"],
+.leap-dark [class*="bg-emerald-50"],
+.leap-dark [class*="bg-amber-50"],
+.leap-dark [class*="bg-rose-50"] {
+  background-color: #172033 !important;
+}
+
+.leap-dark [class*="text-[#101828]"],
+.leap-dark [class*="text-[#0f1419]"],
+.leap-dark [class*="text-slate-950"],
+.leap-dark [class*="text-slate-900"],
+.leap-dark [class*="text-slate-800"],
+.leap-dark [class*="text-slate-700"],
+.leap-dark .field,
+.leap-dark .secondary {
+  color: #e5e7eb !important;
+}
+
+.leap-dark [class*="text-[#536471]"],
+.leap-dark [class*="text-slate-600"],
+.leap-dark [class*="text-slate-500"],
+.leap-dark [class*="text-slate-400"] {
+  color: #9ca3af !important;
+}
+
+.leap-dark [class*="border-slate-100"],
+.leap-dark [class*="border-slate-200"],
+.leap-dark [class*="border-[#eff3f4]"],
+.leap-dark [class*="ring-slate-100"],
+.leap-dark [class*="ring-[#eff3f4]"],
+.leap-dark [class*="divide-[#eff3f4]"],
+.leap-dark [class*="divide-slate-100"] {
+  border-color: #263244 !important;
+  --tw-ring-color: #263244 !important;
+}
+
+.leap-dark .field,
+.leap-dark .secondary,
+.leap-dark select,
+.leap-dark textarea,
+.leap-dark input {
+  border-color: #334155 !important;
+  background: #111827 !important;
+}
+
+.leap-dark .pill {
+  background: #172033 !important;
+  color: #cbd5e1 !important;
+}
+
+.leap-dark button:hover {
+  background-color: rgba(148, 163, 184, 0.1);
+}
+
+.leap-dark .primary {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}
