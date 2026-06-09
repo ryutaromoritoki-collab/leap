@@ -1956,20 +1956,25 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
   const completedSetup = setupItems.filter((item) => item.done).length;
   const nextSetup = setupItems.find((item) => !item.done);
   const completionRate = Math.round((completedSetup / setupItems.length) * 100);
+  const slideStoryCards = (direction: -1 | 1) => {
+    const scroller = storyScrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollBy({ left: direction * scroller.clientWidth, behavior: 'smooth' });
+  };
   return (
     <div className="bg-[#f5f8fb]">
       <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover onPostsClick={() => postsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} onFollowingClick={() => setSocialModal('following')} onFollowersClick={() => setSocialModal('followers')} onTicketsClick={() => setPage('tickets')} />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
         <main className="grid gap-4">
-          <div className="relative">
-            <button className="absolute left-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => storyScrollerRef.current?.scrollBy({ left: -320, behavior: 'smooth' })} aria-label="左へスクロール">
-              <ChevronLeft size={18} />
+          <div className="relative lg:contents">
+            <button className="absolute left-1 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white lg:hidden" onClick={() => slideStoryCards(-1)} aria-label="前のカード">
+              <ChevronLeft size={17} />
             </button>
-            <button className="absolute right-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => storyScrollerRef.current?.scrollBy({ left: 320, behavior: 'smooth' })} aria-label="右へスクロール">
-              <ChevronLeft size={18} className="rotate-180" />
+            <button className="absolute right-1 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white lg:hidden" onClick={() => slideStoryCards(1)} aria-label="次のカード">
+              <ChevronLeft size={17} className="rotate-180" />
             </button>
-            <div ref={storyScrollerRef} className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-12 py-1 [scrollbar-width:thin]">
-              <div className="min-w-[min(88vw,520px)] snap-start lg:min-w-[520px]">
+            <div ref={storyScrollerRef} className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:contents lg:overflow-visible lg:px-0 lg:pb-0">
+              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0">
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1992,10 +1997,10 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
                   )}
                 </section>
               </div>
-              <div className="min-w-[min(88vw,520px)] snap-start lg:min-w-[520px]"><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
-              <div className="min-w-[min(88vw,520px)] snap-start lg:min-w-[520px]"><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
-              <div className="min-w-[min(88vw,520px)] snap-start lg:min-w-[520px]"><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
-              <div className="min-w-[min(88vw,520px)] snap-start lg:min-w-[520px]">
+              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0"><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
+              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0"><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
+              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0"><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0">
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between gap-3">
                     <div>
