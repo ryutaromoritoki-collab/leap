@@ -1938,7 +1938,6 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
 function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer, openBlogComposer, reactToPost, startEditPost, hidePost, deletePost, startEditBlog, hideBlog, deleteBlog }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; blogs: BlogArticle[]; setPage: (page: Page) => void; openComposer: () => void; openBlogComposer: () => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
   const [socialModal, setSocialModal] = useState<'following' | 'followers' | null>(null);
   const postsRef = useRef<HTMLElement | null>(null);
-  const storyScrollerRef = useRef<HTMLDivElement | null>(null);
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
   }
@@ -1956,25 +1955,14 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
   const completedSetup = setupItems.filter((item) => item.done).length;
   const nextSetup = setupItems.find((item) => !item.done);
   const completionRate = Math.round((completedSetup / setupItems.length) * 100);
-  const slideStoryCards = (direction: -1 | 1) => {
-    const scroller = storyScrollerRef.current;
-    if (!scroller) return;
-    scroller.scrollBy({ left: direction * scroller.clientWidth, behavior: 'smooth' });
-  };
   return (
     <div className="bg-[#f5f8fb]">
       <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover onPostsClick={() => postsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} onFollowingClick={() => setSocialModal('following')} onFollowersClick={() => setSocialModal('followers')} onTicketsClick={() => setPage('tickets')} />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
         <main className="grid gap-4">
-          <div className="relative lg:contents">
-            <button className="absolute left-1 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white lg:hidden" onClick={() => slideStoryCards(-1)} aria-label="前のカード">
-              <ChevronLeft size={17} />
-            </button>
-            <button className="absolute right-1 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white lg:hidden" onClick={() => slideStoryCards(1)} aria-label="次のカード">
-              <ChevronLeft size={17} className="rotate-180" />
-            </button>
-            <div ref={storyScrollerRef} className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:contents lg:overflow-visible lg:px-0 lg:pb-0">
-              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0">
+          <div className="contents">
+            <div className="contents">
+              <div>
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1997,10 +1985,10 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
                   )}
                 </section>
               </div>
-              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0"><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
-              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0"><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
-              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0"><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
-              <div className="min-w-[calc(100vw-24px)] snap-center lg:min-w-0">
+              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div>
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between gap-3">
                     <div>
