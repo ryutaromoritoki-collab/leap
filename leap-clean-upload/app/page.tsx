@@ -1960,9 +1960,9 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
       <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover onPostsClick={() => postsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} onFollowingClick={() => setSocialModal('following')} onFollowersClick={() => setSocialModal('followers')} onTicketsClick={() => setPage('tickets')} />
       <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
         <main className="grid gap-4">
-          <div className="-mx-3 overflow-x-auto px-3 lg:mx-0 lg:contents lg:overflow-visible lg:px-0">
-            <div className="flex snap-x snap-mandatory gap-3 lg:contents">
-              <div className="h-[148px] min-w-[92vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto">
+          <div className="contents">
+            <div className="contents">
+              <div>
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1985,10 +1985,10 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
                   )}
                 </section>
               </div>
-              <div className="h-[148px] min-w-[92vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto"><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
-              <div className="h-[148px] min-w-[92vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto"><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
-              <div className="h-[148px] min-w-[92vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto"><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
-              <div className="h-[148px] min-w-[92vw] snap-start lg:h-auto lg:min-w-0 [&>section]:h-full [&>section]:overflow-y-auto">
+              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div>
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between gap-3">
                     <div>
