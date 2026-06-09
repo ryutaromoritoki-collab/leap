@@ -1258,8 +1258,8 @@ export default function LeapApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
-      <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px]">
+    <main className="min-h-screen bg-white text-[#101828] lg:p-6">
+      <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-none lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px] lg:shadow-sm lg:ring-1 lg:ring-[#eff3f4]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
         <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} />
 
@@ -2935,9 +2935,14 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
 }
 
 function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'feed' | 'lg'; active?: boolean }) {
-  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : size === 'feed' ? 'h-10 w-10 text-sm' : 'h-11 w-11 text-sm';
-  const label = account.avatarLabel || displayAccountName(account).slice(0, 1) || 'L';
-  return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
+  const dimension = size === 'lg' ? 'h-20 w-20' : size === 'feed' ? 'h-10 w-10' : 'h-11 w-11';
+  const iconSize = size === 'lg' ? 30 : size === 'feed' ? 18 : 17;
+  return (
+    <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]`}>
+      {account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : <Building2 size={iconSize} strokeWidth={1.8} />}
+      {active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}
+    </span>
+  );
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
