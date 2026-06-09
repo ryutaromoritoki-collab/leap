@@ -1809,7 +1809,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
             readFileAsDataUrl(file, (url) => setAttachment({ name: file.name, url, type: file.type.startsWith('image/') ? 'image' : 'file' }));
           }} />
         </label>
-        <input className="field" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activePartner} />
+        <textarea className="field max-h-32 min-h-12 resize-none" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activePartner} />
         <button className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#050816] text-white disabled:opacity-30" disabled={!activePartner || (!draft.trim() && !attachment)} onClick={() => { sendMessage(activePartner, mode, attachment); setAttachment(undefined); }}><Send size={18} /></button>
         </div>
       </div>
