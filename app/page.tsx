@@ -362,27 +362,40 @@ function companyLogoLabel(company: string) {
 
 function companyLogoDataUri(company: string, seed = 0) {
   const palettes = [
-    ['#0f172a', '#2563eb', '#dbeafe'],
-    ['#052e2b', '#10b981', '#d1fae5'],
-    ['#312e81', '#8b5cf6', '#ede9fe'],
-    ['#4a044e', '#ec4899', '#fce7f3'],
-    ['#431407', '#f97316', '#ffedd5'],
-    ['#083344', '#06b6d4', '#cffafe'],
-    ['#172554', '#38bdf8', '#e0f2fe'],
-    ['#14532d', '#22c55e', '#dcfce7'],
+    ['#08111f', '#1d4ed8', '#60a5fa', '#e0f2fe'],
+    ['#052e2b', '#059669', '#34d399', '#dcfce7'],
+    ['#1e1b4b', '#7c3aed', '#c084fc', '#f3e8ff'],
+    ['#500724', '#db2777', '#fb7185', '#ffe4e6'],
+    ['#431407', '#ea580c', '#fbbf24', '#ffedd5'],
+    ['#082f49', '#0891b2', '#67e8f9', '#ecfeff'],
+    ['#172554', '#2563eb', '#38bdf8', '#dbeafe'],
+    ['#14532d', '#16a34a', '#86efac', '#f0fdf4'],
+    ['#111827', '#64748b', '#cbd5e1', '#f8fafc'],
+    ['#312e81', '#4f46e5', '#a5b4fc', '#eef2ff'],
   ];
   const hash = Math.abs(hashText(company) + seed * 97);
-  const [ink, accent, bg] = palettes[hash % palettes.length];
+  const [ink, accent, glow, paper] = palettes[hash % palettes.length];
   const label = companyLogoLabel(company);
-  const shape = hash % 4;
-  const mark = shape === 0
-    ? `<path d="M45 108V52h24c21 0 35 11 35 28s-14 28-35 28H45Zm19-18h7c8 0 14-4 14-10s-6-10-14-10h-7v20Z" fill="${accent}"/>`
-    : shape === 1
-      ? `<circle cx="80" cy="80" r="36" fill="${accent}"/><circle cx="80" cy="80" r="18" fill="${bg}"/>`
-      : shape === 2
-        ? `<path d="M44 102 80 38l36 64H44Z" fill="${accent}"/><path d="M80 62 95 90H65l15-28Z" fill="${bg}"/>`
-        : `<rect x="45" y="45" width="70" height="70" rx="20" fill="${accent}"/><path d="M62 82h36v14H62V82Zm0-21h36v14H62V61Z" fill="${bg}"/>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#bg)"/><rect x="14" y="14" width="132" height="132" rx="30" fill="none" stroke="${accent}" stroke-opacity=".18" stroke-width="2"/><g opacity=".96">${mark}</g><text x="80" y="128" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${label.length > 1 ? 20 : 26}" font-weight="900" fill="${ink}">${label}</text></svg>`;
+  const shape = hash % 9;
+  const pattern = hash % 3 === 0
+    ? `<path d="M18 116C48 86 81 135 142 66" fill="none" stroke="${glow}" stroke-width="9" stroke-linecap="round" opacity=".22"/>`
+    : hash % 3 === 1
+      ? `<g opacity=".18" fill="${glow}"><circle cx="36" cy="38" r="5"/><circle cx="61" cy="30" r="3"/><circle cx="124" cy="118" r="6"/><circle cx="104" cy="130" r="3"/></g>`
+      : `<path d="M22 41h116M22 119h116" stroke="${glow}" stroke-width="3" stroke-linecap="round" opacity=".18"/>`;
+  const marks = [
+    `<path d="M49 108 80 44l31 64H92l-6-14H73l-6 14H49Zm29-31h7l-4-11-3 11Z" fill="${accent}"/>`,
+    `<path d="M45 106V54h27c20 0 34 10 34 26s-14 26-34 26H45Zm18-17h10c8 0 14-4 14-9s-6-9-14-9H63v18Z" fill="${accent}"/>`,
+    `<circle cx="80" cy="80" r="35" fill="${accent}"/><circle cx="80" cy="80" r="19" fill="${paper}"/><circle cx="80" cy="80" r="7" fill="${ink}"/>`,
+    `<rect x="47" y="47" width="66" height="66" rx="21" fill="${accent}"/><path d="M63 68h34v9H63v-9Zm0 17h34v9H63v-9Z" fill="${paper}"/>`,
+    `<path d="M43 99 80 43l37 56H96L80 73 64 99H43Z" fill="${accent}"/><path d="M69 108h22" stroke="${ink}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M49 59c14-15 48-15 62 0v42c-14 15-48 15-62 0V59Z" fill="${accent}"/><path d="M66 73h28M66 88h28" stroke="${paper}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M42 80c18-32 58-32 76 0-18 32-58 32-76 0Z" fill="${accent}"/><circle cx="80" cy="80" r="15" fill="${paper}"/>`,
+    `<path d="M80 40 111 58v44L80 120l-31-18V58l31-18Z" fill="${accent}"/><path d="M65 80h30" stroke="${paper}" stroke-width="10" stroke-linecap="round"/>`,
+    `<path d="M50 51h60v22H88v36H72V73H50V51Z" fill="${accent}"/>`,
+  ];
+  const mark = marks[shape];
+  const labelFontSize = label.length > 2 ? 17 : label.length > 1 ? 21 : 27;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${paper}"/><stop offset=".52" stop-color="#ffffff"/><stop offset="1" stop-color="${glow}" stop-opacity=".35"/></linearGradient><filter id="s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="${ink}" flood-opacity=".18"/></filter></defs><rect width="160" height="160" rx="38" fill="url(#bg)"/><rect x="12" y="12" width="136" height="136" rx="32" fill="#fff" opacity=".42"/><rect x="14" y="14" width="132" height="132" rx="30" fill="none" stroke="${accent}" stroke-opacity=".24" stroke-width="2"/><g>${pattern}</g><g filter="url(#s)">${mark}</g><text x="80" y="132" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${labelFontSize}" font-weight="900" letter-spacing=".5" fill="${ink}">${label}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -596,7 +609,8 @@ function normalizeAccount(account: Account): Account {
   const hasIdentityMaterial = Boolean(account.corporateNumber || account.licenseFileName);
   const identityStatus = account.identityStatus || (account.verified ? 'verified' : hasIdentityMaterial ? 'submitted' : 'none');
   const isManagedAccount = Boolean(account.isBot || account.botKind);
-  const avatarUrl = account.avatarUrl || (isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, Math.abs(hashText(account.id || account.email || account.company))) : '');
+  const avatarSeed = Math.abs(hashText(account.id || account.email || account.company));
+  const avatarUrl = isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, avatarSeed) : account.avatarUrl || '';
   return {
     ...emptyAccount,
     ...account,
