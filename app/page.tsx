@@ -886,10 +886,10 @@ export default function LeapApp() {
     if (currentAccount && currentAccount.id !== currentAccountId) setCurrentAccountId(currentAccount.id);
   }, [currentAccount, currentAccountId]);
   useEffect(() => {
-    if (!currentAccount || currentAccount.isBot || currentAccount.tutorialCompleted || page === 'auth') return;
+    if (!currentAccount || isAdmin || currentAccount.isBot || currentAccount.tutorialCompleted || page === 'auth') return;
     setTutorialStep(0);
     setShowTutorial(true);
-  }, [currentAccount?.id, currentAccount?.isBot, currentAccount?.tutorialCompleted, page]);
+  }, [currentAccount?.id, currentAccount?.isBot, currentAccount?.tutorialCompleted, isAdmin, page]);
   const systemPosts = useMemo(() => createAiPosts(aiAccounts), []);
   const allPosts = useMemo(() => mergeById(systemPosts.map((post) => {
     const actionUserIds = systemPostActions[post.id] ?? post.actionUserIds;
@@ -1299,6 +1299,7 @@ export default function LeapApp() {
   }
 
   function reopenTutorial() {
+    if (isAdmin) return;
     setTutorialStep(0);
     setShowTutorial(true);
     setMenuOpen(false);
@@ -1550,7 +1551,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             [currentAccount ? 'profileEdit' : 'auth', '設定'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
-          {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={openTutorial}>使い方を見る</button>}
+          {currentAccount && !isAdmin && <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={openTutorial}>使い方を見る</button>}
           <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { toggleDarkMode(); setMenuOpen(false); }}>{darkMode ? 'ライトモードにする' : 'ダークモードにする'}</button>
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
         </div>
