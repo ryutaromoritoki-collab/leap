@@ -349,14 +349,40 @@ const aiInvestorPostThemes = [
   '市場規模だけではなく、最初の顧客がなぜ使い続けるのかを見ています。投稿から仮説検証の過程が見えると判断しやすいです。',
 ];
 
-function aiAvatarDataUri(label: string, index: number) {
-  const palette = [
-    ['#dbeafe', '#dcfce7'],
-    ['#fce7f3', '#e0f2fe'],
-    ['#fef3c7', '#ede9fe'],
-    ['#cffafe', '#f0fdf4'],
-  ][index % 4];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${palette[0]}"/><stop offset="1" stop-color="${palette[1]}"/></linearGradient></defs><rect width="160" height="160" rx="80" fill="url(#g)"/><circle cx="116" cy="34" r="11" fill="#34d399"/><text x="80" y="96" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="800" fill="#0f172a">${label}</text></svg>`;
+function hashText(text: string) {
+  return Array.from(text).reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
+}
+
+function companyLogoLabel(company: string) {
+  const cleaned = company.replace(/株式会社|合同会社|有限会社|Inc\.?|Corp\.?|LLC|Partners|Capital|Ventures|Fund|Studio|Group/gi, '').trim();
+  const source = cleaned || company || 'L';
+  const latin = source.match(/[A-Za-z0-9]/g)?.slice(0, 2).join('').toUpperCase();
+  return latin || Array.from(source).slice(0, 2).join('');
+}
+
+function companyLogoDataUri(company: string, seed = 0) {
+  const palettes = [
+    ['#0f172a', '#2563eb', '#dbeafe'],
+    ['#052e2b', '#10b981', '#d1fae5'],
+    ['#312e81', '#8b5cf6', '#ede9fe'],
+    ['#4a044e', '#ec4899', '#fce7f3'],
+    ['#431407', '#f97316', '#ffedd5'],
+    ['#083344', '#06b6d4', '#cffafe'],
+    ['#172554', '#38bdf8', '#e0f2fe'],
+    ['#14532d', '#22c55e', '#dcfce7'],
+  ];
+  const hash = Math.abs(hashText(company) + seed * 97);
+  const [ink, accent, bg] = palettes[hash % palettes.length];
+  const label = companyLogoLabel(company);
+  const shape = hash % 4;
+  const mark = shape === 0
+    ? `<path d="M45 108V52h24c21 0 35 11 35 28s-14 28-35 28H45Zm19-18h7c8 0 14-4 14-10s-6-10-14-10h-7v20Z" fill="${accent}"/>`
+    : shape === 1
+      ? `<circle cx="80" cy="80" r="36" fill="${accent}"/><circle cx="80" cy="80" r="18" fill="${bg}"/>`
+      : shape === 2
+        ? `<path d="M44 102 80 38l36 64H44Z" fill="${accent}"/><path d="M80 62 95 90H65l15-28Z" fill="${bg}"/>`
+        : `<rect x="45" y="45" width="70" height="70" rx="20" fill="${accent}"/><path d="M62 82h36v14H62V82Zm0-21h36v14H62V61Z" fill="${bg}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#bg)"/><rect x="14" y="14" width="132" height="132" rx="30" fill="none" stroke="${accent}" stroke-opacity=".18" stroke-width="2"/><g opacity=".96">${mark}</g><text x="80" y="128" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${label.length > 1 ? 20 : 26}" font-weight="900" fill="${ink}">${label}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -400,7 +426,7 @@ function createAiAccounts(): Account[] {
     bio: `${aiFounderStories[index % aiFounderStories.length]}\n\n現在は「${aiBusinessDomains[index % aiBusinessDomains.length]}」を提供し、現場の声をもとにプロダクトと導入体験を改善しています。`,
     achievements: `${accountAchievementTitle(index)}\n・週次のKPIレビューを継続\n・顧客ヒアリングを累計${35 + index * 4}件実施\n・導入後オンボーディング改善を毎月実施`,
     avatarLabel: '',
-    avatarUrl: '',
+    avatarUrl: companyLogoDataUri(`${aiCompanyWords[index % aiCompanyWords.length]}株式会社`, index),
     isBot: true,
     botKind: 'entrepreneur',
     age: `${28 + (index % 18)}歳`,
@@ -429,7 +455,7 @@ function createAiAccounts(): Account[] {
     bio: aiInvestorStories[index % aiInvestorStories.length],
     achievements: `投資検討領域：${aiIndustries[index % aiIndustries.length]}\n支援可能領域：${['事業戦略', '採用支援', '営業支援', '資金調達', 'ネットワーク提供'][index % 5]}\n公開プロフィールと投稿内容をもとに継続的に案件を確認しています。`,
     avatarLabel: '',
-    avatarUrl: '',
+    avatarUrl: companyLogoDataUri(aiInvestorFirms[index], index + 100),
     isBot: true,
     botKind: 'investor',
     age: `${32 + (index % 22)}歳`,
@@ -569,9 +595,12 @@ function saveLocal<T>(key: string, value: T) {
 function normalizeAccount(account: Account): Account {
   const hasIdentityMaterial = Boolean(account.corporateNumber || account.licenseFileName);
   const identityStatus = account.identityStatus || (account.verified ? 'verified' : hasIdentityMaterial ? 'submitted' : 'none');
+  const isManagedAccount = Boolean(account.isBot || account.botKind);
+  const avatarUrl = account.avatarUrl || (isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, Math.abs(hashText(account.id || account.email || account.company))) : '');
   return {
     ...emptyAccount,
     ...account,
+    avatarUrl,
     identityStatus,
     followingIds: Array.isArray(account.followingIds) ? account.followingIds : [],
     followerIds: Array.isArray(account.followerIds) ? account.followerIds : [],
@@ -580,7 +609,7 @@ function normalizeAccount(account: Account): Account {
     isHidden: Boolean(account.isHidden),
     isDeleted: Boolean(account.isDeleted),
     emailNotificationsEnabled: account.emailNotificationsEnabled !== false,
-    isBot: Boolean(account.isBot),
+    isBot: isManagedAccount,
     botKind: account.botKind || '',
     age: account.age || '',
     gender: account.gender || '',
