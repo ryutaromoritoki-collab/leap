@@ -39,6 +39,7 @@ type Visibility = 'public' | 'followers' | 'investors' | 'entrepreneurs' | 'draf
 type BusinessType = 'corporation' | 'sole';
 type MessageKind = 'direct' | 'meeting';
 type IdentityStatus = 'none' | 'submitted' | 'verified' | 'resubmit';
+type DesignMode = 'balanced' | 'wantedly' | 'threads' | 'luxury';
 
 type Account = {
   id: string;
@@ -786,6 +787,7 @@ export default function LeapApp() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [darkMode, setDarkMode] = useState(() => loadLocal('leap.darkMode', false));
+  const [designMode, setDesignMode] = useState<DesignMode>(() => loadLocal('leap.designMode', 'balanced'));
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
@@ -803,6 +805,7 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.savedPosts', savedPosts), [savedPosts]);
   useEffect(() => saveLocal('leap.readMessageIds', readMessageIds), [readMessageIds]);
   useEffect(() => saveLocal('leap.darkMode', darkMode), [darkMode]);
+  useEffect(() => saveLocal('leap.designMode', designMode), [designMode]);
   useEffect(() => {
     function syncAcrossTabs(event: StorageEvent) {
       if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
@@ -1331,10 +1334,10 @@ export default function LeapApp() {
   }
 
   return (
-    <main className={`min-h-screen bg-white text-[#101828] lg:p-6 ${darkMode ? 'leap-dark' : ''}`}>
+    <main className={`min-h-screen bg-white text-[#101828] lg:p-6 leap-design-${designMode} ${darkMode || designMode === 'luxury' ? 'leap-dark' : ''}`}>
       <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-none lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px] lg:shadow-sm lg:ring-1 lg:ring-[#eff3f4]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} openTutorial={reopenTutorial} darkMode={darkMode} toggleDarkMode={() => setDarkMode((value) => !value)} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} openTutorial={reopenTutorial} darkMode={darkMode} toggleDarkMode={() => setDarkMode((value) => !value)} designMode={designMode} setDesignMode={setDesignMode} />
 
         <section data-app-scroll className="min-h-0 overflow-y-auto pb-14 lg:col-start-2 lg:row-start-2 lg:pb-6">
           {cloudError && (
@@ -1523,7 +1526,7 @@ function TutorialModal({ account, step, setStep, onSkip, onFinish }: { account: 
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount, openTutorial, darkMode, toggleDarkMode }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number; openTutorial: () => void; darkMode: boolean; toggleDarkMode: () => void }) {
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount, openTutorial, darkMode, toggleDarkMode, designMode, setDesignMode }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number; openTutorial: () => void; darkMode: boolean; toggleDarkMode: () => void; designMode: DesignMode; setDesignMode: (mode: DesignMode) => void }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -1555,7 +1558,7 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
         </div>
       </div>
       {menuOpen && (
-        <div className="absolute right-2 top-10 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
+        <div className="absolute right-2 top-10 z-40 w-60 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
           {[
             ['feed', 'フィード'],
             ['search', '検索'],
@@ -1565,6 +1568,23 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             [currentAccount ? 'profileEdit' : 'auth', '設定'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
+          <div className="my-1 border-t border-slate-100 pt-1">
+            <p className="px-3 py-2 text-[10px] font-black text-slate-400">デザイン</p>
+            {[
+              ['balanced', 'A：白基調・標準'],
+              ['wantedly', 'B：Wantedly風'],
+              ['threads', 'C：Threads風'],
+              ['luxury', 'D：黒背景・高級感'],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                className={`block w-full rounded-xl px-3 py-2.5 text-left hover:bg-slate-50 ${designMode === mode ? 'bg-blue-50 text-blue-700' : ''}`}
+                onClick={() => { setDesignMode(mode as DesignMode); setMenuOpen(false); }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {currentAccount && !isAdmin && <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={openTutorial}>使い方を見る</button>}
           <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { toggleDarkMode(); setMenuOpen(false); }}>{darkMode ? 'ライトモードにする' : 'ダークモードにする'}</button>
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
