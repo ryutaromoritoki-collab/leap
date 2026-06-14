@@ -1,0 +1,92 @@
+<svg width="390" height="844" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cover" x1="0" y1="0" x2="390" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF8FF"/>
+      <stop offset="0.48" stop-color="#F4F0FF"/>
+      <stop offset="1" stop-color="#EAFBF1"/>
+    </linearGradient>
+    <linearGradient id="avatar" x1="60" y1="100" x2="142" y2="182" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#06B6D4"/>
+      <stop offset="0.55" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0F172A" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect width="390" height="844" fill="#FFFFFF"/>
+
+  <rect x="0" y="0" width="390" height="48" fill="#FFFFFF"/>
+  <text x="22" y="31" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#111827">‹</text>
+  <text x="58" y="21" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#111827">株式会社Leap</text>
+  <text x="58" y="38" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#6B7280">24件の投稿</text>
+  <circle cx="338" cy="24" r="16" fill="#F3F4F6"/>
+  <text x="330" y="30" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111827">⋯</text>
+
+  <rect x="0" y="48" width="390" height="132" fill="url(#cover)"/>
+  <path d="M34 129 C70 78, 124 114, 156 80 C194 40, 252 82, 282 54 C321 20, 365 50, 390 34 L390 180 L0 180 L0 146 C8 142, 20 138, 34 129Z" fill="#FFFFFF" fill-opacity="0.38"/>
+
+  <circle cx="73" cy="179" r="43" fill="#FFFFFF"/>
+  <circle cx="73" cy="179" r="38" fill="url(#avatar)" filter="url(#shadow)"/>
+  <text x="55" y="191" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="800" fill="#FFFFFF">L</text>
+  <circle cx="112" cy="206" r="15" fill="#111827" stroke="#FFFFFF" stroke-width="3"/>
+  <text x="104" y="213" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">+</text>
+
+  <rect x="236" y="194" width="62" height="34" rx="17" fill="#111827"/>
+  <text x="252" y="216" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">フォロー</text>
+  <rect x="306" y="194" width="72" height="34" rx="17" fill="#FFFFFF" stroke="#D1D5DB"/>
+  <text x="319" y="216" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#111827">メッセージ</text>
+
+  <text x="20" y="256" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="800" fill="#111827">株式会社Leap</text>
+  <text x="20" y="278" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#6B7280">@leap_startup</text>
+  <text x="20" y="310" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#111827">起業家の成長を投資家が継続的に観察できる</text>
+  <text x="20" y="331" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#111827">資本提携プラットフォーム。</text>
+  <text x="20" y="359" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6B7280">東京都　2026年5月登録　累計投資金額 0円</text>
+
+  <text x="20" y="389" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#111827">128</text>
+  <text x="48" y="389" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#6B7280">フォロー中</text>
+  <text x="135" y="389" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#111827">922</text>
+  <text x="166" y="389" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#6B7280">フォロワー</text>
+
+  <rect x="20" y="410" width="112" height="34" rx="17" fill="#FFFFFF" stroke="#D1D5DB"/>
+  <text x="42" y="432" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#111827">面談申込</text>
+  <rect x="142" y="410" width="116" height="34" rx="17" fill="#FFFFFF" stroke="#D1D5DB"/>
+  <text x="163" y="432" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" fill="#111827">プロフィール共有</text>
+
+  <line x1="0" y1="466" x2="390" y2="466" stroke="#E5E7EB"/>
+  <text x="45" y="494" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="800" fill="#111827">投稿</text>
+  <text x="139" y="494" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#6B7280">返信</text>
+  <text x="232" y="494" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#6B7280">メディア</text>
+  <text x="326" y="494" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#6B7280">いいね</text>
+  <line x1="20" y1="512" x2="102" y2="512" stroke="#111827" stroke-width="3"/>
+
+  <line x1="0" y1="513" x2="390" y2="513" stroke="#E5E7EB"/>
+  <circle cx="35" cy="556" r="21" fill="url(#avatar)"/>
+  <text x="26" y="563" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800" fill="#FFFFFF">L</text>
+  <text x="66" y="544" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="800" fill="#111827">株式会社Leap</text>
+  <text x="166" y="544" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6B7280">4時間</text>
+  <text x="66" y="572" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111827">新しい投資家検索画面を公開しました。</text>
+  <text x="66" y="595" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111827">起業家の投稿導線をさらに短くしています。</text>
+  <text x="66" y="629" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#6B7280">♡   ◯   ↻   ↗</text>
+  <text x="262" y="629" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#6B7280">128表示</text>
+
+  <line x1="0" y1="654" x2="390" y2="654" stroke="#E5E7EB"/>
+  <circle cx="35" cy="697" r="21" fill="url(#avatar)"/>
+  <text x="26" y="704" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800" fill="#FFFFFF">L</text>
+  <text x="66" y="685" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="800" fill="#111827">株式会社Leap</text>
+  <text x="166" y="685" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6B7280">5時間</text>
+  <text x="66" y="713" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111827">月次KPIを更新しました。面談前に数字の</text>
+  <text x="66" y="736" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#111827">変化を見てもらえる設計です。</text>
+  <text x="66" y="770" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#6B7280">♡   ◯   ↻   ↗</text>
+  <text x="262" y="770" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#6B7280">92表示</text>
+
+  <rect x="0" y="790" width="390" height="54" fill="#FFFFFF"/>
+  <line x1="0" y1="790" x2="390" y2="790" stroke="#E5E7EB"/>
+  <text x="42" y="824" font-family="Arial, Helvetica, sans-serif" font-size="25" fill="#111827">⌂</text>
+  <text x="114" y="824" font-family="Arial, Helvetica, sans-serif" font-size="25" fill="#6B7280">⌕</text>
+  <rect x="172" y="798" width="46" height="36" rx="18" fill="#111827"/>
+  <text x="187" y="824" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#FFFFFF">+</text>
+  <text x="268" y="824" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#6B7280">✉</text>
+  <text x="338" y="824" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#6B7280">◉</text>
+</svg>
