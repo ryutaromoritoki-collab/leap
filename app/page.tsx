@@ -100,6 +100,7 @@ type Account = {
   gender: string;
   verified: boolean;
   tutorialCompleted: boolean;
+  updatedAt?: string;
 };
 
 type Post = {
@@ -260,6 +261,7 @@ const emptyAccount: Account = {
   gender: '',
   verified: false,
   tutorialCompleted: false,
+  updatedAt: '',
 };
 
 const adminAccount: Account = {
@@ -615,6 +617,7 @@ function normalizeAccount(account: Account): Account {
     gender: account.gender || '',
     ticketTransferName: account.ticketTransferName || '',
     tutorialCompleted: Boolean(account.tutorialCompleted),
+    updatedAt: account.updatedAt || '',
     verified: identityStatus === 'verified' || identityStatus === 'submitted',
   };
 }
@@ -677,9 +680,25 @@ function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
   return Array.from(map.values());
 }
 
+function newerAccount(local: Account | undefined, cloud: Account): Account {
+  if (!local) return normalizeAccount(cloud);
+  const normalizedLocal = normalizeAccount(local);
+  const normalizedCloud = normalizeAccount(cloud);
+  const localTime = normalizedLocal.updatedAt ? new Date(normalizedLocal.updatedAt).getTime() : 0;
+  const cloudTime = normalizedCloud.updatedAt ? new Date(normalizedCloud.updatedAt).getTime() : 0;
+  return cloudTime > localTime ? normalizedCloud : normalizedLocal;
+}
+
+function mergeAccounts(local: Account[], cloud: Account[]): Account[] {
+  const map = new Map<string, Account>();
+  local.map(normalizeAccount).forEach((account) => map.set(account.id, account));
+  cloud.map(normalizeAccount).forEach((account) => map.set(account.id, newerAccount(map.get(account.id), account)));
+  return Array.from(map.values());
+}
+
 function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapCloudState {
   return {
-    accounts: mergeById(local.accounts.map(normalizeAccount), cloud.accounts.map(normalizeAccount)),
+    accounts: mergeAccounts(local.accounts, cloud.accounts),
     posts: mergeById(local.posts, cloud.posts),
     blogs: mergeById(local.blogs ?? [], cloud.blogs ?? []),
     messages: mergeById(local.messages, cloud.messages),
@@ -1245,17 +1264,39 @@ export default function LeapApp() {
 
   function follow(account: Account) {
     if (!requireAccount()) return;
+    if (account.id === currentAccount!.id) {
+      flash('自分自身はフォローできません');
+      return;
+    }
     const alreadyFollowing = currentFollowing.includes(account.id);
     const nextFollowing = alreadyFollowing ? currentFollowing.filter((id) => id !== account.id) : [...currentFollowing, account.id];
+    const now = new Date().toISOString();
+    const normalizedTarget = normalizeAccount(account);
+    let currentFound = false;
+    let targetFound = false;
     const nextAccounts = accounts.map((item) => {
-      if (item.id === currentAccount!.id) return { ...normalizeAccount(item), followingIds: nextFollowing };
+      if (item.id === currentAccount!.id) {
+        currentFound = true;
+        return { ...normalizeAccount(item), followingIds: nextFollowing, updatedAt: now };
+      }
       if (item.id === account.id) {
+        targetFound = true;
         const followers = normalizeAccount(item).followerIds;
-        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]) };
+        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]), updatedAt: now };
       }
       return normalizeAccount(item);
     });
-    setAccounts(nextAccounts);
+    if (!currentFound) nextAccounts.push({ ...normalizeAccount(currentAccount!), followingIds: nextFollowing, updatedAt: now });
+    if (!targetFound && !normalizedTarget.isBot && normalizedTarget.id !== adminAccount.id) {
+      nextAccounts.push({
+        ...normalizedTarget,
+        followerIds: alreadyFollowing
+          ? normalizedTarget.followerIds.filter((id) => id !== currentAccount!.id)
+          : (normalizedTarget.followerIds.includes(currentAccount!.id) ? normalizedTarget.followerIds : [...normalizedTarget.followerIds, currentAccount!.id]),
+        updatedAt: now,
+      });
+    }
+    setAccounts(nextAccounts.map(normalizeAccount));
     setFollowing(nextFollowing);
     void saveCloudState({ accounts: nextAccounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
       .then(() => setCloudError(''))
