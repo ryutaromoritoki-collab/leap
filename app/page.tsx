@@ -1174,10 +1174,16 @@ export default function LeapApp() {
   }
 
   function rejectMeeting(partner: Account) {
-    setMessages((list) => [
-      { id: crypto.randomUUID(), partnerId: partner.id, kind: 'direct', body: '面談申請を非承認にしました。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'rejected' },
-      ...list.map((message) => message.partnerId === partner.id && message.meetingStatus === 'requested' ? { ...message, meetingStatus: 'rejected' as const } : message),
-    ]);
+    setMessages((list) => list.filter((message) => {
+      if (message.meetingStatus !== 'requested') return true;
+      if (message.senderId || message.recipientId) {
+        return !(
+          (message.senderId === currentAccount?.id && message.recipientId === partner.id)
+          || (message.senderId === partner.id && message.recipientId === currentAccount?.id)
+        );
+      }
+      return message.partnerId !== partner.id;
+    }));
     flash('面談申請を非承認にしました');
   }
 
@@ -1241,15 +1247,19 @@ export default function LeapApp() {
     if (!requireAccount()) return;
     const alreadyFollowing = currentFollowing.includes(account.id);
     const nextFollowing = alreadyFollowing ? currentFollowing.filter((id) => id !== account.id) : [...currentFollowing, account.id];
-    setAccounts((list) => list.map((item) => {
+    const nextAccounts = accounts.map((item) => {
       if (item.id === currentAccount!.id) return { ...normalizeAccount(item), followingIds: nextFollowing };
       if (item.id === account.id) {
         const followers = normalizeAccount(item).followerIds;
         return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]) };
       }
       return normalizeAccount(item);
-    }));
+    });
+    setAccounts(nextAccounts);
     setFollowing(nextFollowing);
+    void saveCloudState({ accounts: nextAccounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
+      .then(() => setCloudError(''))
+      .catch((error) => setCloudError(`クラウド同期に失敗しています：${error.message}`));
     if (!alreadyFollowing) {
       setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: `${displayAccountName(currentAccount)}さんにフォローされました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
       if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: フォローされました', `${displayAccountName(currentAccount)}さんがあなたをフォローしました。`);
