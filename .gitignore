@@ -3,10 +3,6 @@ node_modules/
 out/
 out 2/
 dist/
-leap-clean-upload*/
-leap-update*/
-design/*mockup.svg
-leap-entrepreneur-profile-edit-image.svg
 .env.local
 *.zip
 .DS_Store
