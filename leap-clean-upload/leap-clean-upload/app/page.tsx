@@ -63,6 +63,18 @@ type Account = {
   employeeSize: string;
   revenueScale: string;
   bio: string;
+  mission?: string;
+  culture?: string;
+  teamIntro?: string;
+  personalityProfile?: string;
+  workStyleSpeed?: string;
+  workStyleTeam?: string;
+  workStyleRisk?: string;
+  profileImageName?: string;
+  profileImageUrl?: string;
+  dealDetails?: string;
+  businessPlanName?: string;
+  businessPlanUrl?: string;
   avatarLabel: string;
   avatarUrl: string;
   fundingGoal: string;
@@ -87,6 +99,8 @@ type Account = {
   age: string;
   gender: string;
   verified: boolean;
+  tutorialCompleted: boolean;
+  updatedAt?: string;
 };
 
 type Post = {
@@ -111,6 +125,23 @@ type Post = {
   views: number;
 };
 
+type BlogArticle = {
+  id: string;
+  authorId: string;
+  title: string;
+  body: string;
+  tags: string[];
+  visibility: Visibility;
+  imageName: string;
+  imageUrl: string;
+  attachmentName: string;
+  attachmentUrl: string;
+  isHidden: boolean;
+  createdAt: string;
+  updatedAt: string;
+  views: number;
+};
+
 type DirectMessage = {
   id: string;
   partnerId: string;
@@ -129,6 +160,7 @@ type DirectMessage = {
 type LeapCloudState = {
   accounts: Account[];
   posts: Post[];
+  blogs?: BlogArticle[];
   messages: DirectMessage[];
   meetingApplications: MeetingApplication[];
   notices: Notice[];
@@ -192,6 +224,18 @@ const emptyAccount: Account = {
   employeeSize: '',
   revenueScale: '',
   bio: '',
+  mission: '',
+  culture: '',
+  teamIntro: '',
+  personalityProfile: '',
+  workStyleSpeed: '3',
+  workStyleTeam: '3',
+  workStyleRisk: '3',
+  profileImageName: '',
+  profileImageUrl: '',
+  dealDetails: '',
+  businessPlanName: '',
+  businessPlanUrl: '',
   avatarLabel: '',
   avatarUrl: '',
   fundingGoal: '',
@@ -216,6 +260,8 @@ const emptyAccount: Account = {
   age: '',
   gender: '',
   verified: false,
+  tutorialCompleted: false,
+  updatedAt: '',
 };
 
 const adminAccount: Account = {
@@ -236,18 +282,139 @@ const adminAccount: Account = {
 
 const aiPersonNames = ['山田 太郎', '佐藤 花子', '鈴木 健一', '田中 明', '伊藤 真央', '高橋 優', '渡辺 航', '中村 葵', '小林 直樹', '加藤 美咲', '吉田 悠斗', '山本 紗季', '井上 蓮', '木村 彩乃', '林 大輔', '清水 結衣', '斎藤 陽菜', '山崎 匠', '森 里奈', '池田 蒼', '橋本 凛', '石川 翔', '前田 菜月', '藤田 亮', '岡田 美月', '後藤 悠真', '長谷川 栞', '村上 智也', '近藤 愛', '遠藤 颯'];
 const aiInvestorNames = ['松本 拓也', '藤原 玲奈', '青木 大地', '石井 美穂', '坂本 悠介', '西村 沙織', '福田 直人', '太田 佳奈', '三浦 健太', '原田 杏奈', '中川 智', '小川 真由', '岡本 裕也', '松田 千尋', '中島 亮介', '平野 彩', '上田 航平', '森田 奈緒', '内田 諒', '柴田 優香', '酒井 慎', '宮本 由衣', '横山 大輔', '安藤 萌', '島田 啓太', '片山 香織', '大野 翔太', '栗原 梨央', '西田 司', '杉山 美里'];
-const aiCompanyWords = ['NextFlow', 'GreenBridge', 'RetailMind', 'CareSync', 'FinPulse', 'HRWave', 'LogiCore', 'EduLift', 'MedLink', 'LegalBase'];
+const aiCompanyWords = [
+  'NextFlow', 'GreenBridge', 'RetailMind', 'CareSync', 'FinPulse', 'HRWave', 'LogiCore', 'EduLift', 'MedLink', 'LegalBase',
+  'BuildVista', 'AgriNest', 'TravelMesh', 'FoodLoop', 'MediNote', 'SkillBridge', 'SalesPilot', 'FactoryOne', 'LocalGrid', 'PayNest',
+  'ClinicPath', 'CarbonWorks', 'StudyPort', 'WorkShift', 'CraftBank', 'HomeLogi', 'EventHub', 'RiskScope', 'Wellnest', 'DataHarbor',
+];
+const aiInvestorFirms = [
+  'Future Ventures', 'Seed Partners', 'Bridge Capital', 'Growth Angels', 'Impact Studio', 'North Star Capital', 'Blue Lake Partners', 'Tokyo Founders Fund', 'Orbit Ventures', 'Anchor Capital',
+  'MIRAI Seed', 'River Growth', 'Launch Gate', 'First Check Partners', 'Sakura Capital', 'Horizon Angels', 'Next Stage Ventures', 'Basecamp Capital', 'Urban Innovation Fund', 'DeepTech Partners',
+  'Local Impact Fund', 'FinEdge Capital', 'Health Bridge VC', 'Retail Innovation Partners', 'EduNext Fund', 'Climate Seed Lab', 'DX Growth Studio', 'Founders Orbit', 'Prime Angel Group', 'CrossBorder Ventures',
+];
 const aiIndustries = ['AI / SaaS', 'FinTech', 'ヘルスケア', 'HRTech', '物流DX', '教育', 'Climate Tech', '小売DX', 'リーガルテック', 'クリエイター支援'];
+const aiBusinessDomains = [
+  '商談後の顧客フォローを自動化するSaaS',
+  '中小企業のCO2排出量を可視化するクラウド',
+  '小売店舗の在庫と発注を予測するシステム',
+  '介護事業所の記録と請求をつなぐ業務ツール',
+  '個人事業主向けの資金繰り管理サービス',
+  '採用候補者との接点を管理するHRプラットフォーム',
+  '配送計画と倉庫作業を最適化する物流DX',
+  '社会人学習の進捗を可視化する学習支援サービス',
+  'クリニックの予約と問診を一体化するサービス',
+  '契約レビューを効率化するリーガルSaaS',
+  '建設現場の写真管理と報告書作成を支援するアプリ',
+  '農家の収穫予測と販売計画を支えるツール',
+  '宿泊施設の予約単価を改善する分析サービス',
+  '飲食店のフードロスを減らす仕入れ管理ツール',
+  '医療チーム内の申し送りを標準化するSaaS',
+  'リスキリング研修を企業内で運用するサービス',
+  '営業チームの提案資料を自動生成するツール',
+  '製造ラインの異常検知を行うモニタリングSaaS',
+  '自治体と地域事業者の情報共有を支える基盤',
+  '請求と入金確認を効率化する決済管理サービス',
+  'クリニックの来院導線を改善する患者向けアプリ',
+  'サプライチェーンの環境負荷を見える化するSaaS',
+  '学校外学習の成果を記録するポートフォリオ',
+  'シフト作成と勤怠管理を統合する店舗向けツール',
+  '職人と発注者をつなぐ受発注プラットフォーム',
+  '住宅設備メンテナンスの日程調整サービス',
+  'イベント運営の受付と導線を管理するアプリ',
+  '中小企業の与信とリスクを可視化する分析サービス',
+  '従業員の健康状態と面談記録を管理するツール',
+  '社内データを横断検索するナレッジ基盤',
+];
+const aiFounderStories = [
+  '現場の非効率をなくし、少人数でも大きな成果を出せる仕組みをつくっています。今は顧客の声を起点に、毎週プロダクト改善を重ねています。',
+  '業界に残る手作業や属人的な判断を、使いやすいソフトウェアで置き換えることを目指しています。導入後の定着率を最重要指標にしています。',
+  '一次情報を集めながら、小さく検証して伸びた施策に集中しています。投資家には成長の背景まで伝わるよう、進捗とKPIを公開しています。',
+  'チーム全員で顧客課題を深く理解し、毎週の改善を積み上げています。短期の数字だけでなく、継続利用される理由づくりに取り組んでいます。',
+];
+const aiInvestorStories = [
+  'シードからシリーズA前後の事業を中心に、創業者の学習速度と顧客理解を重視して見ています。数字の変化だけでなく、意思決定の質を確認します。',
+  'AI、SaaS、DX領域で、課題の深さと再現性のある成長に注目しています。必要に応じて営業、採用、資金調達の壁打ちを支援します。',
+  '初期の熱量と市場の広がりを大切にしています。投資検討では、継続率、紹介率、顧客単価の変化を中心に確認しています。',
+];
+const aiPostThemes = [
+  '新規導入前の不安点を分解し、初回説明で伝える順番を変えました。次は導入後7日目の利用率を追って、どこでつまずくかを確認します。',
+  '既存ユーザーの操作ログを見直し、最初に触られる機能と使われない機能を分けました。来週は使われていない機能を削る判断も含めて整理します。',
+  '商談資料を数字中心から導入後の現場変化が伝わる構成に変えました。反応が良かったため、次回から事例ページにも反映します。',
+  '問い合わせが多かった画面に補足テキストを追加しました。サポート工数が下がるかを見ながら、セルフオンボーディングに寄せていきます。',
+  '週次レビューで、伸びているチャネルに営業時間を寄せることを決めました。小さな施策を続けるより、勝ち筋に集中します。',
+];
+const aiInvestorPostThemes = [
+  '初期SaaSでは、売上の伸び方よりも解約理由の解像度を重視しています。学習速度が見える投稿は継続して追いやすいです。',
+  '顧客課題が深い事業は、最初の数字が小さくても前進が見えます。今週は導入後の利用頻度と紹介発生の有無を中心に見ています。',
+  'AI領域は機能差が短期間で埋まりやすいため、業務フローの中にどれだけ入り込めているかを確認しています。',
+  '投資検討では、月次売上、継続率、顧客単価の変化をセットで見ています。特に単価が上がる理由が説明できる会社は強いです。',
+  '市場規模だけではなく、最初の顧客がなぜ使い続けるのかを見ています。投稿から仮説検証の過程が見えると判断しやすいです。',
+];
+
+function hashText(text: string) {
+  return Array.from(text).reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
+}
+
+function companyLogoLabel(company: string) {
+  const cleaned = company.replace(/株式会社|合同会社|有限会社|Inc\.?|Corp\.?|LLC|Partners|Capital|Ventures|Fund|Studio|Group/gi, '').trim();
+  const source = cleaned || company || 'L';
+  const latin = source.match(/[A-Za-z0-9]/g)?.slice(0, 2).join('').toUpperCase();
+  return latin || Array.from(source).slice(0, 2).join('');
+}
+
+function companyLogoDataUri(company: string, seed = 0) {
+  const palettes = [
+    ['#0f172a', '#2563eb', '#dbeafe'],
+    ['#052e2b', '#10b981', '#d1fae5'],
+    ['#312e81', '#8b5cf6', '#ede9fe'],
+    ['#4a044e', '#ec4899', '#fce7f3'],
+    ['#431407', '#f97316', '#ffedd5'],
+    ['#083344', '#06b6d4', '#cffafe'],
+    ['#172554', '#38bdf8', '#e0f2fe'],
+    ['#14532d', '#22c55e', '#dcfce7'],
+  ];
+  const hash = Math.abs(hashText(company) + seed * 97);
+  const [ink, accent, bg] = palettes[hash % palettes.length];
+  const label = companyLogoLabel(company);
+  const shape = hash % 4;
+  const mark = shape === 0
+    ? `<path d="M45 108V52h24c21 0 35 11 35 28s-14 28-35 28H45Zm19-18h7c8 0 14-4 14-10s-6-10-14-10h-7v20Z" fill="${accent}"/>`
+    : shape === 1
+      ? `<circle cx="80" cy="80" r="36" fill="${accent}"/><circle cx="80" cy="80" r="18" fill="${bg}"/>`
+      : shape === 2
+        ? `<path d="M44 102 80 38l36 64H44Z" fill="${accent}"/><path d="M80 62 95 90H65l15-28Z" fill="${bg}"/>`
+        : `<rect x="45" y="45" width="70" height="70" rx="20" fill="${accent}"/><path d="M62 82h36v14H62V82Zm0-21h36v14H62V61Z" fill="${bg}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#bg)"/><rect x="14" y="14" width="132" height="132" rx="30" fill="none" stroke="${accent}" stroke-opacity=".18" stroke-width="2"/><g opacity=".96">${mark}</g><text x="80" y="128" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${label.length > 1 ? 20 : 26}" font-weight="900" fill="${ink}">${label}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function dynamicAiKpi(index: number, role: Role) {
+  const weeks = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+  const momentum = (weeks + index * 3) % 18;
+  if (role === 'entrepreneur') {
+    return {
+      monthlyRevenue: `${120 + index * 13 + momentum * 4}万円`,
+      growthRate: `+${10 + (momentum % 22)}%`,
+      customerCount: `${10 + index + Math.floor(momentum / 2)}社`,
+      fundingGoal: `${(index % 5) + 1},000万円`,
+    };
+  }
+  return {
+    investmentRange: ['500万円〜3,000万円', '1,000万円〜1億円', '3,000万円〜3億円'][index % 3],
+    supportAreas: ['事業戦略', '採用支援', '営業支援', '資金調達', 'ネットワーク提供'][index % 5],
+  };
+}
 
 function createAiAccounts(): Account[] {
   const entrepreneurs = aiPersonNames.map((name, index): Account => ({
     ...emptyAccount,
+    ...dynamicAiKpi(index, 'entrepreneur'),
     id: `ai-entrepreneur-${index + 1}`,
     role: 'entrepreneur',
     email: `ai-entrepreneur-${index + 1}@leap.local`,
     phone: '',
     emailVerified: true,
-    accountName: `ai_founder_${String(index + 1).padStart(2, '0')}`,
+    accountName: `${aiCompanyWords[index]}株式会社`,
     name,
     company: `${aiCompanyWords[index % aiCompanyWords.length]}株式会社`,
     title: '代表取締役',
@@ -258,13 +425,10 @@ function createAiAccounts(): Account[] {
     foundedMonth: `${(index % 12) + 1}月`,
     employeeSize: employeeSizes[index % employeeSizes.length],
     revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
-    bio: 'AI運用アカウントです。Leap内の投稿・検索・メッセージ体験を確認するための参考アカウントとして運用しています。',
-    achievements: 'プロダクト検証、顧客ヒアリング、KPI改善の記録を公開しています。',
-    avatarLabel: name.slice(0, 1),
-    fundingGoal: `${(index % 5) + 1},000万円`,
-    monthlyRevenue: `${80 + index * 12}万円`,
-    growthRate: `+${8 + (index % 18)}%`,
-    customerCount: `${6 + index}社`,
+    bio: `${aiFounderStories[index % aiFounderStories.length]}\n\n現在は「${aiBusinessDomains[index % aiBusinessDomains.length]}」を提供し、現場の声をもとにプロダクトと導入体験を改善しています。`,
+    achievements: `${accountAchievementTitle(index)}\n・週次のKPIレビューを継続\n・顧客ヒアリングを累計${35 + index * 4}件実施\n・導入後オンボーディング改善を毎月実施`,
+    avatarLabel: '',
+    avatarUrl: companyLogoDataUri(`${aiCompanyWords[index % aiCompanyWords.length]}株式会社`, index),
     isBot: true,
     botKind: 'entrepreneur',
     age: `${28 + (index % 18)}歳`,
@@ -273,14 +437,15 @@ function createAiAccounts(): Account[] {
   }));
   const investors = aiInvestorNames.map((name, index): Account => ({
     ...emptyAccount,
+    ...dynamicAiKpi(index, 'investor'),
     id: `ai-investor-${index + 1}`,
     role: 'investor',
     email: `ai-investor-${index + 1}@leap.local`,
     phone: '',
     emailVerified: true,
-    accountName: `ai_investor_${String(index + 1).padStart(2, '0')}`,
+    accountName: aiInvestorFirms[index],
     name,
-    company: `${['Future Ventures', 'Seed Partners', 'Bridge Capital', 'Growth Angels', 'Impact Studio'][index % 5]}`,
+    company: aiInvestorFirms[index],
     title: index % 3 === 0 ? 'パートナー' : '投資担当',
     industry: aiIndustries[index % aiIndustries.length],
     location: locations[(index + 12) % locations.length],
@@ -289,11 +454,10 @@ function createAiAccounts(): Account[] {
     foundedMonth: `${(index % 12) + 1}月`,
     employeeSize: employeeSizes[(index + 2) % employeeSizes.length],
     revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
-    bio: 'AI運用アカウントです。Leap内の投資家プロフィール、検索、メッセージ体験を確認するための参考アカウントとして運用しています。',
-    achievements: 'SaaS、AI、DX領域の投資検討プロセスを想定した公開プロフィールです。',
-    avatarLabel: name.slice(0, 1),
-    investmentRange: ['500万円〜3,000万円', '1,000万円〜1億円', '3,000万円〜3億円'][index % 3],
-    supportAreas: ['事業戦略', '採用支援', '営業支援', '資金調達', 'ネットワーク提供'][index % 5],
+    bio: aiInvestorStories[index % aiInvestorStories.length],
+    achievements: `投資検討領域：${aiIndustries[index % aiIndustries.length]}\n支援可能領域：${['事業戦略', '採用支援', '営業支援', '資金調達', 'ネットワーク提供'][index % 5]}\n公開プロフィールと投稿内容をもとに継続的に案件を確認しています。`,
+    avatarLabel: '',
+    avatarUrl: companyLogoDataUri(aiInvestorFirms[index], index + 100),
     isBot: true,
     botKind: 'investor',
     age: `${32 + (index % 22)}歳`,
@@ -305,25 +469,107 @@ function createAiAccounts(): Account[] {
 
 const aiAccounts = createAiAccounts();
 
+function accountAchievementTitle(index: number) {
+  return ['初期顧客の獲得', '継続率の改善', '営業導線の整理', 'プロダクト改善', '採用体制の構築'][index % 5];
+}
+
+function recentWeekdayDate(accountIndex: number, postIndex: number) {
+  const now = new Date();
+  const date = new Date(now);
+  const minutesInDay = 24 * 60;
+  const scheduledMinutes = (accountIndex * 37 + postIndex * 113) % minutesInDay;
+  date.setHours(Math.floor(scheduledMinutes / 60), scheduledMinutes % 60, 0, 0);
+  if (date.getTime() > now.getTime()) date.setDate(date.getDate() - 1);
+  date.setDate(date.getDate() - postIndex);
+  return date.toISOString();
+}
+
+function createEntrepreneurPostBody(account: Account, accountIndex: number, postIndex: number) {
+  const domain = aiBusinessDomains[accountIndex % aiBusinessDomains.length];
+  const theme = aiPostThemes[(accountIndex + postIndex) % aiPostThemes.length];
+  const focus = ['初回導入', '商談後フォロー', '継続利用', '単価改善', '紹介発生', 'サポート削減'][accountIndex % 6];
+  const nextAction = ['画面文言を短くする', '導入事例を追加する', '利用ログを深掘りする', '営業資料を業界別に分ける', 'オンボーディング動画を撮る', '解約理由を分類する'][(accountIndex + postIndex) % 6];
+  switch ((accountIndex * 5 + postIndex) % 12) {
+    case 0:
+      return `今日の進捗メモ。\n\n${account.company}では「${domain}」の${focus}を見直しました。${theme}\n\n次は${nextAction}予定です。`;
+    case 1:
+      return `数字から見ると、今月は月間売上${account.monthlyRevenue}、導入社数${account.customerCount}。\n\n伸びている一方で、最初の設定で止まるユーザーがまだいます。今週はそこだけに絞って改善します。`;
+    case 2:
+      return `顧客ヒアリングで刺さった一言。\n「便利そう」より「明日から使えそう」と言われた時の方が受注に近い。\n\n${domain}は、機能説明より導入後の業務イメージを先に見せる方針に変えます。`;
+    case 3:
+      return `今週やったこと\n・${focus}のボトルネック確認\n・既存顧客への使い方ヒアリング\n・営業資料の1ページ目を差し替え\n\n小さい修正ですが、商談の温度感が少し変わりました。`;
+    case 4:
+      return `${account.company}の課題共有です。\n\n${domain}は説明すれば価値が伝わるのですが、説明前に離脱する人がいます。次はファーストビューで「誰の何を減らすのか」が伝わるようにします。`;
+    case 5:
+      return `KPI更新。\n成長率：${account.growthRate}\n導入社数：${account.customerCount}\n月間売上：${account.monthlyRevenue}\n\n数字は悪くないですが、問い合わせ対応の属人化が見えてきました。サポート導線を整えます。`;
+    case 6:
+      return `今日はプロダクトより営業プロセスの日でした。\n\n${domain}の商談で、導入決裁者と実際に使う人の見ているポイントが違うことが分かりました。資料を2種類に分けます。`;
+    case 7:
+      return `小さな勝ち。\n既存顧客から「社内で紹介したい」と言ってもらえました。\n\nまだ再現性はありませんが、${focus}の改善が効いている可能性があります。紹介が出た理由を聞き切ります。`;
+    case 8:
+      return `反省。\n今週は機能追加に寄りすぎました。\n\n${account.company}に今必要なのは多機能化ではなく、初回利用の迷いを減らすこと。来週は新機能を止めて、既存導線を磨きます。`;
+    case 9:
+      return `投資家の方に見てほしいポイント。\n\n${domain}は市場規模よりも、現場で毎週使われるかが重要です。今は導入後2週間の利用頻度を一番追っています。`;
+    case 10:
+      return `今週の意思決定：${nextAction}。\n\n理由はシンプルで、商談では興味を持たれるのに利用開始で止まるからです。受注数より先に、利用開始率を上げます。`;
+    default:
+      return `${account.company}の近況です。\n\n${theme}\n\n${domain}を必要としている会社に、もっと短い時間で価値が伝わるように磨き込みます。`;
+  }
+}
+
+function createInvestorPostBody(account: Account, accountIndex: number, postIndex: number) {
+  const theme = aiInvestorPostThemes[(accountIndex + postIndex) % aiInvestorPostThemes.length];
+  const lens = ['継続率', '顧客単価', '紹介発生率', '導入スピード', '創業者の学習速度', '市場の切実さ'][accountIndex % 6];
+  const sector = account.industry || aiIndustries[accountIndex % aiIndustries.length];
+  switch ((accountIndex * 7 + postIndex) % 12) {
+    case 0:
+      return `${account.company}の投資メモ。\n\n今日は${sector}領域で${lens}が見える会社を中心に確認しています。${theme}`;
+    case 1:
+      return `初期案件を見る時、最初に確認するのは売上の大きさではなく「なぜ今伸びているのか」です。\n\n${sector}では特に${lens}の説明があると追いやすいです。`;
+    case 2:
+      return `面談前に見たい投稿\n・顧客が誰か\n・今週何を学んだか\n・数字がなぜ変わったか\n\nこの3つがあると、初回面談の質がかなり上がります。`;
+    case 3:
+      return `最近の関心は${sector}。\n\n派手な機能より、現場の作業が本当に減っているかを見ています。プロダクトの説明より、導入後の変化が知りたいです。`;
+    case 4:
+      return `投資レンジは${account.investmentRange}。\n今週は、初期顧客の熱量が高い会社を優先して見ています。\n\n数字が小さくても、使われ方が濃い事業は追い続けたいです。`;
+    case 5:
+      return `支援できること：${account.supportAreas}。\n\n投稿で課題が具体的に書かれていると、投資前でも何を手伝えるか考えやすいです。`;
+    case 6:
+      return `メモ：${lens}が伸びている会社は、投稿の粒度も具体的なことが多い。\n\nやったことだけでなく、なぜそう判断したかが見えると強いです。`;
+    case 7:
+      return `${sector}の案件で見落としがちなのは、導入後の運用負荷。\n\n売れるかだけでなく、使い続けるために誰が何をするのかを見ています。`;
+    case 8:
+      return `今週のチェック項目は3つ。\n1. 顧客課題の頻度\n2. 導入後の継続理由\n3. 次の打ち手の具体性\n\n${theme}`;
+    case 9:
+      return `創業者の投稿で好きなのは、うまくいった話より「外した仮説」の共有です。\n\n学習の速さが見えるので、継続して見たくなります。`;
+    case 10:
+      return `${account.company}では、${sector}の中でも最初の顧客が強く使っている会社を探しています。\n\n大きな市場より、まず濃い利用。そこから広がるかを見ます。`;
+    default:
+      return `投資検討の観点を少し共有します。\n\n${theme}\n\n投稿に数字と背景がセットであると、判断材料としてかなり使いやすいです。`;
+  }
+}
+
 function createAiPosts(accounts: Account[]): Post[] {
-  return accounts.map((account, index) => ({
-    id: `ai-post-${account.id}`,
-    authorId: account.id,
-    body: account.role === 'entrepreneur'
-      ? `${account.company}の今週の進捗です。顧客ヒアリングを追加で実施し、導入前の不安点を整理しました。次はオンボーディング資料を改善して、継続率の変化を見ていきます。`
-      : `${account.industry}領域で、初期の利用継続と紹介発生率を重視して見ています。数字だけではなく、創業者が課題をどう学習しているかも確認しています。`,
-    tags: account.role === 'entrepreneur' ? ['進捗', account.industry] : ['投資観点', account.industry],
-    visibility: 'public',
-    attachmentName: '',
-    imageName: '',
-    imageUrl: '',
-    isHidden: false,
-    actionUserIds: { likes: [], saves: [], meetings: [] },
-    createdAt: new Date(Date.now() - (index + 1) * 42 * 60 * 1000).toISOString(),
-    likes: 0,
-    saves: 0,
-    meetings: 0,
-    views: 0,
+  return accounts.flatMap((account, accountIndex) => Array.from({ length: 5 }, (_, postIndex) => {
+    return {
+      id: `ai-post-${account.id}-${postIndex + 1}`,
+      authorId: account.id,
+      body: account.role === 'entrepreneur'
+        ? createEntrepreneurPostBody(account, accountIndex, postIndex)
+        : createInvestorPostBody(account, accountIndex, postIndex),
+      tags: account.role === 'entrepreneur' ? ['進捗', account.industry] : ['投資観点', account.industry],
+      visibility: 'public' as const,
+      attachmentName: '',
+      imageName: '',
+      imageUrl: '',
+      isHidden: false,
+      actionUserIds: { likes: [], saves: [], meetings: [] },
+      createdAt: recentWeekdayDate(accountIndex, postIndex),
+      likes: 0,
+      saves: 0,
+      meetings: 0,
+      views: 0,
+    };
   }));
 }
 
@@ -351,9 +597,12 @@ function saveLocal<T>(key: string, value: T) {
 function normalizeAccount(account: Account): Account {
   const hasIdentityMaterial = Boolean(account.corporateNumber || account.licenseFileName);
   const identityStatus = account.identityStatus || (account.verified ? 'verified' : hasIdentityMaterial ? 'submitted' : 'none');
+  const isManagedAccount = Boolean(account.isBot || account.botKind);
+  const avatarUrl = account.avatarUrl || (isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, Math.abs(hashText(account.id || account.email || account.company))) : '');
   return {
     ...emptyAccount,
     ...account,
+    avatarUrl,
     identityStatus,
     followingIds: Array.isArray(account.followingIds) ? account.followingIds : [],
     followerIds: Array.isArray(account.followerIds) ? account.followerIds : [],
@@ -362,11 +611,13 @@ function normalizeAccount(account: Account): Account {
     isHidden: Boolean(account.isHidden),
     isDeleted: Boolean(account.isDeleted),
     emailNotificationsEnabled: account.emailNotificationsEnabled !== false,
-    isBot: Boolean(account.isBot),
+    isBot: isManagedAccount,
     botKind: account.botKind || '',
     age: account.age || '',
     gender: account.gender || '',
     ticketTransferName: account.ticketTransferName || '',
+    tutorialCompleted: Boolean(account.tutorialCompleted),
+    updatedAt: account.updatedAt || '',
     verified: identityStatus === 'verified' || identityStatus === 'submitted',
   };
 }
@@ -381,6 +632,26 @@ function displayAccountName(account?: Account | null): string {
   return name || 'アカウント未設定';
 }
 
+function displayPostAuthorName(account?: Account | null): string {
+  const name = account?.name?.trim();
+  return name || '名前未設定';
+}
+
+function scrollContentToTop() {
+  const scroll = () => {
+    document.querySelector<HTMLElement>('[data-app-scroll]')?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  };
+  scroll();
+  requestAnimationFrame(() => {
+    scroll();
+    requestAnimationFrame(() => {
+      scroll();
+    });
+  });
+  setTimeout(scroll, 80);
+}
+
 function replaceAccountIds(text: string, accounts: Account[]): string {
   return accounts.reduce((body, account) => body.replaceAll(account.id, displayAccountName(account)), text);
 }
@@ -389,15 +660,17 @@ async function loadCloudState(): Promise<LeapCloudState | null> {
   const supabase = createSupabaseBrowserClient();
   if (!supabase) return null;
   const { data, error } = await supabase.from('app_state').select('data').eq('key', 'leap-main').maybeSingle();
-  if (error || !data?.data) return null;
+  if (error) throw new Error(error.message);
+  if (!data?.data) return null;
   const cloud = data.data as LeapCloudState;
-  return { ...cloud, accounts: (cloud.accounts ?? []).map(normalizeAccount), posts: cloud.posts ?? [], messages: cloud.messages ?? [], meetingApplications: cloud.meetingApplications ?? [], notices: cloud.notices ?? [] };
+  return { ...cloud, accounts: (cloud.accounts ?? []).map(normalizeAccount), posts: cloud.posts ?? [], blogs: cloud.blogs ?? [], messages: cloud.messages ?? [], meetingApplications: cloud.meetingApplications ?? [], notices: cloud.notices ?? [] };
 }
 
 async function saveCloudState(state: LeapCloudState) {
   const supabase = createSupabaseBrowserClient();
   if (!supabase) return;
-  await supabase.from('app_state').upsert({ key: 'leap-main', data: state, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  const { error } = await supabase.from('app_state').upsert({ key: 'leap-main', data: state, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw new Error(error.message);
 }
 
 function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
@@ -407,10 +680,27 @@ function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
   return Array.from(map.values());
 }
 
+function newerAccount(local: Account | undefined, cloud: Account): Account {
+  if (!local) return normalizeAccount(cloud);
+  const normalizedLocal = normalizeAccount(local);
+  const normalizedCloud = normalizeAccount(cloud);
+  const localTime = normalizedLocal.updatedAt ? new Date(normalizedLocal.updatedAt).getTime() : 0;
+  const cloudTime = normalizedCloud.updatedAt ? new Date(normalizedCloud.updatedAt).getTime() : 0;
+  return cloudTime > localTime ? normalizedCloud : normalizedLocal;
+}
+
+function mergeAccounts(local: Account[], cloud: Account[]): Account[] {
+  const map = new Map<string, Account>();
+  local.map(normalizeAccount).forEach((account) => map.set(account.id, account));
+  cloud.map(normalizeAccount).forEach((account) => map.set(account.id, newerAccount(map.get(account.id), account)));
+  return Array.from(map.values());
+}
+
 function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapCloudState {
   return {
-    accounts: mergeById(local.accounts.map(normalizeAccount), cloud.accounts.map(normalizeAccount)),
+    accounts: mergeAccounts(local.accounts, cloud.accounts),
     posts: mergeById(local.posts, cloud.posts),
+    blogs: mergeById(local.blogs ?? [], cloud.blogs ?? []),
     messages: mergeById(local.messages, cloud.messages),
     meetingApplications: mergeById(local.meetingApplications, cloud.meetingApplications),
     notices: mergeById(local.notices, cloud.notices),
@@ -468,6 +758,7 @@ export default function LeapApp() {
   const [currentAccountId, setCurrentAccountId] = useState(() => loadLocal('leap.currentAccountId', ''));
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [posts, setPosts] = useState<Post[]>(() => loadLocal('leap.posts', []));
+  const [blogs, setBlogs] = useState<BlogArticle[]>(() => loadLocal('leap.blogs', []));
   const [messages, setMessages] = useState<DirectMessage[]>(() => loadLocal('leap.messages', []));
   const [meetingApplications, setMeetingApplications] = useState<MeetingApplication[]>(() => loadLocal('leap.meetingApplications', []));
   const [notices, setNotices] = useState<Notice[]>(() => loadLocal('leap.notices', []));
@@ -484,10 +775,24 @@ export default function LeapApp() {
   const [postImageName, setPostImageName] = useState('');
   const [postImageUrl, setPostImageUrl] = useState('');
   const [editingPostId, setEditingPostId] = useState('');
+  const [showBlogComposer, setShowBlogComposer] = useState(false);
+  const [editingBlogId, setEditingBlogId] = useState('');
+  const [blogTitle, setBlogTitle] = useState('');
+  const [blogBody, setBlogBody] = useState('');
+  const [blogTags, setBlogTags] = useState('');
+  const [blogVisibility, setBlogVisibility] = useState<Visibility>('public');
+  const [blogImageName, setBlogImageName] = useState('');
+  const [blogImageUrl, setBlogImageUrl] = useState('');
+  const [blogAttachmentName, setBlogAttachmentName] = useState('');
+  const [blogAttachmentUrl, setBlogAttachmentUrl] = useState('');
   const [messageDraft, setMessageDraft] = useState('');
   const [messageMode, setMessageMode] = useState<MessageKind>('direct');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [darkMode, setDarkMode] = useState(() => loadLocal('leap.darkMode', false));
   const [cloudReady, setCloudReady] = useState(false);
+  const [cloudError, setCloudError] = useState('');
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
   const [authenticatedEmail, setAuthenticatedEmail] = useState('');
   const [systemPostActions, setSystemPostActions] = useState<Record<string, Post['actionUserIds']>>({});
@@ -495,16 +800,19 @@ export default function LeapApp() {
   useEffect(() => saveLocal('leap.accounts', accounts), [accounts]);
   useEffect(() => saveLocal('leap.currentAccountId', currentAccountId), [currentAccountId]);
   useEffect(() => saveLocal('leap.posts', posts), [posts]);
+  useEffect(() => saveLocal('leap.blogs', blogs), [blogs]);
   useEffect(() => saveLocal('leap.messages', messages), [messages]);
   useEffect(() => saveLocal('leap.meetingApplications', meetingApplications), [meetingApplications]);
   useEffect(() => saveLocal('leap.notices', notices), [notices]);
   useEffect(() => saveLocal('leap.following', following), [following]);
   useEffect(() => saveLocal('leap.savedPosts', savedPosts), [savedPosts]);
   useEffect(() => saveLocal('leap.readMessageIds', readMessageIds), [readMessageIds]);
+  useEffect(() => saveLocal('leap.darkMode', darkMode), [darkMode]);
   useEffect(() => {
     function syncAcrossTabs(event: StorageEvent) {
       if (event.key === 'leap.accounts') setAccounts(loadLocal('leap.accounts', []));
       if (event.key === 'leap.posts') setPosts(loadLocal('leap.posts', []));
+      if (event.key === 'leap.blogs') setBlogs(loadLocal('leap.blogs', []));
       if (event.key === 'leap.messages') setMessages(loadLocal('leap.messages', []));
       if (event.key === 'leap.meetingApplications') setMeetingApplications(loadLocal('leap.meetingApplications', []));
       if (event.key === 'leap.notices') setNotices(loadLocal('leap.notices', []));
@@ -515,13 +823,18 @@ export default function LeapApp() {
   useEffect(() => {
     loadCloudState().then((cloud) => {
       if (cloud) {
-        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }, cloud);
+        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices }, cloud);
         setAccounts(merged.accounts);
         setPosts(merged.posts);
+        setBlogs(merged.blogs ?? []);
         setMessages(merged.messages);
         setMeetingApplications(merged.meetingApplications);
         setNotices(merged.notices);
       }
+      setCloudReady(true);
+      setCloudError('');
+    }).catch((error) => {
+      setCloudError(`クラウド同期に失敗しています：${error.message}`);
       setCloudReady(true);
     });
   }, []);
@@ -530,21 +843,29 @@ export default function LeapApp() {
     const timer = window.setInterval(() => {
       loadCloudState().then((cloud) => {
         if (!cloud) return;
-        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }, cloud);
+        const merged = mergeCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices }, cloud);
         setAccounts(merged.accounts);
         setPosts(merged.posts);
+        setBlogs(merged.blogs ?? []);
         setMessages(merged.messages);
         setMeetingApplications(merged.meetingApplications);
         setNotices(merged.notices);
+        setCloudError('');
+      }).catch((error) => {
+        setCloudError(`クラウド同期に失敗しています：${error.message}`);
       });
     }, 8000);
     return () => window.clearInterval(timer);
-  }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
+  }, [accounts, blogs, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
     if (!cloudReady) return;
-    const timer = window.setTimeout(() => saveCloudState({ accounts: accounts.map(normalizeAccount), posts, messages, meetingApplications, notices }), 700);
+    const timer = window.setTimeout(() => {
+      saveCloudState({ accounts: accounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
+        .then(() => setCloudError(''))
+        .catch((error) => setCloudError(`クラウド同期に失敗しています：${error.message}`));
+    }, 700);
     return () => window.clearTimeout(timer);
-  }, [accounts, cloudReady, meetingApplications, messages, notices, posts]);
+  }, [accounts, blogs, cloudReady, meetingApplications, messages, notices, posts]);
   useEffect(() => {
     if (!cloudReady || authBootstrapped) return;
     const supabase = createSupabaseBrowserClient();
@@ -583,6 +904,11 @@ export default function LeapApp() {
   useEffect(() => {
     if (currentAccount && currentAccount.id !== currentAccountId) setCurrentAccountId(currentAccount.id);
   }, [currentAccount, currentAccountId]);
+  useEffect(() => {
+    if (!currentAccount || isAdmin || currentAccount.isBot || currentAccount.tutorialCompleted || page === 'auth') return;
+    setTutorialStep(0);
+    setShowTutorial(true);
+  }, [currentAccount?.id, currentAccount?.isBot, currentAccount?.tutorialCompleted, isAdmin, page]);
   const systemPosts = useMemo(() => createAiPosts(aiAccounts), []);
   const allPosts = useMemo(() => mergeById(systemPosts.map((post) => {
     const actionUserIds = systemPostActions[post.id] ?? post.actionUserIds;
@@ -590,6 +916,7 @@ export default function LeapApp() {
   }), posts).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [posts, systemPostActions, systemPosts]);
 
   const visiblePosts = useMemo(() => allPosts.filter((post) => discoverableAccounts.some((account) => account.id === post.authorId)).filter((post) => canSeePost(post, currentAccount, currentFollowing)).filter((post) => post.visibility !== 'draft' && !post.isHidden), [allPosts, currentAccount, currentFollowing, discoverableAccounts]);
+  const visibleBlogs = useMemo(() => blogs.filter((blog) => discoverableAccounts.some((account) => account.id === blog.authorId) || blog.authorId === currentAccount?.id).filter((blog) => canSeeBlog(blog, currentAccount, currentFollowing)).filter((blog) => blog.visibility !== 'draft' && !blog.isHidden).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [blogs, currentAccount, currentFollowing, discoverableAccounts]);
   const feedPosts = useMemo(() => {
     if (feedTab === 'following') return visiblePosts.filter((post) => currentFollowing.includes(post.authorId));
     if (feedTab === 'investors') return visiblePosts.filter((post) => visibleAccounts.find((account) => account.id === post.authorId)?.role === 'investor');
@@ -765,20 +1092,83 @@ export default function LeapApp() {
     flash('投稿を削除しました');
   }
 
-  function requestMeeting(account: Account) {
+  function submitBlog() {
     if (!requireAccount()) return;
-    if (account.isBot) {
-      const body = 'お問い合わせありがとうございます。AI運用アカウントのため、面談は受け付けていません。公開プロフィールや投稿に関する質問にはメッセージで回答します。';
-      setMessages((list) => [
-        { id: crypto.randomUUID(), partnerId: account.id, senderId: account.id, recipientId: currentAccount!.id, kind: 'direct', body, createdAt: new Date().toISOString(), mine: false, meetingStatus: 'rejected' },
-        ...list,
-      ]);
-      setSelectedAccountId(account.id);
-      setMessageMode('direct');
-      setPage('messages');
-      flash('AI運用アカウントは面談を受け付けていません');
+    if (!blogTitle.trim() || !blogBody.trim()) {
+      flash('タイトルと本文を入力してください');
       return;
     }
+    const now = new Date().toISOString();
+    const tags = blogTags.split(',').map((tag) => tag.trim()).filter(Boolean);
+    if (editingBlogId) {
+      setBlogs((list) => list.map((blog) => blog.id === editingBlogId ? { ...blog, title: blogTitle.trim(), body: blogBody.trim(), tags, visibility: blogVisibility, imageName: blogImageName, imageUrl: blogImageUrl, attachmentName: blogAttachmentName, attachmentUrl: blogAttachmentUrl, updatedAt: now } : blog));
+      resetBlogComposer();
+      flash('ブログを更新しました');
+      return;
+    }
+    setBlogs((list) => [{
+      id: crypto.randomUUID(),
+      authorId: currentAccount!.id,
+      title: blogTitle.trim(),
+      body: blogBody.trim(),
+      tags,
+      visibility: blogVisibility,
+      imageName: blogImageName,
+      imageUrl: blogImageUrl,
+      attachmentName: blogAttachmentName,
+      attachmentUrl: blogAttachmentUrl,
+      isHidden: false,
+      createdAt: now,
+      updatedAt: now,
+      views: 0,
+    }, ...list]);
+    resetBlogComposer();
+    flash(blogVisibility === 'draft' ? 'ブログを下書き保存しました' : 'ブログを公開しました');
+  }
+
+  function resetBlogComposer() {
+    setEditingBlogId('');
+    setBlogTitle('');
+    setBlogBody('');
+    setBlogTags('');
+    setBlogVisibility('public');
+    setBlogImageName('');
+    setBlogImageUrl('');
+    setBlogAttachmentName('');
+    setBlogAttachmentUrl('');
+    setShowBlogComposer(false);
+  }
+
+  function startEditBlog(blog: BlogArticle) {
+    setEditingBlogId(blog.id);
+    setBlogTitle(blog.title);
+    setBlogBody(blog.body);
+    setBlogTags(blog.tags.join(', '));
+    setBlogVisibility(blog.visibility);
+    setBlogImageName(blog.imageName);
+    setBlogImageUrl(blog.imageUrl);
+    setBlogAttachmentName(blog.attachmentName);
+    setBlogAttachmentUrl(blog.attachmentUrl);
+    setShowBlogComposer(true);
+  }
+
+  function hideBlog(blogId: string) {
+    let hidden = false;
+    setBlogs((list) => list.map((blog) => {
+      if (blog.id !== blogId) return blog;
+      hidden = !blog.isHidden;
+      return { ...blog, isHidden: hidden };
+    }));
+    flash(hidden ? 'ブログを非表示にしました' : 'ブログを再公開しました');
+  }
+
+  function deleteBlog(blogId: string) {
+    setBlogs((list) => list.filter((blog) => blog.id !== blogId));
+    flash('ブログを削除しました');
+  }
+
+  function requestMeeting(account: Account) {
+    if (!requireAccount()) return;
     const body = `${displayAccountName(currentAccount) || 'あなた'}さんから面談申請が届きました。個別メッセージで承認すると面談メッセージに移行できます。`;
     setMessages((list) => [
       { id: crypto.randomUUID(), partnerId: account.id, senderId: currentAccount?.id, recipientId: account.id, kind: 'direct', body: '面談申請を送信しました。相手が承認すると面談メッセージに移行できます。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'requested' },
@@ -803,10 +1193,16 @@ export default function LeapApp() {
   }
 
   function rejectMeeting(partner: Account) {
-    setMessages((list) => [
-      { id: crypto.randomUUID(), partnerId: partner.id, kind: 'direct', body: '面談申請を非承認にしました。', createdAt: new Date().toISOString(), mine: true, meetingStatus: 'rejected' },
-      ...list.map((message) => message.partnerId === partner.id && message.meetingStatus === 'requested' ? { ...message, meetingStatus: 'rejected' as const } : message),
-    ]);
+    setMessages((list) => list.filter((message) => {
+      if (message.meetingStatus !== 'requested') return true;
+      if (message.senderId || message.recipientId) {
+        return !(
+          (message.senderId === currentAccount?.id && message.recipientId === partner.id)
+          || (message.senderId === partner.id && message.recipientId === currentAccount?.id)
+        );
+      }
+      return message.partnerId !== partner.id;
+    }));
     flash('面談申請を非承認にしました');
   }
 
@@ -868,17 +1264,43 @@ export default function LeapApp() {
 
   function follow(account: Account) {
     if (!requireAccount()) return;
+    if (account.id === currentAccount!.id) {
+      flash('自分自身はフォローできません');
+      return;
+    }
     const alreadyFollowing = currentFollowing.includes(account.id);
     const nextFollowing = alreadyFollowing ? currentFollowing.filter((id) => id !== account.id) : [...currentFollowing, account.id];
-    setAccounts((list) => list.map((item) => {
-      if (item.id === currentAccount!.id) return { ...normalizeAccount(item), followingIds: nextFollowing };
+    const now = new Date().toISOString();
+    const normalizedTarget = normalizeAccount(account);
+    let currentFound = false;
+    let targetFound = false;
+    const nextAccounts = accounts.map((item) => {
+      if (item.id === currentAccount!.id) {
+        currentFound = true;
+        return { ...normalizeAccount(item), followingIds: nextFollowing, updatedAt: now };
+      }
       if (item.id === account.id) {
+        targetFound = true;
         const followers = normalizeAccount(item).followerIds;
-        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]) };
+        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]), updatedAt: now };
       }
       return normalizeAccount(item);
-    }));
+    });
+    if (!currentFound) nextAccounts.push({ ...normalizeAccount(currentAccount!), followingIds: nextFollowing, updatedAt: now });
+    if (!targetFound && !normalizedTarget.isBot && normalizedTarget.id !== adminAccount.id) {
+      nextAccounts.push({
+        ...normalizedTarget,
+        followerIds: alreadyFollowing
+          ? normalizedTarget.followerIds.filter((id) => id !== currentAccount!.id)
+          : (normalizedTarget.followerIds.includes(currentAccount!.id) ? normalizedTarget.followerIds : [...normalizedTarget.followerIds, currentAccount!.id]),
+        updatedAt: now,
+      });
+    }
+    setAccounts(nextAccounts.map(normalizeAccount));
     setFollowing(nextFollowing);
+    void saveCloudState({ accounts: nextAccounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
+      .then(() => setCloudError(''))
+      .catch((error) => setCloudError(`クラウド同期に失敗しています：${error.message}`));
     if (!alreadyFollowing) {
       setNotices((list) => [{ id: crypto.randomUUID(), userId: account.id, body: `${displayAccountName(currentAccount)}さんにフォローされました`, createdAt: new Date().toISOString(), unread: true }, ...list]);
       if (account.emailNotificationsEnabled) void sendDirectEmail(account.email, 'Leap: フォローされました', `${displayAccountName(currentAccount)}さんがあなたをフォローしました。`);
@@ -896,8 +1318,8 @@ export default function LeapApp() {
       recipientId: currentAccount?.id,
       kind: 'direct' as const,
       body: partner.role === 'entrepreneur'
-        ? 'メッセージありがとうございます。AI運用アカウントとして、公開している事業進捗やKPIの見方について回答できます。面談は受け付けていません。'
-        : 'メッセージありがとうございます。AI運用アカウントとして、投資観点や公開プロフィールに関する質問に回答できます。面談は受け付けていません。',
+        ? 'メッセージありがとうございます。公開している事業進捗やKPIの見方について回答できます。面談は受け付けていません。'
+        : 'メッセージありがとうございます。投資観点や公開プロフィールに関する質問に回答できます。面談は受け付けていません。',
       createdAt: new Date(Date.now() + 1000).toISOString(),
       mine: false,
     } : null;
@@ -916,6 +1338,24 @@ export default function LeapApp() {
     setPage('tickets');
   }
 
+  function finishTutorial(nextPage?: Page) {
+    if (currentAccount) {
+      setAccounts((list) => list.map((account) => account.id === currentAccount.id ? { ...normalizeAccount(account), tutorialCompleted: true } : account));
+    }
+    setShowTutorial(false);
+    if (nextPage) {
+      setPage(nextPage);
+      scrollContentToTop();
+    }
+  }
+
+  function reopenTutorial() {
+    if (isAdmin) return;
+    setTutorialStep(0);
+    setShowTutorial(true);
+    setMenuOpen(false);
+  }
+
   async function logout() {
     const supabase = createSupabaseBrowserClient();
     if (supabase) await supabase.auth.signOut();
@@ -928,12 +1368,17 @@ export default function LeapApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef5ff] text-[#101828] lg:p-6">
-      <div className="mx-auto grid min-h-screen w-full max-w-[430px] bg-white shadow-2xl lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:overflow-hidden lg:rounded-[28px]">
+    <main className={`min-h-screen bg-white text-[#101828] lg:p-6 ${darkMode ? 'leap-dark' : ''}`}>
+      <div className="mx-auto grid h-[100dvh] min-h-[100dvh] w-full max-w-[430px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white shadow-none lg:max-w-6xl lg:grid-cols-[220px_1fr] lg:rounded-[28px] lg:shadow-sm lg:ring-1 lg:ring-[#eff3f4]">
         <DesktopNav page={page} setPage={setPage} openTickets={openTickets} isAdmin={isAdmin} />
-        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} />
+        <AppHeader page={page} goBack={() => setPage('feed')} openTickets={openTickets} menuOpen={menuOpen} setMenuOpen={setMenuOpen} setPage={setPage} currentAccount={currentAccount} isAdmin={isAdmin} logout={logout} unreadNoticeCount={notices.filter((notice) => notice.unread && (!notice.userId || notice.userId === currentAccount?.id)).length} openTutorial={reopenTutorial} darkMode={darkMode} toggleDarkMode={() => setDarkMode((value) => !value)} />
 
-        <section className="min-h-0 overflow-y-auto pb-20 lg:col-start-2 lg:pb-6">
+        <section data-app-scroll className="min-h-0 overflow-y-auto pb-14 lg:col-start-2 lg:row-start-2 lg:pb-6">
+          {cloudError && (
+            <div className="m-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-800">
+              {cloudError}<br />PC/スマホ連携にはSupabase SQL Editorで `supabase/fix_20260608_app_state_permissions.sql` を実行してください。
+            </div>
+          )}
           {page === 'feed' && (
             <FeedPage posts={feedPosts} accounts={discoverableAccounts} currentAccount={currentAccount} feedTab={feedTab} setFeedTab={setFeedTab} openComposer={() => setShowComposer(true)} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
           )}
@@ -944,13 +1389,13 @@ export default function LeapApp() {
           )}
           {page === 'auth' && <AuthPage accounts={accounts} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} onAuthenticated={syncAuthenticatedAccount} />}
           {page === 'mypage' && (
-            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <MyPage currentAccount={currentAccount} accounts={accountsWithAdmin} posts={posts.filter((post) => post.authorId === currentAccount?.id)} blogs={blogs.filter((blog) => blog.authorId === currentAccount?.id)} setPage={setPage} openComposer={() => setShowComposer(true)} openBlogComposer={() => setShowBlogComposer(true)} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />
           )}
           {page === 'profileEdit' && <ProfileEditPage accounts={accounts} currentAccount={currentAccount} setAccounts={setAccounts} setCurrentAccountId={setCurrentAccountId} setPage={setPage} flash={flash} />}
           {page === 'tickets' && <TicketPage currentAccount={currentAccount} setAccounts={setAccounts} />}
           {page === 'admin' && (isAdmin ? <AdminPage accounts={accounts} posts={posts} meetingApplications={meetingApplications} setAccounts={setAccounts} setPosts={setPosts} setMessages={setMessages} setNotices={setNotices} reviewMeetingApplication={reviewMeetingApplication} openProfile={openProfile} /> : <EmptyState icon={<ShieldCheck size={28} />} title="管理者のみ表示できます" body="管理者アカウントでログインしてください。" action="ログインへ" onAction={() => setPage('auth')} />)}
           {(page === 'profile' || page === 'deal') && selectedAccount && (
-            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />
+            <ProfilePage account={selectedAccount} accounts={accountsWithAdmin} currentAccount={currentAccount} posts={allPosts.filter((post) => post.authorId === selectedAccount.id && canSeePost(post, currentAccount, currentFollowing) && (!post.isHidden || currentAccount?.id === selectedAccount.id))} blogs={blogs.filter((blog) => blog.authorId === selectedAccount.id && canSeeBlog(blog, currentAccount, currentFollowing) && (!blog.isHidden || currentAccount?.id === selectedAccount.id))} isFollowing={currentFollowing.includes(selectedAccount.id)} isMine={currentAccount?.id === selectedAccount.id} follow={() => follow(selectedAccount)} message={() => { setSelectedAccountId(selectedAccount.id); setMessageMode('direct'); setPage('messages'); }} requestMeeting={() => requestMeeting(selectedAccount)} openDeal={() => setPage('deal')} dealMode={page === 'deal'} setPage={setPage} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />
           )}
           {page === 'matching' && <MatchingPage accounts={visibleAccounts.filter((account) => account.role === 'entrepreneur')} openProfile={openProfile} requestMeeting={requestMeeting} />}
         </section>
@@ -978,12 +1423,144 @@ export default function LeapApp() {
         </Modal>
       )}
 
+      {showBlogComposer && (
+        <Modal onClose={resetBlogComposer} title={editingBlogId ? 'ブログを編集' : 'ブログを書く'}>
+          <input className="field" placeholder="ブログタイトル" value={blogTitle} onChange={(event) => setBlogTitle(event.target.value)} />
+          <textarea className="field mt-3 min-h-56 resize-none leading-7" placeholder="会社のストーリー、事業の考え方、顧客事例、学び、採用・資本提携につながる長文を書いてください" value={blogBody} onChange={(event) => setBlogBody(event.target.value)} />
+          <Select label="公開範囲" value={blogVisibility} options={Object.values(visibilityLabels)} onChange={(value) => setBlogVisibility((Object.keys(visibilityLabels).find((key) => visibilityLabels[key as Visibility] === value) as Visibility) || 'public')} />
+          <input className="field mt-3" placeholder="タグ。例：会社紹介, SaaS, 資金調達" value={blogTags} onChange={(event) => setBlogTags(event.target.value)} />
+          <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
+            <ImageIcon size={17} />カバー画像を選択
+            <input className="hidden" type="file" accept="image/*" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              setBlogImageName(file.name);
+              readFileAsDataUrl(file, setBlogImageUrl);
+            }} />
+          </label>
+          {blogImageUrl && <img src={blogImageUrl} alt={blogImageName} className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" />}
+          <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
+            <Paperclip size={17} />添付ファイルを選択
+            <input className="hidden" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              setBlogAttachmentName(file.name);
+              readFileAsDataUrl(file, setBlogAttachmentUrl);
+            }} />
+          </label>
+          {blogAttachmentName && <p className="mt-2 truncate rounded-2xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">{blogAttachmentName}</p>}
+          <button className="primary mt-4 w-full" onClick={submitBlog}>{editingBlogId ? 'ブログを更新する' : 'ブログを公開する'}</button>
+        </Modal>
+      )}
+
+      {showTutorial && currentAccount && (
+        <TutorialModal
+          account={currentAccount}
+          step={tutorialStep}
+          setStep={setTutorialStep}
+          onSkip={() => finishTutorial()}
+          onFinish={(nextPage) => finishTutorial(nextPage)}
+        />
+      )}
+
       {toast && <div className="fixed left-1/2 top-5 z-[70] -translate-x-1/2 rounded-full bg-[#050816] px-5 py-3 text-xs font-black text-white shadow-xl">{toast}</div>}
     </main>
   );
 }
 
-function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void> }) {
+function TutorialModal({ account, step, setStep, onSkip, onFinish }: { account: Account; step: number; setStep: (step: number) => void; onSkip: () => void; onFinish: (page: Page) => void }) {
+  const isEntrepreneur = account.role === 'entrepreneur';
+  const steps = [
+    {
+      title: 'Leapへようこそ',
+      body: 'Leapでは、投稿・プロフィール・メッセージを通じて、起業家と投資家が自然につながれます。まずは使う順番を短く確認しましょう。',
+      tip: 'この案内は右上の「…」からいつでも見直せます。',
+    },
+    {
+      title: 'プロフィールを整える',
+      body: isEntrepreneur
+        ? '会社の想い、事業内容、実績、案件詳細を入力すると、投資家があなたの事業を判断しやすくなります。'
+        : '投資方針、支援できること、本人確認情報を入力すると、起業家が安心してやり取りできます。',
+      tip: 'プロフィールはマイページ、または右上メニューのプロフィール編集から変更できます。',
+    },
+    {
+      title: '投稿で活動を共有する',
+      body: '投稿ボタンから近況、進捗、学び、募集したいことを気軽に投稿できます。画像やファイルも添付できます。',
+      tip: '公開範囲は、全体公開・フォロワー限定・投資家限定・起業家限定・下書きから選べます。',
+    },
+    {
+      title: 'フィードを見る',
+      body: 'フィードでは、フォロー中・おすすめ・起業家の投稿を切り替えられます。気になる投稿には応援、保存、面談希望ができます。',
+      tip: '自分の投稿の閲覧数は本人だけが確認できます。一定以上見られた投稿は他の人にも閲覧数が表示されます。',
+    },
+    {
+      title: '検索で相手を探す',
+      body: '検索ページでは、アカウント名、会社名、業界、地域などから起業家を探せます。気になる相手はプロフィールを確認しましょう。',
+      tip: 'プロフィール画面からフォローやメッセージ送信ができます。',
+    },
+    {
+      title: 'メッセージと面談',
+      body: '通常メッセージでやり取りし、面談したい場合は面談希望を送ります。双方が進める場合は面談メッセージへ移動します。',
+      tip: '面談日時が決まったら、面談メッセージから運営へ面談日程を申請します。',
+    },
+    {
+      title: '通知を確認する',
+      body: 'フォロー、メッセージ、面談申込、運営からのお知らせは通知で確認できます。未読だけに絞り込むこともできます。',
+      tip: 'メール通知のオン・オフは設定から変更できます。',
+    },
+    {
+      title: '準備完了です',
+      body: isEntrepreneur
+        ? 'まずはプロフィール編集で会社の魅力を整えてから、最初の投稿をしてみましょう。'
+        : 'まずは検索で気になる起業家を探し、プロフィールや投稿を見てみましょう。',
+      tip: '迷ったら、プロフィールを整える、投稿を見る、メッセージする、の順番で使えば大丈夫です。',
+    },
+  ];
+  const current = steps[step] ?? steps[0];
+  const isLast = step >= steps.length - 1;
+  const targetPage: Page = isEntrepreneur ? 'profileEdit' : 'search';
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center">
+      <div className="w-full max-w-[430px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-slate-200">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[10px] font-black text-blue-600">はじめての使い方</p>
+            <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" aria-label="閉じる" onClick={onSkip}><X size={17} /></button>
+          </div>
+          <div className="flex gap-1">
+            {steps.map((_, index) => <span key={index} className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-blue-600' : 'bg-slate-100'}`} />)}
+          </div>
+        </div>
+        <div className="px-5 py-6">
+          <div className="mb-5 grid h-14 w-14 place-items-center rounded-3xl bg-blue-50 text-blue-600">
+            {step === 0 && <CheckCircle2 size={26} />}
+            {step === 1 && <UserRound size={26} />}
+            {step === 2 && <Plus size={26} />}
+            {step === 3 && <Home size={26} />}
+            {step === 4 && <Search size={26} />}
+            {step === 5 && <MessageCircle size={26} />}
+            {step === 6 && <Bell size={26} />}
+            {step >= 7 && <ShieldCheck size={26} />}
+          </div>
+          <h2 className="text-[20px] font-black tracking-tight text-[#101828]">{current.title}</h2>
+          <p className="mt-3 text-[13px] font-bold leading-6 text-slate-600">{current.body}</p>
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-[12px] font-bold leading-5 text-slate-500">{current.tip}</div>
+        </div>
+        <div className="flex items-center gap-2 border-t border-slate-100 p-4">
+          <button className="h-11 rounded-2xl px-4 text-xs font-black text-slate-500 hover:bg-slate-50" onClick={onSkip}>スキップ</button>
+          <div className="flex-1" />
+          {step > 0 && <button className="h-11 rounded-2xl border border-slate-200 px-4 text-xs font-black" onClick={() => setStep(step - 1)}>戻る</button>}
+          <button className="h-11 rounded-2xl bg-[#050816] px-5 text-xs font-black text-white" onClick={() => isLast ? onFinish(targetPage) : setStep(step + 1)}>
+            {isLast ? (isEntrepreneur ? 'プロフィール編集へ' : '検索へ') : '次へ'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, currentAccount, isAdmin, logout, unreadNoticeCount, openTutorial, darkMode, toggleDarkMode }: { page: Page; goBack: () => void; openTickets: () => void; menuOpen: boolean; setMenuOpen: (value: boolean) => void; setPage: (page: Page) => void; currentAccount: Account | null; isAdmin: boolean; logout: () => void | Promise<void>; unreadNoticeCount: number; openTutorial: () => void; darkMode: boolean; toggleDarkMode: () => void }) {
   const title: Record<Page, string> = {
     feed: 'フィード',
     search: '検索',
@@ -999,18 +1576,23 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
     admin: '管理者画面',
   };
   const canBack = page === 'profile' || page === 'deal' || page === 'matching' || page === 'profileEdit' || page === 'tickets' || page === 'auth';
-  const compact = page === 'feed' || page === 'notifications';
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
-      <div className={`flex items-center justify-between px-4 ${compact ? 'h-10' : 'h-14'}`}>
-        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
-          {canBack ? <ChevronLeft size={20} /> : <BriefcaseBusiness size={20} />}
+    <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur lg:col-start-2">
+      <div className="grid h-11 grid-cols-[34px_1fr_62px] items-center px-2">
+        <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={canBack ? goBack : openTickets} aria-label={canBack ? '戻る' : 'チケット'}>
+          {canBack ? <ChevronLeft size={18} /> : <BriefcaseBusiness size={18} />}
         </button>
-        <h1 className="text-sm font-black">{title[page]}</h1>
-        <button className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={20} /></button>
+        <h1 className="text-center text-[13px] font-black">{title[page]}</h1>
+        <div className="flex items-center justify-end gap-0.5">
+          <button className="relative grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" aria-label="通知" onClick={() => { setPage('notifications'); scrollContentToTop(); }}>
+            <Bell size={17} />
+            {unreadNoticeCount > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-rose-600 px-1 text-[8px] font-black leading-none text-white">{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}</span>}
+          </button>
+          <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" aria-label="メニュー" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} /></button>
+        </div>
       </div>
       {menuOpen && (
-        <div className="absolute right-3 top-12 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
+        <div className="absolute right-2 top-10 z-40 w-52 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
           {[
             ['feed', 'フィード'],
             ['search', '検索'],
@@ -1020,6 +1602,8 @@ function AppHeader({ page, goBack, openTickets, menuOpen, setMenuOpen, setPage, 
             [currentAccount ? 'profileEdit' : 'auth', '設定'],
             [currentAccount ? 'profileEdit' : 'auth', currentAccount ? 'プロフィール編集' : 'アカウント作成'],
           ].map(([key, label]) => <button key={key} className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { setPage(key as Page); setMenuOpen(false); }}>{label}</button>)}
+          {currentAccount && !isAdmin && <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={openTutorial}>使い方を見る</button>}
+          <button className="block w-full rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { toggleDarkMode(); setMenuOpen(false); }}>{darkMode ? 'ライトモードにする' : 'ダークモードにする'}</button>
           {currentAccount && <button className="block w-full rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={logout}>ログアウト</button>}
         </div>
       )}
@@ -1048,26 +1632,41 @@ function DesktopNav({ page, setPage, openTickets, isAdmin }: { page: Page; setPa
 }
 
 function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openComposer, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { posts: Post[]; accounts: Account[]; currentAccount: Account | null; feedTab: FeedTab; setFeedTab: (tab: FeedTab) => void; openComposer: () => void; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  const accountScrollerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    scrollContentToTop();
+  }, [feedTab]);
+
   return (
     <div>
-      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold text-slate-500">
+      <div className="sticky top-0 z-20 grid grid-cols-3 border-b border-slate-100 bg-white text-center text-[10px] font-bold text-slate-500">
         {[
           ['following', 'フォロー中'],
           ['recommended', 'おすすめ'],
           ['entrepreneurs', '起業家'],
-        ].map(([key, label]) => <button key={key} className={`py-2.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => setFeedTab(key as FeedTab)}>{label}</button>)}
+        ].map(([key, label]) => <button key={key} className={`py-0.5 ${feedTab === key ? 'border-b-2 border-blue-600 text-slate-950' : ''}`} onClick={() => { setFeedTab(key as FeedTab); scrollContentToTop(); }}>{label}</button>)}
       </div>
-      {feedTab !== 'following' && <div className="flex gap-3 overflow-x-auto border-b border-slate-100 px-3 py-2">
-        <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
-          <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
-          投稿する
-        </button>
-        {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span>{account.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI</span>}</button>)}
-      </div>}
+      {feedTab !== 'following' && (
+        <div className="relative border-b border-slate-100">
+          <button className="absolute left-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => accountScrollerRef.current?.scrollBy({ left: -240, behavior: 'smooth' })} aria-label="左へスクロール">
+            <ChevronLeft size={18} />
+          </button>
+          <button className="absolute right-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => accountScrollerRef.current?.scrollBy({ left: 240, behavior: 'smooth' })} aria-label="右へスクロール">
+            <ChevronLeft size={18} className="rotate-180" />
+          </button>
+          <div ref={accountScrollerRef} className="flex gap-2.5 overflow-x-auto scroll-smooth px-14 py-1.5 [scrollbar-width:thin]">
+            <button className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={openComposer}>
+              <span className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 text-blue-600"><Plus size={22} /></span>
+              投稿する
+            </button>
+            {accounts.map((account) => <button key={account.id} className="grid w-14 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => openProfile(account)}><Avatar account={account} active /><span className="w-full truncate">{displayAccountName(account)}</span></button>)}
+          </div>
+        </div>
+      )}
       {posts.length === 0 ? (
-        <EmptyState icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
+        <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-[#eff3f4]">
           {posts.map((post) => {
             const author = accounts.find((account) => account.id === post.authorId);
             return <PostCard key={post.id} post={post} author={author} currentAccount={currentAccount} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />;
@@ -1130,6 +1729,10 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const ownNotices = notices.filter((notice) => !notice.userId || notice.userId === currentAccount?.id);
   const visibleNotices = tab === 'unread' ? ownNotices.filter((notice) => notice.unread) : ownNotices;
+  useEffect(() => {
+    scrollContentToTop();
+  }, [tab]);
+
   function openNotice(notice: Notice) {
     const readNotice = { ...notice, unread: false };
     setNotices(notices.map((item) => item.id === notice.id ? readNotice : item));
@@ -1138,13 +1741,13 @@ function NotificationsPage({ notices, currentAccount, setNotices }: { notices: N
 
   return (
     <div>
-      <div className="grid grid-cols-2 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-2.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('all')}>すべて</button>
-        <button className={`py-2.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('unread')}>未読</button>
+      <div className="sticky top-0 z-20 grid grid-cols-2 border-b border-slate-100 bg-white text-center text-[11px] font-bold">
+        <button className={`py-0.5 ${tab === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('all'); scrollContentToTop(); }}>すべて</button>
+        <button className={`py-0.5 ${tab === 'unread' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => { setTab('unread'); scrollContentToTop(); }}>未読</button>
       </div>
       {visibleNotices.length === 0 ? (
-        <div className={tab === 'unread' ? 'px-3 py-0' : 'px-3 py-3'}>
-          <div className={`rounded-2xl bg-slate-50 px-4 py-4 ${tab === 'unread' ? 'rounded-t-none' : ''}`}>
+        <div className={tab === 'unread' ? 'px-0 py-0' : 'px-3 py-3'}>
+          <div className={`${tab === 'unread' ? 'rounded-none px-3 py-2' : 'rounded-2xl px-4 py-4'} bg-slate-50`}>
             <p className="text-sm font-black text-slate-700">{tab === 'unread' ? '未読通知はありません' : '通知はまだありません'}</p>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">フォロー、コメント、面談申込、メッセージが届くと表示されます。</p>
           </div>
@@ -1241,11 +1844,11 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
         <button className={`py-3 ${mode === 'meeting' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setMode('meeting')}>面談メッセージ</button>
       </div>
       <div className="relative border-b border-slate-100">
-        <button className="absolute left-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white shadow-sm lg:grid" onClick={() => partnerScrollerRef.current?.scrollBy({ left: -220, behavior: 'smooth' })} aria-label="左へスクロール"><ChevronLeft size={16} /></button>
-        <button className="absolute right-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white shadow-sm lg:grid" onClick={() => partnerScrollerRef.current?.scrollBy({ left: 220, behavior: 'smooth' })} aria-label="右へスクロール"><ChevronLeft size={16} className="rotate-180" /></button>
-        <div ref={partnerScrollerRef} className="min-w-0 overflow-x-auto px-4 py-3 [scrollbar-width:thin] lg:px-12">
+        <button className="absolute left-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => partnerScrollerRef.current?.scrollBy({ left: -240, behavior: 'smooth' })} aria-label="左へスクロール"><ChevronLeft size={18} /></button>
+        <button className="absolute right-2 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-[#050816] text-white shadow-lg ring-2 ring-white" onClick={() => partnerScrollerRef.current?.scrollBy({ left: 240, behavior: 'smooth' })} aria-label="右へスクロール"><ChevronLeft size={18} className="rotate-180" /></button>
+        <div ref={partnerScrollerRef} className="min-w-0 overflow-x-auto px-14 py-3 [scrollbar-width:thin]">
           <div className="flex w-max min-w-full gap-3">
-        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{displayAccountName(partner)}</span>{partner.isBot && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-indigo-700">AI運用</span>}</button>)}
+        {partners.length === 0 ? <span className="text-xs text-slate-500">{mode === 'meeting' ? '承認済みの面談相手はまだいません。' : 'メッセージ相手はまだいません。'}</span> : partners.map((partner) => <button key={partner.id} className="grid w-16 shrink-0 justify-items-center gap-1 text-[10px] font-bold" onClick={() => setSelectedAccountId(partner.id)}><span className="relative"><Avatar account={partner} active={activePartner?.id === partner.id} />{hasUnreadFromPartner(partner) && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-600" aria-label="未読あり" />}</span><span className="w-full truncate">{displayAccountName(partner)}</span></button>)}
           </div>
         </div>
       </div>
@@ -1254,8 +1857,8 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
       ) : (
         <div className="overflow-y-auto px-4 py-4">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{displayAccountName(activePartner)} {activePartner.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
-            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{activePartner.isBot ? '面談不可' : outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
+            <button className="flex min-w-0 items-center gap-3" onClick={() => openProfile(activePartner)}><Avatar account={activePartner} /><span className="min-w-0 text-left"><b className="block truncate text-sm">{displayAccountName(activePartner)}</b><span className="text-[11px] text-slate-500">プロフィールを見る</span></span></button>
+            {mode === 'direct' && <button className="rounded-xl bg-[#050816] px-3 py-2 text-[11px] font-black text-white disabled:bg-slate-300" disabled={incomingRequested || outgoingRequested || hasApproved} onClick={() => requestMeeting(activePartner)}>{outgoingRequested ? '申請中' : hasApproved ? '承認済み' : '面談希望'}</button>}
           </div>
           {mode === 'direct' && incomingRequested && !hasApproved && <div className="mb-3 grid grid-cols-2 gap-2"><button className="primary" onClick={() => approveMeeting(activePartner)}>承認</button><button className="secondary text-rose-600" onClick={() => rejectMeeting(activePartner)}>非承認</button></div>}
           {mode === 'direct' && outgoingRequested && !hasApproved && <p className="mb-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold text-blue-700">相手の承認待ちです。</p>}
@@ -1287,7 +1890,7 @@ function MessagesPage({ accounts, currentAccount, selectedAccount, messages, mee
             readFileAsDataUrl(file, (url) => setAttachment({ name: file.name, url, type: file.type.startsWith('image/') ? 'image' : 'file' }));
           }} />
         </label>
-        <input className="field" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activePartner} />
+        <textarea className="field max-h-32 min-h-12 resize-none" placeholder="メッセージを書く" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activePartner} />
         <button className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#050816] text-white disabled:opacity-30" disabled={!activePartner || (!draft.trim() && !attachment)} onClick={() => { sendMessage(activePartner, mode, attachment); setAttachment(undefined); }}><Send size={18} /></button>
         </div>
       </div>
@@ -1413,8 +2016,9 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
   );
 }
 
-function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startEditPost, hidePost, deletePost }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; setPage: (page: Page) => void; openComposer: () => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer, openBlogComposer, reactToPost, startEditPost, hidePost, deletePost, startEditBlog, hideBlog, deleteBlog }: { currentAccount: Account | null; accounts: Account[]; posts: Post[]; blogs: BlogArticle[]; setPage: (page: Page) => void; openComposer: () => void; openBlogComposer: () => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
   const [socialModal, setSocialModal] = useState<'following' | 'followers' | null>(null);
+  const postsRef = useRef<HTMLElement | null>(null);
   if (!currentAccount) {
     return <EmptyState icon={<ShieldCheck size={28} />} title="アカウント作成が必要です" body="メール認証後にプロフィールを作成するとマイページが表示されます。" action="アカウント作成へ" onAction={() => setPage('auth')} />;
   }
@@ -1422,19 +2026,92 @@ function MyPage({ currentAccount, accounts, posts, setPage, openComposer, startE
   const followingAccounts = normalized.followingIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean) as Account[];
   const followerAccounts = normalized.followerIds.map((id) => accounts.find((account) => account.id === id)).filter(Boolean) as Account[];
   const modalAccounts = socialModal === 'following' ? followingAccounts : followerAccounts;
+  const setupItems = [
+    { label: '会社名・肩書きを登録', done: Boolean(currentAccount.company && currentAccount.title), action: '編集する', onClick: () => setPage('profileEdit') },
+    { label: '会社の想いと事業内容を書く', done: Boolean(currentAccount.bio && currentAccount.mission), action: 'ストーリーを書く', onClick: () => setPage('profileEdit') },
+    { label: '実績・KPI・案件詳細を整理', done: Boolean(currentAccount.achievements && currentAccount.dealDetails), action: '数字を入力', onClick: () => setPage('profileEdit') },
+    { label: '最初の投稿で近況を共有', done: posts.length > 0, action: '投稿する', onClick: openComposer },
+    { label: 'ブログで会社紹介を公開', done: blogs.length > 0, action: 'ブログを書く', onClick: openBlogComposer },
+  ];
+  const completedSetup = setupItems.filter((item) => item.done).length;
+  const nextSetup = setupItems.find((item) => !item.done);
+  const completionRate = Math.round((completedSetup / setupItems.length) * 100);
   return (
-    <div className="p-4">
-      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} />
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('following')}><span className="block text-lg">{followingAccounts.length}</span>フォロー一覧を見る</button>
-        <button className="rounded-2xl border border-slate-100 bg-white p-3 text-left text-xs font-black" onClick={() => setSocialModal('followers')}><span className="block text-lg">{followerAccounts.length}</span>フォロワー一覧を見る</button>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <button className="secondary" onClick={() => setPage('profileEdit')}><Settings size={16} />プロフィールを編集</button>
-        <button className="primary" onClick={openComposer}><Plus size={17} />投稿する</button>
-      </div>
-      <div className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-        {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿するとここに保存され、公開範囲に合わせてフィードにも表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
+    <div className="bg-[#f5f8fb]">
+      <ProfileHero account={currentAccount} accounts={accounts} isMine posts={posts} setPage={setPage} hideCover onPostsClick={() => postsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} onFollowingClick={() => setSocialModal('following')} onFollowersClick={() => setSocialModal('followers')} onTicketsClick={() => setPage('tickets')} />
+      <div className="mx-auto grid max-w-6xl gap-4 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-6">
+        <main className="grid gap-4">
+          <div className="contents">
+            <div className="contents">
+              <div>
+                <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">COMPANY PAGE</p>
+                      <h2 className="mt-1 text-lg font-black tracking-tight">会社ページを育てる</h2>
+                      <p className="mt-1 max-w-xl text-xs font-bold leading-5 text-slate-500">Wantedlyの会社紹介のように、事業内容、想い、実績、ストーリーを積み上げるマイページです。</p>
+                    </div>
+                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{completionRate}%</div>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-blue-600" style={{ width: `${completionRate}%` }} />
+                  </div>
+                  {nextSetup ? (
+                    <button className="mt-3 flex w-full items-center justify-between rounded-2xl bg-[#101828] px-3 py-2.5 text-left text-xs font-black text-white" onClick={nextSetup.onClick}>
+                      <span>{nextSetup.label}</span>
+                      <span className="opacity-80">{nextSetup.action}</span>
+                    </button>
+                  ) : (
+                    <div className="mt-3 rounded-2xl bg-emerald-50 p-2.5 text-xs font-black text-emerald-700">基本準備は完了しています。ストーリーと投稿を継続して成長を見せましょう。</div>
+                  )}
+                </section>
+              </div>
+              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div>
+                <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">STORY</p>
+                      <h2 className="mt-1 text-base font-black">会社のストーリー</h2>
+                    </div>
+                    <button className="text-xs font-black text-blue-600" onClick={openBlogComposer}>ストーリーを書く</button>
+                  </div>
+                  {blogs.length === 0 ? (
+                    <EmptyState compact icon={<FileText size={24} />} title="ストーリーはまだありません" body="会社紹介、創業背景、顧客事例、チームの考え方を書けます。" action="書く" onAction={openBlogComposer} />
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">{blogs.slice(0, 4).map((blog) => <MiniBlogCard key={blog.id} blog={blog} />)}</div>
+                  )}
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <section ref={postsRef} className="rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-center justify-between border-b border-[#eff3f4] px-4 py-2.5">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">POSTS</p>
+                <h2 className="text-base font-black">最近の投稿</h2>
+              </div>
+              <button className="text-xs font-black text-blue-600" onClick={openComposer}>投稿する</button>
+            </div>
+            {posts.length === 0 ? <EmptyState compact icon={<FileText size={24} />} title="投稿はまだありません" body="投稿するとここに保存され、フィードにも表示されます。" action="投稿する" onAction={openComposer} /> : <div className="divide-y divide-[#eff3f4]">{posts.map((post) => <PostCard key={post.id} post={post} author={currentAccount} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}</div>}
+          </section>
+        </main>
+
+        <aside className="grid gap-4 lg:sticky lg:top-16 lg:self-start">
+          <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">ACTIONS</p>
+            <div className="mt-3 grid gap-2">
+              <button className="primary w-full" onClick={() => setPage('profileEdit')}><Settings size={15} />プロフィールを編集</button>
+              <button className="secondary w-full" onClick={openComposer}><Plus size={15} />投稿する</button>
+              <button className="secondary w-full" onClick={openBlogComposer}><FileText size={15} />ブログを書く</button>
+            </div>
+          </section>
+          <CompanyInfoPanel account={currentAccount} />
+          <CultureMap account={currentAccount} />
+        </aside>
       </div>
       {socialModal && (
         <Modal title={socialModal === 'following' ? 'フォロー中' : 'フォロワー'} onClose={() => setSocialModal(null)}>
@@ -1526,6 +2203,18 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
     setCurrentAccountId(next.id);
     setPage('mypage');
   }
+  const profileSteps = [
+    { label: '会社名・代表者・肩書き', done: Boolean(form.company && form.name && form.title) },
+    { label: '業界・地域・フェーズ', done: Boolean(form.industry && form.location && form.stage) },
+    { label: '会社紹介画像', done: Boolean(form.profileImageUrl || form.avatarUrl) },
+    { label: 'なにをやっているのか', done: Boolean(form.bio) },
+    { label: 'なぜやるのか', done: Boolean(form.mission) },
+    { label: 'どうやっているのか', done: Boolean(form.culture) },
+    { label: '実績・KPI・案件詳細', done: Boolean(form.achievements && form.dealDetails) },
+    { label: '本人確認', done: Boolean(form.corporateNumber || form.licenseFileName) },
+  ];
+  const profileStepCount = profileSteps.filter((step) => step.done).length;
+  const profileCompletion = Math.round((profileStepCount / profileSteps.length) * 100);
   if (form.role === 'entrepreneur') {
     return (
       <div className="bg-[#f7f9fb] pb-20">
@@ -1553,7 +2242,55 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
           </div>
         </section>
 
-        <div className="mx-auto grid max-w-3xl gap-4 p-4">
+        <div className="mx-auto grid max-w-6xl gap-4 p-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100 lg:sticky lg:top-14 lg:self-start">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.16em] text-blue-600">EDIT FLOW</p>
+                <h2 className="mt-1 text-base font-black">会社ページ編集</h2>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">左の項目を確認しながら、上から順に入力してください。</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{profileCompletion}%</div>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-blue-600" style={{ width: `${profileCompletion}%` }} />
+              </div>
+            </div>
+            <div className="mt-4 grid gap-1">
+              {profileSteps.map((step, index) => (
+                <div key={step.label} className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-[11px] font-bold">
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] ${step.done ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{step.done ? '✓' : index + 1}</span>
+                  <span className={step.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{step.label}</span>
+                </div>
+              ))}
+            </div>
+            <button className="primary mt-4 w-full" onClick={save}>保存する</button>
+          </aside>
+
+          <div className="grid gap-4">
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black tracking-[0.16em] text-blue-600">PROFILE SETUP</p>
+                <h2 className="mt-1 text-base font-black">会社ページ完成度</h2>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">会社紹介、事業内容、実績、本人確認まで整えます。</p>
+              </div>
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-black text-blue-600 ring-1 ring-blue-100">{profileCompletion}%</div>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${profileCompletion}%` }} />
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {profileSteps.map((step) => (
+                <div key={step.label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2 text-xs font-bold">
+                  <span className={step.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{step.label}</span>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${step.done ? 'bg-emerald-50 text-emerald-600' : 'bg-white text-blue-600 ring-1 ring-blue-100'}`}>{step.done ? '完了' : '未入力'}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">基本情報</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">投資家が最初に確認する会社情報です。</p>
@@ -1568,9 +2305,48 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
             <h2 className="text-base font-black">ストーリー</h2>
-            <p className="mt-1 text-xs font-bold text-slate-500">Wantedlyの会社紹介のように、想いと事業内容が伝わる文章にしてください。</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">あなたの会社の想いと事業内容が伝わる文章にしてください。</p>
+            <label className="mt-4 grid gap-2 text-[11px] font-bold text-slate-600">
+              会社紹介画像
+              {form.profileImageUrl && <img src={form.profileImageUrl} alt={form.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" />}
+              <span className="secondary relative min-h-11 overflow-hidden">
+                画像を選択
+                <input className="absolute inset-0 opacity-0" type="file" accept="image/*" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  update('profileImageName', file.name);
+                  readFileAsDataUrl(file, (url) => update('profileImageUrl', url));
+                }} />
+              </span>
+              {form.profileImageName && <span className="truncate text-xs text-slate-500">{form.profileImageName}</span>}
+            </label>
             <label className="mt-4 grid gap-1 text-[11px] font-bold text-slate-600">会社紹介・事業の背景<textarea className="field min-h-36 resize-none leading-7" placeholder={'例）私たちは、〇〇業界で起きている「〇〇」という課題を解決するために事業を始めました。\n\n現在は〇〇向けに〇〇を提供しており、利用者は〇〇をより簡単に、早く、安全に行えるようになります。\n\nこの事業で目指しているのは、〇〇な社会をつくることです。今後は〇〇を強化し、〇〇領域まで展開していきます。'} value={form.bio} onChange={(event) => update('bio', event.target.value)} /></label>
             <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">実績・トラクション<textarea className="field min-h-28 resize-none leading-7" placeholder={'例）現在の導入社数は〇社、月間売上は〇万円です。\n\n直近では〇〇を達成し、前月比〇％で成長しています。\n\n主な実績として、〇〇への導入、〇〇との提携、〇〇賞の受賞があります。投資家の方には、〇〇の支援を期待しています。'} value={form.achievements} onChange={(event) => update('achievements', event.target.value)} /></label>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black">会社ページ構成</h2>
+                <p className="mt-1 text-xs font-bold text-slate-500">採用・資本提携どちらにも伝わるように、想い、文化、チームを整理します。</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">ミッション・実現したい未来<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）私たちは、〇〇を通じて、誰もが〇〇できる社会をつくります。\n\nこの市場で変えたい常識、届けたい価値、10年後に実現したい世界を書いてください。'} value={form.mission || ''} onChange={(event) => update('mission', event.target.value)} /></label>
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">カルチャー・大切にしている価値観<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）顧客の現場から考える、早く試して学ぶ、数字と誠実さを大切にする、など。\n\n普段の意思決定やチームで大切にしている行動を書いてください。'} value={form.culture || ''} onChange={(event) => update('culture', event.target.value)} /></label>
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">チーム紹介<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）代表、開発、営業、CSなど、どんな経験を持つメンバーが集まっているか。\n\nチームの強み、役割分担、これから採用・協力したい人も書けます。'} value={form.teamIntro || ''} onChange={(event) => update('teamIntro', event.target.value)} /></label>
+            </div>
+          </section>
+
+          <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h2 className="text-base font-black">働き方タイプ診断</h2>
+            <p className="mt-1 text-xs font-bold text-slate-500">診断結果のように、代表者・チームの意思決定スタイルを投資家へ伝えます。</p>
+            <div className="mt-4 grid gap-4">
+              <RangeInput label="意思決定スピード" left="慎重に検証" right="すぐ試す" value={form.workStyleSpeed || '3'} onChange={(value) => update('workStyleSpeed', value)} />
+              <RangeInput label="チームの進め方" left="個人で深掘り" right="全員で議論" value={form.workStyleTeam || '3'} onChange={(value) => update('workStyleTeam', value)} />
+              <RangeInput label="リスクの取り方" left="堅実に積む" right="大胆に挑む" value={form.workStyleRisk || '3'} onChange={(value) => update('workStyleRisk', value)} />
+              <label className="grid gap-1 text-[11px] font-bold text-slate-600">自己理解メモ<textarea className="field min-h-24 resize-none leading-7" placeholder={'例）顧客課題が明確な領域では早く検証します。一方で、資金計画や採用では慎重に意思決定します。\n\n投資家や協業先が一緒に動く時に知っておくとよい特徴を書いてください。'} value={form.personalityProfile || ''} onChange={(event) => update('personalityProfile', event.target.value)} /></label>
+            </div>
           </section>
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -1583,6 +2359,20 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
               <Input label="成長率" value={form.growthRate} onChange={(value) => update('growthRate', value)} />
               <Input label="導入社数" value={form.customerCount} onChange={(value) => update('customerCount', value)} />
             </div>
+            <label className="mt-4 grid gap-1 text-[11px] font-bold text-slate-600">案件詳細<textarea className="field min-h-32 resize-none leading-7" placeholder={'例）現在の調達目的、投資家に見てほしいポイント、資金用途、今後12ヶ月の計画、面談で相談したいことを書いてください。'} value={form.dealDetails || ''} onChange={(event) => update('dealDetails', event.target.value)} /></label>
+            <label className="mt-3 grid gap-2 text-[11px] font-bold text-slate-600">
+              事業計画書・ピッチ資料
+              <span className="secondary relative min-h-11 overflow-hidden">
+                ファイルを選択
+                <input className="absolute inset-0 opacity-0" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  update('businessPlanName', file.name);
+                  readFileAsDataUrl(file, (url) => update('businessPlanUrl', url));
+                }} />
+              </span>
+              {form.businessPlanName && <span className="truncate rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">{form.businessPlanName}</span>}
+            </label>
           </section>
 
           <section className="rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -1611,7 +2401,8 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
             </div>
           </section>
 
-          <button className="primary sticky bottom-20 z-20 w-full shadow-xl lg:bottom-6" onClick={save}>プロフィールを保存する</button>
+          <button className="primary w-full shadow-sm" onClick={save}>プロフィールを保存する</button>
+          </div>
         </div>
       </div>
     );
@@ -1909,42 +2700,173 @@ function AdminStat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl border border-slate-100 p-4"><span className="text-[11px] font-black text-slate-500">{label}</span><b className="mt-2 block text-xl">{value}</b></div>;
 }
 
-function ProfilePage({ account, accounts, currentAccount, posts, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, startEditPost, hidePost, deletePost }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
-  const [tab, setTab] = useState<'overview' | 'achievements' | 'posts'>('overview');
+function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollowing, isMine, follow, message, requestMeeting, openDeal, dealMode, setPage, reactToPost, startEditPost, hidePost, deletePost, startEditBlog, hideBlog, deleteBlog }: { account: Account; accounts: Account[]; currentAccount: Account | null; posts: Post[]; blogs: BlogArticle[]; isFollowing: boolean; isMine: boolean; follow: () => void; message: () => void; requestMeeting: () => void; openDeal: () => void; dealMode: boolean; setPage: (page: Page) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
+  const [tab, setTab] = useState<'overview' | 'achievements' | 'posts' | 'blogs'>('overview');
   if (dealMode && account.role === 'entrepreneur') return <DealPage account={account} requestMeeting={requestMeeting} />;
   return (
     <div>
       <ProfileHero account={account} accounts={accounts} isMine={isMine} posts={posts} setPage={setPage} compact={tab !== 'overview'} />
-      <div className="grid grid-cols-3 border-b border-slate-100 text-center text-[11px] font-bold">
-        <button className={`py-3 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
-        <button className={`py-3 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
-        <button className={`py-3 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
+      <div className="grid grid-cols-4 border-b border-slate-100 text-center text-[11px] font-bold">
+        <button className={`py-2 ${tab === 'overview' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('overview')}>概要</button>
+        <button className={`py-2 ${tab === 'achievements' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('achievements')}>実績</button>
+        <button className={`py-2 ${tab === 'posts' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('posts')}>投稿</button>
+        <button className={`py-2 ${tab === 'blogs' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`} onClick={() => setTab('blogs')}>ブログ</button>
       </div>
       {tab === 'overview' && (
-        <div className="px-4 py-3">
-          <KpiGrid account={account} />
-          <TextBlock title="自己紹介" body={account.bio || '自己紹介は未入力です。'} />
-          {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
-          {!isMine && (
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <button className="secondary" onClick={follow}>{isFollowing ? '解除' : 'フォロー'}</button>
-              <button className="secondary" onClick={message}>メッセージ</button>
-              <button className="primary" onClick={requestMeeting}>面談</button>
+        <div className="bg-[#f5f8fb] px-4 py-5 lg:px-8">
+          <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid gap-5">
+              {account.profileImageUrl && (
+                <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-[28px] object-cover shadow-sm ring-1 ring-slate-100" />
+              )}
+              <CompanyStorySection eyebrow="WHAT WE DO" title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。プロフィール編集から、解決している課題、提供サービス、顧客に届けている価値を記載してください。'} />
+              {account.role === 'entrepreneur' && (
+                <>
+                  <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={account.mission || '創業の背景や、実現したい未来はまだ登録されていません。なぜこの事業を続けるのか、誰のどんな課題を変えたいのかを書いてください。'} />
+                  <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={account.culture || '事業の進め方、大切にしている価値観、顧客との向き合い方はまだ登録されていません。チームらしさが伝わる内容を書くと、投資家が判断しやすくなります。'} />
+                  <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                    <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">MEMBERS</p>
+                    <h3 className="mt-1 text-lg font-black">メンバー</h3>
+                    <div className="mt-4 flex gap-4">
+                      <Avatar account={account} size="lg" />
+                      <div className="min-w-0 flex-1">
+                        <b className="block truncate text-sm">{account.name || '代表者名未設定'}</b>
+                        <span className="text-xs font-bold text-slate-500">{account.title || '肩書き未設定'}</span>
+                        <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">{account.teamIntro || 'チーム紹介はまだ登録されていません。創業メンバーの経験、役割、これから仲間にしたい人を書いてください。'}</p>
+                      </div>
+                    </div>
+                  </section>
+                  <CultureMap account={account} />
+                </>
+              )}
+              <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">STORY</p>
+                    <h3 className="mt-1 text-lg font-black">ストーリー</h3>
+                  </div>
+                  {isMine && <button className="secondary min-h-9 px-3 text-[11px]" onClick={() => setPage('profileEdit')}>編集する</button>}
+                </div>
+                {blogs.length === 0 ? (
+                  <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-bold leading-7 text-slate-500">会社紹介、事業への想い、顧客事例などのブログを書くと、ここに表示されます。</p>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {blogs.slice(0, 2).map((blog) => <MiniBlogCard key={blog.id} blog={blog} />)}
+                  </div>
+                )}
+              </section>
             </div>
-          )}
+            <aside className="grid gap-4 lg:sticky lg:top-4 lg:self-start">
+              <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">HIGHLIGHT</p>
+                <h3 className="mt-1 text-lg font-black">会社のハイライト</h3>
+                <KpiGrid account={account} />
+                {account.role === 'entrepreneur' && <button className="secondary mt-4 w-full" onClick={openDeal}>案件詳細を見る</button>}
+              </section>
+              <CompanyInfoPanel account={account} />
+              {!isMine && (
+                <section className="rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="grid gap-2">
+                    <button className="primary w-full" onClick={requestMeeting}>面談を申し込む</button>
+                    <button className="secondary w-full" onClick={message}>メッセージ</button>
+                    <button className="secondary w-full" onClick={follow}>{isFollowing ? 'フォロー解除' : 'フォローする'}</button>
+                  </div>
+                </section>
+              )}
+            </aside>
+          </div>
         </div>
       )}
       {tab === 'achievements' && (
-        <div className="p-4">
+        <div className="px-3 py-2">
           <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} />
         </div>
       )}
       {tab === 'posts' && (
+        <div className="divide-y divide-[#e5e7eb]">
+          {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
+        </div>
+      )}
+      {tab === 'blogs' && (
         <div className="divide-y divide-slate-100">
-          {posts.length === 0 ? <EmptyState icon={<FileText size={28} />} title="投稿はまだありません" body="投稿されるとここに表示されます。" /> : posts.map((post) => <PostCard key={post.id} post={post} author={account} currentAccount={currentAccount} openProfile={() => undefined} reactToPost={() => undefined} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />)}
+          {blogs.length === 0 ? <EmptyState icon={<FileText size={28} />} title="ブログはまだありません" body="公開されたブログがここに表示されます。" /> : blogs.map((blog) => <BlogCard key={blog.id} blog={blog} author={account} currentAccount={currentAccount} startEditBlog={startEditBlog} hideBlog={hideBlog} deleteBlog={deleteBlog} />)}
         </div>
       )}
     </div>
+  );
+}
+
+function CompanyStorySection({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+  return (
+    <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">{eyebrow}</p>
+      <h3 className="mt-1 text-xl font-black tracking-tight">{title}</h3>
+      <p className="mt-4 whitespace-pre-line text-[15px] font-bold leading-8 text-slate-700">{body}</p>
+    </section>
+  );
+}
+
+function CultureMap({ account }: { account: Account }) {
+  const rows = [
+    ['スピード', '慎重に検証', 'すぐ試す', Number(account.workStyleSpeed || 3)],
+    ['チーム', '個人で深掘り', '全員で議論', Number(account.workStyleTeam || 3)],
+    ['リスク', '堅実に積む', '大胆に挑む', Number(account.workStyleRisk || 3)],
+  ] as const;
+  return (
+    <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">CULTURE MAP</p>
+      <h3 className="mt-1 text-lg font-black">組織の特徴</h3>
+      <div className="mt-4 grid gap-4">
+        {rows.map(([label, left, right, value]) => (
+          <div key={label}>
+            <div className="mb-2 flex items-center justify-between text-[11px] font-black text-slate-500"><span>{left}</span><b className="text-slate-900">{label}</b><span>{right}</span></div>
+            <div className="h-2 rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, Math.max(20, value * 20))}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 whitespace-pre-line text-sm font-bold leading-7 text-slate-600">{account.personalityProfile || '意思決定やチームの特徴はまだ登録されていません。プロフィール編集で、投資家が一緒に動く時に知っておくとよい特徴を書けます。'}</p>
+    </section>
+  );
+}
+
+function CompanyInfoPanel({ account }: { account: Account }) {
+  const rows = [
+    ['会社名', account.company || '未入力'],
+    ['代表者', account.name || '未入力'],
+    ['業界', account.industry || '未入力'],
+    ['地域', account.location || '未入力'],
+    ['設立', account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '未入力'],
+    ['従業員数', account.employeeSize || '未入力'],
+    ['年商規模', account.revenueScale || '未入力'],
+    ['フェーズ', account.stage || '未入力'],
+  ];
+  return (
+    <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">COMPANY INFO</p>
+      <h3 className="mt-1 text-lg font-black">基本情報</h3>
+      <div className="mt-4 divide-y divide-slate-100 text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[82px_1fr] gap-3 py-3">
+            <b className="text-slate-500">{label}</b>
+            <span className="font-bold text-slate-800">{value}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MiniBlogCard({ blog }: { blog: BlogArticle }) {
+  return (
+    <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+      {blog.imageUrl ? <img src={blog.imageUrl} alt={blog.imageName || blog.title} className="aspect-[16/9] w-full object-cover" /> : <div className="aspect-[16/9] bg-gradient-to-br from-blue-50 to-emerald-50" />}
+      <div className="p-3">
+        <b className="line-clamp-2 text-sm">{blog.title || 'タイトル未設定'}</b>
+        <p className="mt-2 line-clamp-2 text-xs font-bold leading-5 text-slate-500">{blog.body}</p>
+      </div>
+    </article>
   );
 }
 
@@ -1953,14 +2875,15 @@ function DealPage({ account, requestMeeting }: { account: Account; requestMeetin
     <div className="p-4">
       <h2 className="text-lg font-black">{account.company || account.accountName || '案件詳細'}</h2>
       <div className="mt-2 flex flex-wrap gap-2">{[account.industry, account.stage, account.location].filter(Boolean).map((tag) => <span className="pill" key={tag}>{tag}</span>)}</div>
-      <DashboardCard />
+      {account.profileImageUrl ? <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" /> : <DashboardCard />}
       <h3 className="mt-5 text-sm font-black">ハイライト</h3>
       <KpiGrid account={account} />
+      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} />
       <h3 className="mt-5 text-sm font-black">関連情報</h3>
       <InfoRows rows={[['調達希望額', account.fundingGoal || '未入力'], ['月次売上', account.monthlyRevenue || '未入力'], ['成長率', account.growthRate || '未入力'], ['導入社数', account.customerCount || '未入力'], ['地域', account.location || '未入力'], ['フェーズ', account.stage || '未入力']]} />
       <div className="mt-4 rounded-2xl border border-slate-100 p-4">
-        <p className="text-sm font-black">ピッチ資料</p>
-        <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>
+        <p className="text-sm font-black">事業計画書・ピッチ資料</p>
+        {account.businessPlanUrl ? <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={account.businessPlanUrl} download={account.businessPlanName || 'business-plan'}><Paperclip size={15} />{account.businessPlanName || '資料をダウンロード'}</a> : <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>}
       </div>
       <button className="primary mt-4 w-full" onClick={requestMeeting}>面談を申し込む</button>
     </div>
@@ -1980,6 +2903,37 @@ function MatchingPage({ accounts, openProfile, requestMeeting }: { accounts: Acc
   );
 }
 
+function BlogCard({ blog, author, currentAccount, startEditBlog, hideBlog, deleteBlog }: { blog: BlogArticle; author?: Account | null; currentAccount: Account | null; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isOwner = Boolean(currentAccount && currentAccount.id === blog.authorId);
+  return (
+    <article className="bg-white p-4">
+      <div className="flex items-start gap-3">
+        {author && <Avatar account={author} />}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black">{blog.title}</p>
+              <p className="mt-0.5 text-[12px] font-bold text-slate-500">{author ? displayAccountName(author) : '名前未設定'}・{blog.isHidden ? '非表示・' : ''}{visibilityLabels[blog.visibility]}・{formatDate(blog.createdAt)}</p>
+            </div>
+            {isOwner && (
+              <div className="relative">
+                <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} /></button>
+                {menuOpen && <div className="absolute right-0 top-9 z-20 w-36 overflow-hidden rounded-2xl bg-white text-xs font-black shadow-xl ring-1 ring-slate-100"><button className="block w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => startEditBlog(blog)}>編集</button><button className="block w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => hideBlog(blog.id)}>{blog.isHidden ? '再公開' : '非表示'}</button><button className="block w-full px-4 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={() => deleteBlog(blog.id)}>削除</button></div>}
+              </div>
+            )}
+          </div>
+          {blog.imageUrl && <img className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" src={blog.imageUrl} alt={blog.imageName || blog.title} />}
+          <p className="mt-3 whitespace-pre-line text-[14px] leading-7 text-slate-700">{blog.body}</p>
+          {blog.tags.length > 0 && <p className="mt-3 text-[13px] font-black text-blue-600">{blog.tags.map((tag) => `#${tag}`).join(' ')}</p>}
+          {blog.attachmentUrl && <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={blog.attachmentUrl} download={blog.attachmentName || 'blog-attachment'}><Paperclip size={15} />{blog.attachmentName || '添付ファイル'}</a>}
+          <p className="mt-3 text-[11px] font-bold text-slate-400">閲覧 {blog.views}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function PostCard({ post, author, currentAccount, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { post: Post; author?: Account; currentAccount: Account | null; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(false);
@@ -1988,17 +2942,40 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   const liked = currentAccount ? actions.likes?.includes(currentAccount.id) : false;
   const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
+  const authorName = author ? displayAccountName(author) : 'アカウント未設定';
+  const visibilityText = post.visibility === 'public' ? '' : visibilityLabels[post.visibility];
+  const secondaryLabel = [post.isHidden ? '非表示' : '', visibilityText].filter(Boolean).join('・');
+  const canShowViews = isOwner || post.views > 1000;
   return (
-    <article className={`relative px-4 py-4 ${post.isHidden ? 'bg-slate-50' : ''}`}>
-      <div className="flex w-full gap-3 text-left">
-        <button className="flex min-w-0 flex-1 gap-3 text-left" onClick={() => author && openProfile(author)}>
-        {author ? <Avatar account={author} /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-100"><UserRound size={18} /></span>}
-        <span className="min-w-0 flex-1">
-          <b className="block truncate text-sm">{displayAccountName(author)} {author?.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b>
-          <span className="text-[11px] text-slate-500">{post.isHidden ? '非表示・' : ''}{visibilityLabels[post.visibility]}・{formatDate(post.createdAt)}</span>
-        </span>
+    <article className={`relative px-3.5 py-2 ${post.isHidden ? 'bg-slate-50' : ''}`}>
+      <div className="flex w-full items-start gap-2 text-left">
+        <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
+          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]"><Building2 size={18} strokeWidth={1.8} /></span>}
         </button>
-        <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} className="text-slate-400" /></button>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1.5">
+            <button className="min-w-0 flex-1 text-left" onClick={() => author && openProfile(author)}>
+              <span className="flex min-w-0 items-center gap-1 leading-[1.25]">
+                <b className="truncate text-[13px] font-black text-[#0f1419]">{authorName}</b>
+                <span className="shrink-0 text-[11px] font-semibold text-[#536471]">・{formatRelativeTime(post.createdAt)}</span>
+              </span>
+              <span className="block text-[10px] font-semibold leading-[1.25] text-[#536471]">{secondaryLabel}</span>
+            </button>
+            <button className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} className="text-[#536471]" /></button>
+          </div>
+
+          <p className="mt-0.5 text-[13px] leading-[1.24] text-[#0f1419]">{renderPostBody(post.body)}</p>
+          {post.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[12px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+          {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
+          {post.attachmentName && <div className="mt-1.5 flex items-center gap-1.5 rounded-2xl bg-slate-50 p-2 text-[11px]"><Paperclip size={13} />{post.attachmentName}</div>}
+          <div className="mt-1.5 flex items-center gap-5 text-[11px] font-semibold text-[#536471]">
+            <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'like')} aria-label="応援" aria-pressed={liked}><Heart size={16} fill={liked ? 'currentColor' : 'none'} />{post.likes}</button>
+            <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'save')} aria-label="保存" aria-pressed={saved}><Bookmark size={16} fill={saved ? 'currentColor' : 'none'} />{post.saves}</button>
+            <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'meeting')} aria-label="面談" aria-pressed={meetingRequested}><UsersRound size={16} />{post.meetings}</button>
+            {canShowViews && <span className="ml-auto text-[10px]">閲覧 {post.views}</span>}
+          </div>
+        </div>
       </div>
       {menuOpen && isOwner && (
         <div className="absolute right-4 top-12 z-20 w-40 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
@@ -2008,16 +2985,6 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
         </div>
       )}
       {menuOpen && !isOwner && <div className="absolute right-4 top-12 z-20 rounded-2xl border border-slate-100 bg-white p-3 text-xs font-bold text-slate-500 shadow-xl">投稿者のみ操作できます</div>}
-      <p className="mt-3 whitespace-pre-line text-sm leading-7">{post.body}</p>
-      {post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[11px] font-bold text-blue-600" key={tag}>#{tag}</span>)}</div>}
-      {post.imageUrl && <button className="mt-3 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
-      {post.attachmentName && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs"><Paperclip size={15} />{post.attachmentName}</div>}
-      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black">
-        <button className={`rounded-xl border py-2 ${liked ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-100 text-rose-600'}`} onClick={() => reactToPost(post.id, 'like')}><Heart className="mx-auto mb-1" size={16} />応援 {post.likes}</button>
-        <button className={`rounded-xl border py-2 ${saved ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-emerald-600'}`} onClick={() => reactToPost(post.id, 'save')}><Bookmark className="mx-auto mb-1" size={16} />保存 {post.saves}</button>
-        <button className={`rounded-xl border py-2 ${meetingRequested ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-100 text-blue-600'}`} onClick={() => reactToPost(post.id, 'meeting')}><UsersRound className="mx-auto mb-1" size={16} />面談 {post.meetings}</button>
-      </div>
-      <p className="mt-2 text-right text-[10px] text-slate-400">閲覧 {post.views} 回</p>
       {previewImage && (
         <Modal title={post.imageName || '投稿画像'} onClose={() => setPreviewImage(false)}>
           <img className="max-h-[70vh] w-full rounded-2xl object-contain" src={post.imageUrl} alt={post.imageName || '投稿画像'} />
@@ -2027,29 +2994,36 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
   );
 }
 
+function renderPostBody(body: string) {
+  return body.split('\n').map((line, index) => (
+    line.trim()
+      ? <span key={`${index}-${line}`} className="block whitespace-pre-wrap">{line}</span>
+      : <span key={`blank-${index}`} className="block h-[0.55em]" aria-hidden />
+  ));
+}
+
 function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (page: Page) => void; openComposer: () => void }) {
   const tabs = [
     ['feed', 'フィード', Home],
     ['search', '検索', Search],
-    ['notifications', '通知', Bell],
     ['messages', 'メッセージ', Mail],
     ['mypage', 'マイページ', UserRound],
   ] as const;
   return (
-    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-6 border-t border-slate-100 bg-white px-2 py-2 shadow-[0_-10px_28px_rgba(15,23,42,0.08)] lg:hidden">
-      {tabs.slice(0, 3).map(([key, label, Icon]) => (
-        <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
-          <Icon size={18} />
+    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 border-t border-slate-100 bg-white px-1 py-0.5 shadow-[0_-8px_20px_rgba(15,23,42,0.06)] lg:hidden">
+      {tabs.slice(0, 2).map(([key, label, Icon]) => (
+        <button key={key} className={`grid justify-items-center gap-0.5 rounded-xl px-1 py-1 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
+          <Icon size={17} />
           <span>{label}</span>
         </button>
       ))}
-      <button className="grid justify-items-center gap-1 rounded-2xl bg-[#050816] px-1 py-2 text-[9px] font-bold text-white" onClick={openComposer} aria-label="投稿する">
-        <Plus size={18} />
+      <button className="grid justify-items-center gap-0.5 rounded-xl bg-[#050816] px-1 py-1 text-[9px] font-bold text-white" onClick={openComposer} aria-label="投稿する">
+        <Plus size={17} />
         <span>投稿</span>
       </button>
-      {tabs.slice(3).map(([key, label, Icon]) => (
-          <button key={key} className={`grid justify-items-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
-            <Icon size={18} />
+      {tabs.slice(2).map(([key, label, Icon]) => (
+          <button key={key} className={`grid justify-items-center gap-0.5 rounded-xl px-1 py-1 text-[9px] font-bold ${page === key ? 'text-blue-600' : 'text-slate-500'}`} onClick={() => setPage(key as Page)}>
+            <Icon size={17} />
             <span>{label}</span>
           </button>
       ))}
@@ -2057,37 +3031,56 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
   );
 }
 
-function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean }) {
+function ProfileHero({ account, accounts, isMine, posts, setPage, compact = false, hideCover = false, onPostsClick, onFollowingClick, onFollowersClick, onTicketsClick }: { account: Account; accounts: Account[]; isMine: boolean; posts: Post[]; setPage: (page: Page) => void; compact?: boolean; hideCover?: boolean; onPostsClick?: () => void; onFollowingClick?: () => void; onFollowersClick?: () => void; onTicketsClick?: () => void }) {
   const normalized = normalizeAccount(account);
   const followings = normalized.followingIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const followers = normalized.followerIds.map((id) => accounts.find((item) => item.id === id)).filter(Boolean) as Account[];
   const visibleFollowings = isMine ? followings : followings.filter((item) => item.role !== 'investor');
   const visibleFollowers = isMine ? followers : followers.filter((item) => item.role !== 'investor');
-  const canShowSocialGraph = isMine || !normalized.hideSocialGraph;
+  const profileLead = account.title || account.bio || '会社の想いと事業内容はまだ登録されていません。';
   return (
-    <section className={compact ? 'border-b border-slate-100 px-4 py-3' : 'rounded-3xl border border-slate-100 p-4'}>
-      <div className="flex items-start gap-4">
-        <Avatar account={account} size="lg" />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xl font-black">{account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={16} />} {account.isBot && <span className="align-middle rounded-full bg-indigo-50 px-2 py-1 text-[10px] text-indigo-700">AI運用</span>}</h2>
-          <p className="mt-1 text-xs text-slate-500">@{account.accountName || 'account'} / {account.company || '会社名未設定'}</p>
-          <p className="mt-1 text-xs text-slate-500">{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}　{account.stage || 'フェーズ未設定'}</p>
-          {account.verified && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700"><CheckCircle2 size={13} />本人確認済み</span>}
-          {isMine && account.identityStatus === 'resubmit' && <span className="mt-2 inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-700">本人確認資料の再提出が必要です</span>}
+    <section className={compact ? 'border-b border-slate-100 bg-white px-3 py-2' : 'overflow-hidden border-b border-slate-100 bg-white'}>
+      {compact ? (
+        <div className="flex items-center gap-2">
+          <Avatar account={account} size="md" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-black">{account.company || account.name || account.accountName || '名前未設定'} {account.verified && <CheckCircle2 className="inline text-blue-600" size={13} />}</h2>
+            <p className="truncate text-[11px] font-bold text-slate-500">@{account.accountName || 'account'} / {account.title || account.stage || 'プロフィール未設定'}</p>
+          </div>
         </div>
-      </div>
-      {!compact && (
+      ) : (
         <>
-          <p className="mt-4 whitespace-pre-line text-sm leading-7">{account.bio || '自己紹介は未入力です。'}</p>
-          {account.isBot && <p className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-bold leading-6 text-indigo-700">このアカウントはAI運用アカウントです。実在人物として表示するものではなく、Leapの投稿・検索・メッセージ体験を確認するための安全な参考アカウントです。面談は受け付けていません。</p>}
-          <div className="mt-3 flex flex-wrap gap-2">{[account.industry, account.employeeSize, account.revenueScale, account.isBot ? account.age : '', account.isBot ? account.gender : ''].filter(Boolean).map((item) => <span className="pill" key={item}>{item}</span>)}</div>
-          <div className="mt-4 flex gap-5 text-xs"><span><b>{posts.length}</b> 投稿</span><span><b>{visibleFollowings.length}</b> フォロー</span><span><b>{visibleFollowers.length}</b> フォロワー</span>{isMine && account.role === 'entrepreneur' && <span><b>{account.ticketBalance}</b> チケット</span>}</div>
-          {canShowSocialGraph ? (
-            <div className="mt-3 grid gap-3 text-xs text-slate-600">
-              <SocialList title="フォロー" accounts={visibleFollowings} />
-              <SocialList title="フォロワー" accounts={visibleFollowers} />
+          <div className="px-4 pb-3 pt-4">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 rounded-3xl bg-white p-1 ring-1 ring-slate-100">
+                <Avatar account={account} size="lg" />
+              </div>
+              <div className="min-w-0 flex-1 pt-1">
+                <div className="flex items-center gap-1">
+                  <h2 className="truncate text-lg font-black tracking-tight text-slate-950">{account.company || account.name || account.accountName || 'プロフィール未設定'}</h2>
+                  {account.verified && <CheckCircle2 className="shrink-0 text-blue-600" size={14} />}
+                </div>
+                <p className="mt-0.5 truncate text-xs font-bold text-slate-600">{account.name || '名前未設定'} / {account.title || '肩書き未設定'}</p>
+                <p className="mt-0.5 truncate text-[11px] font-bold text-slate-500">@{account.accountName || 'account'}　{account.location || '地域未設定'}　{account.foundedYear && account.foundedMonth ? `${account.foundedYear}年${account.foundedMonth}` : '設立年月未設定'}</p>
+              </div>
+              {isMine && (
+                <button className="secondary mt-1 min-h-8 shrink-0 px-3 text-[11px]" onClick={() => setPage('profileEdit')}>編集</button>
+              )}
             </div>
-          ) : <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">このユーザーはフォロー・フォロワーリストを非公開にしています。</p>}
+            <div className="mt-3">
+              <p className="whitespace-pre-line text-[13px] font-bold leading-5 text-slate-800">{profileLead}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[account.industry, account.stage, account.employeeSize, account.revenueScale].filter(Boolean).map((item) => <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600" key={item}>{item}</span>)}
+              </div>
+              <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/60 text-center text-[10px] font-bold text-slate-500">
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onPostsClick} disabled={!onPostsClick}><b className="block text-[13px] leading-4 text-slate-950">{posts.length}</b>投稿</button>
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onFollowingClick} disabled={!onFollowingClick}><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowings.length}</b>フォロー</button>
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onFollowersClick} disabled={!onFollowersClick}><b className="block text-[13px] leading-4 text-slate-950">{visibleFollowers.length}</b>フォロワー</button>
+                <button className="px-1 py-1.5 hover:bg-white/70" onClick={onTicketsClick} disabled={!onTicketsClick}><b className="block text-[13px] leading-4 text-slate-950">{account.role === 'entrepreneur' ? account.ticketBalance : '-'}</b>{account.role === 'entrepreneur' && isMine ? 'チケット' : '確認'}</button>
+              </div>
+              {isMine && account.identityStatus === 'resubmit' && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">本人確認資料の再提出が必要です</p>}
+            </div>
+          </div>
         </>
       )}
     </section>
@@ -2124,7 +3117,21 @@ function KpiGrid({ account }: { account: Account }) {
   return <div className="mt-3 grid grid-cols-3 gap-2">{items.map(([label, value]) => <div className="rounded-2xl border border-slate-100 p-3" key={label}><span className="text-[10px] font-bold text-slate-500">{label}</span><b className="mt-2 block break-words text-xs">{value || '未入力'}</b></div>)}</div>;
 }
 
-function EmptyState({ icon, title, body, action, onAction }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void }) {
+function EmptyState({ icon, title, body, action, onAction, compact }: { icon: ReactNode; title: string; body: string; action?: string; onAction?: () => void; compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="px-0 py-0 text-left">
+        <div className="flex items-center gap-2.5 rounded-none bg-slate-50 px-3 py-2">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">{icon}</div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[13px] font-black">{title}</h2>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{body}</p>
+          </div>
+          {action && <button className="primary min-h-8 shrink-0 px-3 py-1.5 text-[10px]" onClick={onAction}>{action}</button>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="grid min-h-52 place-items-center p-5 text-center">
       <div>
@@ -2141,27 +3148,34 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
   return (
     <button className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 p-3 text-left" onClick={onClick}>
       <Avatar account={account} />
-      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{displayAccountName(account)} {account.isBot && <span className="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">AI運用</span>}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
+      <span className="min-w-0 flex-1"><b className="block truncate text-sm">{displayAccountName(account)}</b><span className="text-xs text-slate-500">{account.role === 'entrepreneur' ? '起業家' : '投資家'} / {account.industry || '業界未入力'}</span></span>
       <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-500">{account.location || '地域未入力'}</span>
     </button>
   );
 }
 
-function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'lg'; active?: boolean }) {
-  const dimension = size === 'lg' ? 'h-20 w-20 text-xl' : 'h-11 w-11 text-sm';
-  const label = account.avatarLabel || displayAccountName(account).slice(0, 1) || 'L';
-  return <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-emerald-100 font-black ring-1 ring-slate-200`}>{account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : label}{active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}</span>;
+function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'feed' | 'lg'; active?: boolean }) {
+  const dimension = size === 'lg' ? 'h-20 w-20' : size === 'feed' ? 'h-10 w-10' : 'h-11 w-11';
+  const iconSize = size === 'lg' ? 30 : size === 'feed' ? 18 : 17;
+  return (
+    <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]`}>
+      {account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : <Building2 size={iconSize} strokeWidth={1.8} />}
+      {active && <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-400" />}
+    </span>
+  );
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/40 p-3">
-      <div className="w-full max-w-[430px] rounded-[26px] bg-white p-5 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto overscroll-contain bg-black/40 p-3">
+      <div className="my-3 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[430px] flex-col rounded-[26px] bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between p-5 pb-3">
           <h2 className="text-base font-black">{title}</h2>
           <button className="grid h-9 w-9 place-items-center rounded-full bg-slate-100" onClick={onClose}><X size={18} /></button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -2173,6 +3187,16 @@ function Segmented({ value, onChange }: { value: Role; onChange: (value: Role) =
 
 function Input({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
   return <label className="grid gap-1 text-[11px] font-bold text-slate-600">{label}<input className="field" type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function RangeInput({ label, left, right, value, onChange }: { label: string; left: string; right: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-2 text-[11px] font-bold text-slate-600">
+      <span className="flex items-center justify-between gap-3"><b>{label}</b><span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] text-blue-700">Lv.{value || '3'}</span></span>
+      <input className="w-full accent-blue-600" type="range" min="1" max="5" value={value || '3'} onChange={(event) => onChange(event.target.value)} />
+      <span className="flex justify-between text-[10px] text-slate-400"><span>{left}</span><span>{right}</span></span>
+    </label>
+  );
 }
 
 function Select({ label, value, options, onChange, displayMap }: { label: string; value: string; options: string[]; onChange: (value: string) => void; displayMap?: Record<string, string> }) {
@@ -2201,6 +3225,27 @@ function canSeePost(post: Post, viewer: Account | null, following: string[]) {
   return false;
 }
 
+function canSeeBlog(blog: BlogArticle, viewer: Account | null, following: string[]) {
+  if (blog.visibility === 'public') return true;
+  if (!viewer) return false;
+  if (blog.authorId === viewer.id) return true;
+  if (blog.visibility === 'followers') return following.includes(blog.authorId);
+  if (blog.visibility === 'investors') return viewer.role === 'investor';
+  if (blog.visibility === 'entrepreneurs') return viewer.role === 'entrepreneur';
+  return false;
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatRelativeTime(value: string) {
+  const created = new Date(value).getTime();
+  const diffMs = Date.now() - created;
+  if (!Number.isFinite(created)) return '';
+  if (diffMs < 30 * 1000) return 'たった今';
+  if (diffMs < 60 * 60 * 1000) return `${Math.max(1, Math.floor(diffMs / (60 * 1000)))}分前`;
+  if (diffMs < 24 * 60 * 60 * 1000) return `${Math.floor(diffMs / (60 * 60 * 1000))}時間前`;
+  if (diffMs < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diffMs / (24 * 60 * 60 * 1000))}日前`;
+  return new Date(value).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
 }

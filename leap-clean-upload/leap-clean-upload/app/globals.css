@@ -12,7 +12,7 @@ html {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-  background: #eef5ff;
+  background: #ffffff;
   touch-action: manipulation;
 }
 
@@ -22,10 +22,11 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
-  background: #eef5ff;
+  background: #ffffff;
   color: #101828;
   font-family: Inter, "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 13px;
+  font-size: 11px;
+  line-height: 1.28;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
@@ -36,6 +37,23 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+p,
+span,
+b,
+button,
+input,
+textarea,
+select {
+  line-height: 1.28;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.18;
 }
 
 button {
@@ -74,7 +92,9 @@ form {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #ffffff;
-  padding: 12px 13px;
+  padding: 9px 10px;
+  font-size: 11px;
+  line-height: 1.28;
   color: #101828;
   outline: none;
 }
@@ -87,13 +107,13 @@ form {
 .primary,
 .secondary {
   display: inline-flex;
-  min-height: 44px;
+  min-height: 34px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   border-radius: 12px;
-  padding: 0 14px;
-  font-size: 12px;
+  padding: 0 11px;
+  font-size: 10px;
   font-weight: 900;
 }
 
@@ -113,8 +133,109 @@ form {
   align-items: center;
   border-radius: 999px;
   background: #f1f5f9;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 4px 8px;
+  font-size: 10px;
   font-weight: 800;
   color: #475569;
+}
+
+.text-xs {
+  font-size: 10px !important;
+}
+
+.text-sm {
+  font-size: 11px !important;
+}
+
+.text-base {
+  font-size: 12px !important;
+}
+
+.text-lg {
+  font-size: 14px !important;
+}
+
+.text-xl {
+  font-size: 16px !important;
+}
+
+.text-2xl {
+  font-size: 19px !important;
+}
+
+.leap-dark {
+  color-scheme: dark;
+  background: #0b0f19 !important;
+  color: #e5e7eb !important;
+}
+
+.leap-dark [class*="bg-white"],
+.leap-dark [class*="bg-[#f5f8fb]"] {
+  background-color: #0f172a !important;
+}
+
+.leap-dark [class*="bg-white/"],
+.leap-dark [class*="bg-slate-50"],
+.leap-dark [class*="bg-slate-100"],
+.leap-dark [class*="bg-[#f2f4f7]"] {
+  background-color: #111827 !important;
+}
+
+.leap-dark [class*="bg-blue-50"],
+.leap-dark [class*="bg-emerald-50"],
+.leap-dark [class*="bg-amber-50"],
+.leap-dark [class*="bg-rose-50"] {
+  background-color: #172033 !important;
+}
+
+.leap-dark [class*="text-[#101828]"],
+.leap-dark [class*="text-[#0f1419]"],
+.leap-dark [class*="text-slate-950"],
+.leap-dark [class*="text-slate-900"],
+.leap-dark [class*="text-slate-800"],
+.leap-dark [class*="text-slate-700"],
+.leap-dark .field,
+.leap-dark .secondary {
+  color: #e5e7eb !important;
+}
+
+.leap-dark [class*="text-[#536471]"],
+.leap-dark [class*="text-slate-600"],
+.leap-dark [class*="text-slate-500"],
+.leap-dark [class*="text-slate-400"] {
+  color: #9ca3af !important;
+}
+
+.leap-dark [class*="border-slate-100"],
+.leap-dark [class*="border-slate-200"],
+.leap-dark [class*="border-[#eff3f4]"],
+.leap-dark [class*="ring-slate-100"],
+.leap-dark [class*="ring-[#eff3f4]"],
+.leap-dark [class*="divide-[#eff3f4]"],
+.leap-dark [class*="divide-slate-100"] {
+  border-color: #263244 !important;
+  --tw-ring-color: #263244 !important;
+}
+
+.leap-dark .field,
+.leap-dark .secondary,
+.leap-dark select,
+.leap-dark textarea,
+.leap-dark input {
+  border-color: #334155 !important;
+  background: #111827 !important;
+}
+
+.leap-dark .pill {
+  background: #172033 !important;
+  color: #cbd5e1 !important;
+}
+
+.leap-dark button:hover {
+  background-color: rgba(148, 163, 184, 0.1);
+}
+
+.leap-dark .primary {
+  background: #2563eb !important;
+  color: #ffffff !important;
 }
