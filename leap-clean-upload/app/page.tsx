@@ -364,79 +364,69 @@ function companyLogoLabel(company: string) {
 
 function companyLogoDataUri(company: string, seed = 0) {
   const palettes = [
-    { ink: '#08111f', primary: '#155eef', secondary: '#7dd3fc', tertiary: '#dbeafe', bg1: '#f8fbff', bg2: '#e8f1ff' },
-    { ink: '#052e2b', primary: '#0f766e', secondary: '#2dd4bf', tertiary: '#ccfbf1', bg1: '#f8fffd', bg2: '#e7fff7' },
-    { ink: '#27104f', primary: '#7c3aed', secondary: '#c084fc', tertiary: '#ede9fe', bg1: '#fbfaff', bg2: '#f1edff' },
-    { ink: '#4a0826', primary: '#db2777', secondary: '#fb7185', tertiary: '#fce7f3', bg1: '#fff8fc', bg2: '#ffeaf4' },
-    { ink: '#3b1d04', primary: '#d97706', secondary: '#facc15', tertiary: '#fef3c7', bg1: '#fffdf5', bg2: '#fff2cf' },
-    { ink: '#06283a', primary: '#0891b2', secondary: '#22d3ee', tertiary: '#cffafe', bg1: '#f7fdff', bg2: '#e4fbff' },
-    { ink: '#13205d', primary: '#1d4ed8', secondary: '#a3e635', tertiary: '#ecfccb', bg1: '#f8fbff', bg2: '#edf7ff' },
-    { ink: '#0f3b22', primary: '#16a34a', secondary: '#86efac', tertiary: '#dcfce7', bg1: '#f9fffb', bg2: '#eafff1' },
-    { ink: '#111827', primary: '#475569', secondary: '#38bdf8', tertiary: '#e2e8f0', bg1: '#ffffff', bg2: '#f1f5f9' },
-    { ink: '#312e1f', primary: '#b45309', secondary: '#fde68a', tertiary: '#fef9c3', bg1: '#fffdf4', bg2: '#fff4d6' },
-    { ink: '#151515', primary: '#111827', secondary: '#f97316', tertiary: '#f3f4f6', bg1: '#ffffff', bg2: '#f7f7f7' },
-    { ink: '#2a1020', primary: '#be123c', secondary: '#fb923c', tertiary: '#ffe4e6', bg1: '#fff8f8', bg2: '#ffecec' },
-    { ink: '#0c1d16', primary: '#047857', secondary: '#fbbf24', tertiary: '#d1fae5', bg1: '#fbfff9', bg2: '#ebfff3' },
-    { ink: '#1f1a4d', primary: '#4f46e5', secondary: '#06b6d4', tertiary: '#e0e7ff', bg1: '#ffffff', bg2: '#eef2ff' },
+    { ink: '#111827', primary: '#111827', secondary: '#6b7280', paper: '#ffffff' },
+    { ink: '#0f172a', primary: '#1d4ed8', secondary: '#64748b', paper: '#ffffff' },
+    { ink: '#10231d', primary: '#047857', secondary: '#7c8a83', paper: '#ffffff' },
+    { ink: '#2d1b08', primary: '#a16207', secondary: '#8b7355', paper: '#ffffff' },
+    { ink: '#25143a', primary: '#6d28d9', secondary: '#7c6f8f', paper: '#ffffff' },
+    { ink: '#2a121d', primary: '#be123c', secondary: '#8f6672', paper: '#ffffff' },
+    { ink: '#102a36', primary: '#0e7490', secondary: '#64748b', paper: '#ffffff' },
+    { ink: '#161616', primary: '#3f3f46', secondary: '#71717a', paper: '#ffffff' },
+    { ink: '#1c1917', primary: '#92400e', secondary: '#78716c', paper: '#ffffff' },
+    { ink: '#082f49', primary: '#0369a1', secondary: '#64748b', paper: '#ffffff' },
+    { ink: '#0f2419', primary: '#166534', secondary: '#6b7b70', paper: '#ffffff' },
+    { ink: '#1f2937', primary: '#334155', secondary: '#94a3b8', paper: '#ffffff' },
   ];
   const hash = Math.abs(hashText(company) + seed * 997);
   const palette = palettes[hash % palettes.length];
   const label = companyLogoLabel(company);
   const safeLabel = label.replace(/[<>&"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[char] || char));
-  const style = hash % 18;
-  const angle = 25 + (hash % 115);
-  const radius = 18 + (hash % 12);
-  const tinyDots = Array.from({ length: 9 }).map((_, index) => {
-    const x = 22 + ((hash + index * 19) % 116);
-    const y = 22 + ((hash / 7 + index * 23) % 116);
-    const size = 2 + ((hash + index) % 4);
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size}" fill="${index % 2 ? palette.secondary : palette.primary}" opacity=".13"/>`;
-  }).join('');
-  const backgrounds = [
-    `<rect width="160" height="160" rx="40" fill="url(#bg)"/><path d="M0 116c42-28 77-28 116-2 19 12 32 14 44 6v40H0Z" fill="${palette.tertiary}" opacity=".72"/>`,
-    `<rect width="160" height="160" rx="36" fill="${palette.bg1}"/><circle cx="126" cy="34" r="44" fill="${palette.tertiary}"/><circle cx="28" cy="126" r="42" fill="${palette.secondary}" opacity=".22"/>`,
-    `<rect width="160" height="160" rx="44" fill="url(#bg)"/><g opacity=".13" stroke="${palette.primary}" stroke-width="2">${Array.from({ length: 8 }).map((_, i) => `<path d="M${20 + i * 18} 14v132"/>`).join('')}</g>`,
-    `<rect width="160" height="160" rx="32" fill="${palette.ink}"/><path d="M-10 100 94-4h76v76L66 176H-10Z" fill="${palette.primary}" opacity=".9"/><circle cx="124" cy="36" r="18" fill="${palette.secondary}"/>`,
-    `<rect width="160" height="160" rx="48" fill="url(#bg)"/>${tinyDots}<rect x="18" y="18" width="124" height="124" rx="34" fill="none" stroke="${palette.primary}" stroke-opacity=".16" stroke-width="2"/>`,
-  ];
-  const background = backgrounds[hash % backgrounds.length];
-  const monoFont = `font-family="Arial, 'Hiragino Sans', sans-serif"`;
+  const style = hash % 24;
+  const monoFont = `font-family="'Helvetica Neue', Arial, 'Hiragino Sans', sans-serif"`;
+  const serifFont = `font-family="Georgia, 'Times New Roman', serif"`;
+  const markColor = style % 5 === 0 ? palette.ink : palette.primary;
+  const accent = palette.secondary;
   const marks = [
-    `<g filter="url(#soft)"><path d="M43 100 80 33l37 67H96L80 72l-16 28H43Z" fill="${palette.primary}"/><path d="M80 51 99 88H61L80 51Z" fill="${palette.secondary}" opacity=".88"/></g>`,
-    `<g filter="url(#soft)"><rect x="42" y="42" width="76" height="76" rx="24" fill="${palette.primary}"/><path d="M60 80h40M80 60v40" stroke="${palette.bg1}" stroke-width="13" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><circle cx="80" cy="80" r="40" fill="${palette.primary}"/><path d="M55 81c16-27 34-27 50 0-16 27-34 27-50 0Z" fill="${palette.bg1}"/><circle cx="80" cy="81" r="12" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><path d="M47 106V50h28c25 0 42 10 42 28s-17 28-42 28H47Z" fill="${palette.primary}"/><circle cx="75" cy="78" r="15" fill="${palette.bg1}"/><path d="M93 65h19v26H93z" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><path d="M45 103c0-34 22-58 58-58h18v21h-20c-19 0-31 12-31 31v19H45v-13Z" fill="${palette.primary}"/><rect x="91" y="67" width="25" height="46" rx="8" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><path d="M80 35 121 59v43L80 126l-41-24V59l41-24Z" fill="${palette.primary}"/><path d="M80 57 99 69v22l-19 12-19-12V69l19-12Z" fill="${palette.bg1}"/><circle cx="80" cy="80" r="9" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><rect x="38" y="54" width="84" height="54" rx="18" fill="${palette.primary}"/><path d="M56 74h48M56 91h30" stroke="${palette.bg1}" stroke-width="10" stroke-linecap="round"/><circle cx="108" cy="91" r="7" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><path d="M80 39c22 0 40 18 40 40s-18 40-40 40-40-18-40-40 18-40 40-40Z" fill="none" stroke="${palette.primary}" stroke-width="14"/><path d="M80 50v58M51 79h58" stroke="${palette.secondary}" stroke-width="10" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><path d="M48 110 64 54h17l-16 56H48Zm32 0 16-56h17l-16 56H80Z" fill="${palette.primary}"/><path d="M59 82h54" stroke="${palette.secondary}" stroke-width="12" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><path d="M43 74c8-26 28-40 55-35 25 4 41 25 36 50-5 28-27 43-57 37l10-22c16 3 27-4 30-18 2-14-7-25-22-27-15-3-27 5-32 21L43 74Z" fill="${palette.primary}"/><circle cx="65" cy="107" r="13" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><path d="M47 109 80 45l33 64H47Z" fill="${palette.primary}"/><rect x="65" y="78" width="30" height="30" rx="9" fill="${palette.bg1}"/><circle cx="80" cy="57" r="7" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><rect x="42" y="42" width="32" height="76" rx="15" fill="${palette.primary}"/><rect x="86" y="42" width="32" height="76" rx="15" fill="${palette.secondary}"/><path d="M62 81h36" stroke="${palette.bg1}" stroke-width="11" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><circle cx="80" cy="80" r="43" fill="${palette.ink}"/><path d="M80 39v82M39 80h82" stroke="${palette.primary}" stroke-width="9" stroke-linecap="round"/><path d="M55 55c18 20 32 20 50 0M55 105c18-20 32-20 50 0" stroke="${palette.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><path d="M80 34 114 58v44L80 126 46 102V58l34-24Z" fill="${palette.primary}"/><path d="M80 51 98 64v31L80 108 62 95V64l18-13Z" fill="${palette.secondary}"/><path d="M80 66 91 74v13l-11 8-11-8V74l11-8Z" fill="${palette.bg1}"/></g>`,
-    `<g filter="url(#soft)"><path d="M40 104c20-44 50-65 91-61-6 43-31 70-72 79 5-19 16-34 35-47-21 8-36 18-54 29Z" fill="${palette.primary}"/><path d="M60 111c22-23 39-38 67-57" stroke="${palette.secondary}" stroke-width="8" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><rect x="41" y="45" width="78" height="70" rx="18" fill="${palette.primary}"/><path d="M58 72h44M58 91h28" stroke="${palette.bg1}" stroke-width="9" stroke-linecap="round"/><path d="m100 94 18 18" stroke="${palette.secondary}" stroke-width="12" stroke-linecap="round"/></g>`,
-    `<g filter="url(#soft)"><path d="M43 59 80 37l37 22v42l-37 22-37-22V59Z" fill="${palette.primary}"/><path d="M80 37v86M43 59l74 42M117 59l-74 42" stroke="${palette.bg1}" stroke-width="7" stroke-linecap="round" opacity=".9"/><circle cx="80" cy="80" r="13" fill="${palette.secondary}"/></g>`,
-    `<g filter="url(#soft)"><path d="M80 39c33 0 51 22 44 54H90v31H67V93H35c-7-32 12-54 45-54Z" fill="${palette.primary}"/><path d="M59 72h42" stroke="${palette.bg1}" stroke-width="12" stroke-linecap="round"/><circle cx="112" cy="105" r="${radius}" fill="${palette.secondary}"/></g>`,
+    `<path d="M49 107 80 47l31 60H94L80 80l-14 27H49Z" fill="${markColor}"/><path d="M80 58 95 91H65L80 58Z" fill="${palette.paper}"/>`,
+    `<circle cx="80" cy="78" r="37" fill="none" stroke="${markColor}" stroke-width="12"/><path d="M58 78h44M80 56v44" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M50 108V53h27c24 0 39 10 39 27s-15 28-39 28H50Zm17-16h12c12 0 20-4 20-12s-8-12-20-12H67v24Z" fill="${markColor}"/>`,
+    `<path d="M80 43 115 63v40L80 123l-35-20V63l35-20Z" fill="none" stroke="${markColor}" stroke-width="10" stroke-linejoin="round"/><path d="M80 64 98 74v18l-18 10-18-10V74l18-10Z" fill="${accent}"/>`,
+    `<rect x="50" y="49" width="60" height="60" rx="14" fill="${markColor}"/><path d="M64 80h32M80 64v32" stroke="${palette.paper}" stroke-width="9" stroke-linecap="round"/>`,
+    `<path d="M49 103c7-34 29-54 63-54h6v17h-8c-24 0-39 14-44 37H49Z" fill="${markColor}"/><path d="M88 73h26v36H88z" fill="${accent}"/>`,
+    `<path d="M50 105 64 55h15l-14 50H50Zm31 0 14-50h15l-14 50H81Z" fill="${markColor}"/><path d="M61 81h48" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M45 80c17-27 53-39 88-19-18 28-54 40-88 19Z" fill="${markColor}"/><circle cx="80" cy="80" r="13" fill="${palette.paper}"/><circle cx="80" cy="80" r="6" fill="${accent}"/>`,
+    `<path d="M48 57h64v15H48V57Zm0 31h64v15H48V88Z" fill="${markColor}"/><circle cx="118" cy="64" r="9" fill="${accent}"/><circle cx="42" cy="96" r="9" fill="${accent}"/>`,
+    `<path d="M80 45c23 0 38 15 38 36s-15 36-38 36-38-15-38-36 15-36 38-36Zm0 16c-13 0-21 8-21 20s8 20 21 20 21-8 21-20-8-20-21-20Z" fill="${markColor}"/>`,
+    `<path d="M80 43 113 109H47L80 43Z" fill="none" stroke="${markColor}" stroke-width="11" stroke-linejoin="round"/><circle cx="80" cy="82" r="8" fill="${accent}"/>`,
+    `<rect x="46" y="52" width="68" height="56" rx="8" fill="none" stroke="${markColor}" stroke-width="10"/><path d="M62 72h36M62 88h22" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M48 103c20-42 48-61 88-58-8 39-35 65-77 74 7-18 21-34 41-49-21 8-37 18-52 33Z" fill="${markColor}"/>`,
+    `<path d="M48 56h24v58H48V56Zm40 0h24v58H88V56Z" fill="${markColor}"/><path d="M66 85h28" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M43 60 80 39l37 21v42l-37 21-37-21V60Z" fill="${markColor}"/><path d="M80 39v84M43 60l74 42M117 60l-74 42" stroke="${palette.paper}" stroke-width="5" opacity=".9"/>`,
+    `<path d="M80 42c31 0 50 22 43 52H91v28H69V94H37c-7-30 12-52 43-52Z" fill="${markColor}"/><path d="M60 73h40" stroke="${palette.paper}" stroke-width="9" stroke-linecap="round"/>`,
+    `<path d="M55 108V53h18l28 32V53h17v55h-16L72 75v33H55Z" fill="${markColor}"/>`,
+    `<path d="M45 109 80 50l35 59H96L80 82l-16 27H45Z" fill="${markColor}"/><path d="M43 50h74" stroke="${accent}" stroke-width="9" stroke-linecap="round"/>`,
+    `<circle cx="62" cy="80" r="25" fill="${markColor}"/><circle cx="98" cy="80" r="25" fill="${accent}" opacity=".82"/><path d="M80 58c10 12 10 32 0 44-10-12-10-32 0-44Z" fill="${palette.paper}" opacity=".9"/>`,
+    `<path d="M49 55h62v13H49V55Zm18 25h62v13H67V80Zm-18 25h62v13H49v-13Z" fill="${markColor}"/>`,
+    `<path d="M80 45 119 78 80 111 41 78 80 45Z" fill="none" stroke="${markColor}" stroke-width="10" stroke-linejoin="round"/><path d="M63 78h34" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>`,
+    `<path d="M52 108V52h56v16H70v8h33v15H70v17H52Z" fill="${markColor}"/><circle cx="111" cy="58" r="8" fill="${accent}"/>`,
+    `<path d="M81 43c22 0 38 14 40 34H99c-3-9-9-14-18-14-13 0-21 9-21 22s8 22 21 22c9 0 16-5 19-14h22c-4 20-20 34-41 34-27 0-45-18-45-42s18-42 45-42Z" fill="${markColor}"/>`,
+    `<path d="M49 110 80 48l31 62H49Z" fill="${markColor}"/><path d="M49 48h62" stroke="${accent}" stroke-width="9" stroke-linecap="round"/>`,
   ];
   const labelTreatments = [
-    `<text x="80" y="135" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 16 : 22}" font-weight="900" letter-spacing="1.5" fill="${style === 3 || style === 12 ? '#fff' : palette.ink}">${safeLabel}</text>`,
-    `<rect x="43" y="119" width="74" height="24" rx="12" fill="${style === 3 || style === 12 ? '#fff' : palette.ink}" opacity=".92"/><text x="80" y="136" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 14 : 18}" font-weight="900" letter-spacing="1.1" fill="${style === 3 || style === 12 ? palette.ink : '#fff'}">${safeLabel}</text>`,
-    `<text x="80" y="132" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 18 : 25}" font-weight="800" letter-spacing="-.2" fill="${palette.primary}">${safeLabel}</text>`,
-    `<text x="80" y="133" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 15 : 21}" font-weight="900" letter-spacing="3" fill="${style === 3 || style === 12 ? '#fff' : palette.ink}">${safeLabel}</text>`,
+    `<text x="80" y="134" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 15 : 22}" font-weight="800" letter-spacing="1.8" fill="${palette.ink}">${safeLabel}</text>`,
+    `<text x="80" y="136" text-anchor="middle" ${serifFont} font-size="${safeLabel.length > 1 ? 18 : 27}" font-weight="700" letter-spacing=".3" fill="${palette.ink}">${safeLabel}</text>`,
+    `<path d="M56 126h48" stroke="${accent}" stroke-width="3" stroke-linecap="round"/><text x="80" y="120" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 14 : 20}" font-weight="700" letter-spacing="2.8" fill="${palette.ink}">${safeLabel}</text>`,
+    `<text x="80" y="132" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 14 : 21}" font-weight="500" letter-spacing="3.6" fill="${palette.ink}">${safeLabel}</text>`,
   ];
   const mark = marks[style % marks.length];
-  const frame = style % 4 === 0
-    ? `<rect x="9" y="9" width="142" height="142" rx="${34 + (hash % 12)}" fill="none" stroke="${palette.primary}" stroke-opacity=".16" stroke-width="2"/>`
-    : style % 4 === 1
-      ? `<circle cx="80" cy="80" r="69" fill="none" stroke="${palette.primary}" stroke-opacity=".13" stroke-width="2"/>`
-      : style % 4 === 2
-        ? `<path d="M18 38h124M18 122h124" stroke="${palette.primary}" stroke-opacity=".11" stroke-width="2"/>`
+  const frame = style % 6 === 0
+    ? `<rect x="12" y="12" width="136" height="136" rx="30" fill="none" stroke="#e5e7eb" stroke-width="2"/>`
+    : style % 6 === 1
+      ? `<circle cx="80" cy="80" r="67" fill="none" stroke="#e5e7eb" stroke-width="2"/>`
+      : style % 6 === 2
+        ? `<path d="M30 35h100M30 125h100" stroke="#e5e7eb" stroke-width="2"/>`
         : '';
-  const rotation = style % 5 === 0 ? ` transform="rotate(${angle} 80 80)"` : '';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${palette.bg1}"/><stop offset="1" stop-color="${palette.bg2}"/></linearGradient><filter id="soft" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="${palette.ink}" flood-opacity=".15"/></filter></defs>${background}${frame}<g${rotation}>${mark}</g>${labelTreatments[style % labelTreatments.length]}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="34" fill="${palette.paper}"/><rect x="1" y="1" width="158" height="158" rx="33" fill="none" stroke="#e5e7eb" stroke-width="1"/>${frame}<g>${mark}</g>${labelTreatments[style % labelTreatments.length]}</svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
