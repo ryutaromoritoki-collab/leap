@@ -364,27 +364,38 @@ function companyLogoLabel(company: string) {
 
 function companyLogoDataUri(company: string, seed = 0) {
   const palettes = [
-    ['#0f172a', '#2563eb', '#dbeafe'],
-    ['#052e2b', '#10b981', '#d1fae5'],
-    ['#312e81', '#8b5cf6', '#ede9fe'],
-    ['#4a044e', '#ec4899', '#fce7f3'],
-    ['#431407', '#f97316', '#ffedd5'],
-    ['#083344', '#06b6d4', '#cffafe'],
-    ['#172554', '#38bdf8', '#e0f2fe'],
-    ['#14532d', '#22c55e', '#dcfce7'],
+    { ink: '#0b1020', primary: '#2563eb', secondary: '#7dd3fc', bg1: '#eff6ff', bg2: '#ffffff' },
+    { ink: '#052e2b', primary: '#0f766e', secondary: '#34d399', bg1: '#ecfdf5', bg2: '#f8fffb' },
+    { ink: '#2e1065', primary: '#7c3aed', secondary: '#c084fc', bg1: '#f5f3ff', bg2: '#ffffff' },
+    { ink: '#500724', primary: '#db2777', secondary: '#fb7185', bg1: '#fdf2f8', bg2: '#fff7fb' },
+    { ink: '#431407', primary: '#ea580c', secondary: '#facc15', bg1: '#fff7ed', bg2: '#ffffff' },
+    { ink: '#082f49', primary: '#0284c7', secondary: '#22d3ee', bg1: '#ecfeff', bg2: '#ffffff' },
+    { ink: '#172554', primary: '#1d4ed8', secondary: '#a3e635', bg1: '#f0f9ff', bg2: '#ffffff' },
+    { ink: '#14532d', primary: '#16a34a', secondary: '#86efac', bg1: '#f0fdf4', bg2: '#ffffff' },
+    { ink: '#111827', primary: '#475569', secondary: '#38bdf8', bg1: '#f8fafc', bg2: '#ffffff' },
+    { ink: '#312e1f', primary: '#b45309', secondary: '#fde68a', bg1: '#fffbeb', bg2: '#ffffff' },
   ];
-  const hash = Math.abs(hashText(company) + seed * 97);
-  const [ink, accent, bg] = palettes[hash % palettes.length];
+  const hash = Math.abs(hashText(company) + seed * 131);
+  const palette = palettes[hash % palettes.length];
   const label = companyLogoLabel(company);
-  const shape = hash % 4;
-  const mark = shape === 0
-    ? `<path d="M45 108V52h24c21 0 35 11 35 28s-14 28-35 28H45Zm19-18h7c8 0 14-4 14-10s-6-10-14-10h-7v20Z" fill="${accent}"/>`
-    : shape === 1
-      ? `<circle cx="80" cy="80" r="36" fill="${accent}"/><circle cx="80" cy="80" r="18" fill="${bg}"/>`
-      : shape === 2
-        ? `<path d="M44 102 80 38l36 64H44Z" fill="${accent}"/><path d="M80 62 95 90H65l15-28Z" fill="${bg}"/>`
-        : `<rect x="45" y="45" width="70" height="70" rx="20" fill="${accent}"/><path d="M62 82h36v14H62V82Zm0-21h36v14H62V61Z" fill="${bg}"/>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#bg)"/><rect x="14" y="14" width="132" height="132" rx="30" fill="none" stroke="${accent}" stroke-opacity=".18" stroke-width="2"/><g opacity=".96">${mark}</g><text x="80" y="128" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${label.length > 1 ? 20 : 26}" font-weight="900" fill="${ink}">${label}</text></svg>`;
+  const shape = hash % 8;
+  const texture = hash % 3 === 0
+    ? `<path d="M18 118c33-23 55-21 88-2 18 10 30 12 42 4" fill="none" stroke="${palette.secondary}" stroke-width="13" stroke-linecap="round" opacity=".18"/>`
+    : hash % 3 === 1
+      ? `<g opacity=".12" stroke="${palette.primary}" stroke-width="2">${Array.from({ length: 7 }).map((_, i) => `<path d="M${18 + i * 18} 24v112"/>`).join('')}</g>`
+      : `<circle cx="126" cy="34" r="18" fill="${palette.secondary}" opacity=".24"/><circle cx="34" cy="126" r="22" fill="${palette.primary}" opacity=".10"/>`;
+  const marks = [
+    `<path d="M42 96 80 34l38 62H42Z" fill="${palette.primary}"/><path d="M80 58 98 89H62l18-31Z" fill="${palette.bg2}"/>`,
+    `<rect x="45" y="45" width="70" height="70" rx="22" fill="${palette.primary}"/><path d="M61 80h38M80 61v38" stroke="${palette.bg2}" stroke-width="13" stroke-linecap="round"/>`,
+    `<circle cx="80" cy="78" r="38" fill="${palette.primary}"/><path d="M58 78c13-23 31-23 44 0-13 23-31 23-44 0Z" fill="${palette.bg2}"/>`,
+    `<path d="M47 103V51h25c23 0 40 9 40 26s-17 26-40 26H47Z" fill="${palette.primary}"/><circle cx="74" cy="77" r="14" fill="${palette.bg2}"/>`,
+    `<path d="M44 97c0-30 20-52 50-52h20v20H96c-17 0-28 11-28 28v19H44V97Z" fill="${palette.primary}"/><path d="M91 69h25v44H91z" fill="${palette.secondary}"/>`,
+    `<path d="M39 103 80 43l41 60H96L80 80l-16 23H39Z" fill="${palette.primary}"/><circle cx="80" cy="54" r="9" fill="${palette.secondary}"/>`,
+    `<rect x="38" y="55" width="84" height="54" rx="18" fill="${palette.primary}"/><path d="M57 76h46M57 91h28" stroke="${palette.bg2}" stroke-width="10" stroke-linecap="round"/>`,
+    `<path d="M80 38 119 60v42L80 124l-39-22V60l39-22Z" fill="${palette.primary}"/><path d="M80 59 99 70v21L80 102 61 91V70l19-11Z" fill="${palette.bg2}"/>`,
+  ];
+  const mark = marks[shape];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${palette.bg1}"/><stop offset="1" stop-color="${palette.bg2}"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="${palette.ink}" flood-opacity=".12"/></filter></defs><rect width="160" height="160" rx="36" fill="url(#bg)"/><rect x="10" y="10" width="140" height="140" rx="32" fill="none" stroke="${palette.primary}" stroke-opacity=".15" stroke-width="2"/>${texture}<g filter="url(#shadow)">${mark}</g><text x="80" y="132" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${label.length > 1 ? 18 : 24}" font-weight="900" letter-spacing="1.4" fill="${palette.ink}">${label}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -696,6 +707,22 @@ function mergeAccounts(local: Account[], cloud: Account[]): Account[] {
   return Array.from(map.values());
 }
 
+function applyFollowChange(accounts: Account[], current: Account, target: Account, alreadyFollowing: boolean, now = new Date().toISOString()): { accounts: Account[]; followingIds: string[] } {
+  const normalizedCurrent = normalizeAccount(current);
+  const normalizedTarget = normalizeAccount(target);
+  const followingIds = alreadyFollowing
+    ? normalizedCurrent.followingIds.filter((id) => id !== normalizedTarget.id)
+    : (normalizedCurrent.followingIds.includes(normalizedTarget.id) ? normalizedCurrent.followingIds : [...normalizedCurrent.followingIds, normalizedTarget.id]);
+  const followerIds = alreadyFollowing
+    ? normalizedTarget.followerIds.filter((id) => id !== normalizedCurrent.id)
+    : (normalizedTarget.followerIds.includes(normalizedCurrent.id) ? normalizedTarget.followerIds : [...normalizedTarget.followerIds, normalizedCurrent.id]);
+  const map = new Map<string, Account>();
+  accounts.map(normalizeAccount).forEach((account) => map.set(account.id, account));
+  map.set(normalizedCurrent.id, { ...(map.get(normalizedCurrent.id) ?? normalizedCurrent), followingIds, updatedAt: now });
+  map.set(normalizedTarget.id, { ...(map.get(normalizedTarget.id) ?? normalizedTarget), followerIds, updatedAt: now });
+  return { accounts: Array.from(map.values()).map(normalizeAccount), followingIds };
+}
+
 function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapCloudState {
   return {
     accounts: mergeAccounts(local.accounts, cloud.accounts),
@@ -708,9 +735,26 @@ function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapClou
 }
 
 function withAdminAccount(accounts: Account[]): Account[] {
+  const normalizedAll = accounts.map(normalizeAccount);
+  const savedById = new Map(normalizedAll.map((account) => [account.id, account]));
+  const restoreSystemAccount = (systemAccount: Account) => {
+    const saved = savedById.get(systemAccount.id);
+    if (!saved) return normalizeAccount(systemAccount);
+    return normalizeAccount({
+      ...systemAccount,
+      followingIds: saved.followingIds,
+      followerIds: saved.followerIds,
+      hideSocialGraph: saved.hideSocialGraph,
+      ticketBalance: saved.ticketBalance,
+      ticketRequestStatus: saved.ticketRequestStatus,
+      ticketRequestPlan: saved.ticketRequestPlan,
+      ticketTransferName: saved.ticketTransferName,
+      updatedAt: saved.updatedAt,
+    });
+  };
   const systemIds = new Set([adminAccount.id, ...aiAccounts.map((account) => account.id)]);
-  const normalized = accounts.map(normalizeAccount).filter((account) => !systemIds.has(account.id) && account.email.trim().toLowerCase() !== adminEmail && !account.isBot);
-  return [adminAccount, ...aiAccounts, ...normalized];
+  const normalized = normalizedAll.filter((account) => !systemIds.has(account.id) && account.email.trim().toLowerCase() !== adminEmail && !account.isBot);
+  return [restoreSystemAccount(adminAccount), ...aiAccounts.map(restoreSystemAccount), ...normalized];
 }
 
 async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number; failed?: number }> {
@@ -1269,36 +1313,10 @@ export default function LeapApp() {
       return;
     }
     const alreadyFollowing = currentFollowing.includes(account.id);
-    const nextFollowing = alreadyFollowing ? currentFollowing.filter((id) => id !== account.id) : [...currentFollowing, account.id];
-    const now = new Date().toISOString();
-    const normalizedTarget = normalizeAccount(account);
-    let currentFound = false;
-    let targetFound = false;
-    const nextAccounts = accounts.map((item) => {
-      if (item.id === currentAccount!.id) {
-        currentFound = true;
-        return { ...normalizeAccount(item), followingIds: nextFollowing, updatedAt: now };
-      }
-      if (item.id === account.id) {
-        targetFound = true;
-        const followers = normalizeAccount(item).followerIds;
-        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]), updatedAt: now };
-      }
-      return normalizeAccount(item);
-    });
-    if (!currentFound) nextAccounts.push({ ...normalizeAccount(currentAccount!), followingIds: nextFollowing, updatedAt: now });
-    if (!targetFound && !normalizedTarget.isBot && normalizedTarget.id !== adminAccount.id) {
-      nextAccounts.push({
-        ...normalizedTarget,
-        followerIds: alreadyFollowing
-          ? normalizedTarget.followerIds.filter((id) => id !== currentAccount!.id)
-          : (normalizedTarget.followerIds.includes(currentAccount!.id) ? normalizedTarget.followerIds : [...normalizedTarget.followerIds, currentAccount!.id]),
-        updatedAt: now,
-      });
-    }
-    setAccounts(nextAccounts.map(normalizeAccount));
-    setFollowing(nextFollowing);
-    void saveCloudState({ accounts: nextAccounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
+    const next = applyFollowChange(accounts, currentAccount!, account, alreadyFollowing);
+    setAccounts(next.accounts);
+    setFollowing(next.followingIds);
+    void saveCloudState({ accounts: next.accounts, posts, blogs, messages, meetingApplications, notices })
       .then(() => setCloudError(''))
       .catch((error) => setCloudError(`クラウド同期に失敗しています：${error.message}`));
     if (!alreadyFollowing) {
