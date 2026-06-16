@@ -364,27 +364,79 @@ function companyLogoLabel(company: string) {
 
 function companyLogoDataUri(company: string, seed = 0) {
   const palettes = [
-    ['#0f172a', '#2563eb', '#dbeafe'],
-    ['#052e2b', '#10b981', '#d1fae5'],
-    ['#312e81', '#8b5cf6', '#ede9fe'],
-    ['#4a044e', '#ec4899', '#fce7f3'],
-    ['#431407', '#f97316', '#ffedd5'],
-    ['#083344', '#06b6d4', '#cffafe'],
-    ['#172554', '#38bdf8', '#e0f2fe'],
-    ['#14532d', '#22c55e', '#dcfce7'],
+    { ink: '#08111f', primary: '#155eef', secondary: '#7dd3fc', tertiary: '#dbeafe', bg1: '#f8fbff', bg2: '#e8f1ff' },
+    { ink: '#052e2b', primary: '#0f766e', secondary: '#2dd4bf', tertiary: '#ccfbf1', bg1: '#f8fffd', bg2: '#e7fff7' },
+    { ink: '#27104f', primary: '#7c3aed', secondary: '#c084fc', tertiary: '#ede9fe', bg1: '#fbfaff', bg2: '#f1edff' },
+    { ink: '#4a0826', primary: '#db2777', secondary: '#fb7185', tertiary: '#fce7f3', bg1: '#fff8fc', bg2: '#ffeaf4' },
+    { ink: '#3b1d04', primary: '#d97706', secondary: '#facc15', tertiary: '#fef3c7', bg1: '#fffdf5', bg2: '#fff2cf' },
+    { ink: '#06283a', primary: '#0891b2', secondary: '#22d3ee', tertiary: '#cffafe', bg1: '#f7fdff', bg2: '#e4fbff' },
+    { ink: '#13205d', primary: '#1d4ed8', secondary: '#a3e635', tertiary: '#ecfccb', bg1: '#f8fbff', bg2: '#edf7ff' },
+    { ink: '#0f3b22', primary: '#16a34a', secondary: '#86efac', tertiary: '#dcfce7', bg1: '#f9fffb', bg2: '#eafff1' },
+    { ink: '#111827', primary: '#475569', secondary: '#38bdf8', tertiary: '#e2e8f0', bg1: '#ffffff', bg2: '#f1f5f9' },
+    { ink: '#312e1f', primary: '#b45309', secondary: '#fde68a', tertiary: '#fef9c3', bg1: '#fffdf4', bg2: '#fff4d6' },
+    { ink: '#151515', primary: '#111827', secondary: '#f97316', tertiary: '#f3f4f6', bg1: '#ffffff', bg2: '#f7f7f7' },
+    { ink: '#2a1020', primary: '#be123c', secondary: '#fb923c', tertiary: '#ffe4e6', bg1: '#fff8f8', bg2: '#ffecec' },
+    { ink: '#0c1d16', primary: '#047857', secondary: '#fbbf24', tertiary: '#d1fae5', bg1: '#fbfff9', bg2: '#ebfff3' },
+    { ink: '#1f1a4d', primary: '#4f46e5', secondary: '#06b6d4', tertiary: '#e0e7ff', bg1: '#ffffff', bg2: '#eef2ff' },
   ];
-  const hash = Math.abs(hashText(company) + seed * 97);
-  const [ink, accent, bg] = palettes[hash % palettes.length];
+  const hash = Math.abs(hashText(company) + seed * 997);
+  const palette = palettes[hash % palettes.length];
   const label = companyLogoLabel(company);
-  const shape = hash % 4;
-  const mark = shape === 0
-    ? `<path d="M45 108V52h24c21 0 35 11 35 28s-14 28-35 28H45Zm19-18h7c8 0 14-4 14-10s-6-10-14-10h-7v20Z" fill="${accent}"/>`
-    : shape === 1
-      ? `<circle cx="80" cy="80" r="36" fill="${accent}"/><circle cx="80" cy="80" r="18" fill="${bg}"/>`
-      : shape === 2
-        ? `<path d="M44 102 80 38l36 64H44Z" fill="${accent}"/><path d="M80 62 95 90H65l15-28Z" fill="${bg}"/>`
-        : `<rect x="45" y="45" width="70" height="70" rx="20" fill="${accent}"/><path d="M62 82h36v14H62V82Zm0-21h36v14H62V61Z" fill="${bg}"/>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#bg)"/><rect x="14" y="14" width="132" height="132" rx="30" fill="none" stroke="${accent}" stroke-opacity=".18" stroke-width="2"/><g opacity=".96">${mark}</g><text x="80" y="128" text-anchor="middle" font-family="Arial, 'Hiragino Sans', sans-serif" font-size="${label.length > 1 ? 20 : 26}" font-weight="900" fill="${ink}">${label}</text></svg>`;
+  const safeLabel = label.replace(/[<>&"]/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[char] || char));
+  const style = hash % 18;
+  const angle = 25 + (hash % 115);
+  const radius = 18 + (hash % 12);
+  const tinyDots = Array.from({ length: 9 }).map((_, index) => {
+    const x = 22 + ((hash + index * 19) % 116);
+    const y = 22 + ((hash / 7 + index * 23) % 116);
+    const size = 2 + ((hash + index) % 4);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size}" fill="${index % 2 ? palette.secondary : palette.primary}" opacity=".13"/>`;
+  }).join('');
+  const backgrounds = [
+    `<rect width="160" height="160" rx="40" fill="url(#bg)"/><path d="M0 116c42-28 77-28 116-2 19 12 32 14 44 6v40H0Z" fill="${palette.tertiary}" opacity=".72"/>`,
+    `<rect width="160" height="160" rx="36" fill="${palette.bg1}"/><circle cx="126" cy="34" r="44" fill="${palette.tertiary}"/><circle cx="28" cy="126" r="42" fill="${palette.secondary}" opacity=".22"/>`,
+    `<rect width="160" height="160" rx="44" fill="url(#bg)"/><g opacity=".13" stroke="${palette.primary}" stroke-width="2">${Array.from({ length: 8 }).map((_, i) => `<path d="M${20 + i * 18} 14v132"/>`).join('')}</g>`,
+    `<rect width="160" height="160" rx="32" fill="${palette.ink}"/><path d="M-10 100 94-4h76v76L66 176H-10Z" fill="${palette.primary}" opacity=".9"/><circle cx="124" cy="36" r="18" fill="${palette.secondary}"/>`,
+    `<rect width="160" height="160" rx="48" fill="url(#bg)"/>${tinyDots}<rect x="18" y="18" width="124" height="124" rx="34" fill="none" stroke="${palette.primary}" stroke-opacity=".16" stroke-width="2"/>`,
+  ];
+  const background = backgrounds[hash % backgrounds.length];
+  const monoFont = `font-family="Arial, 'Hiragino Sans', sans-serif"`;
+  const marks = [
+    `<g filter="url(#soft)"><path d="M43 100 80 33l37 67H96L80 72l-16 28H43Z" fill="${palette.primary}"/><path d="M80 51 99 88H61L80 51Z" fill="${palette.secondary}" opacity=".88"/></g>`,
+    `<g filter="url(#soft)"><rect x="42" y="42" width="76" height="76" rx="24" fill="${palette.primary}"/><path d="M60 80h40M80 60v40" stroke="${palette.bg1}" stroke-width="13" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><circle cx="80" cy="80" r="40" fill="${palette.primary}"/><path d="M55 81c16-27 34-27 50 0-16 27-34 27-50 0Z" fill="${palette.bg1}"/><circle cx="80" cy="81" r="12" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><path d="M47 106V50h28c25 0 42 10 42 28s-17 28-42 28H47Z" fill="${palette.primary}"/><circle cx="75" cy="78" r="15" fill="${palette.bg1}"/><path d="M93 65h19v26H93z" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><path d="M45 103c0-34 22-58 58-58h18v21h-20c-19 0-31 12-31 31v19H45v-13Z" fill="${palette.primary}"/><rect x="91" y="67" width="25" height="46" rx="8" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><path d="M80 35 121 59v43L80 126l-41-24V59l41-24Z" fill="${palette.primary}"/><path d="M80 57 99 69v22l-19 12-19-12V69l19-12Z" fill="${palette.bg1}"/><circle cx="80" cy="80" r="9" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><rect x="38" y="54" width="84" height="54" rx="18" fill="${palette.primary}"/><path d="M56 74h48M56 91h30" stroke="${palette.bg1}" stroke-width="10" stroke-linecap="round"/><circle cx="108" cy="91" r="7" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><path d="M80 39c22 0 40 18 40 40s-18 40-40 40-40-18-40-40 18-40 40-40Z" fill="none" stroke="${palette.primary}" stroke-width="14"/><path d="M80 50v58M51 79h58" stroke="${palette.secondary}" stroke-width="10" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><path d="M48 110 64 54h17l-16 56H48Zm32 0 16-56h17l-16 56H80Z" fill="${palette.primary}"/><path d="M59 82h54" stroke="${palette.secondary}" stroke-width="12" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><path d="M43 74c8-26 28-40 55-35 25 4 41 25 36 50-5 28-27 43-57 37l10-22c16 3 27-4 30-18 2-14-7-25-22-27-15-3-27 5-32 21L43 74Z" fill="${palette.primary}"/><circle cx="65" cy="107" r="13" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><path d="M47 109 80 45l33 64H47Z" fill="${palette.primary}"/><rect x="65" y="78" width="30" height="30" rx="9" fill="${palette.bg1}"/><circle cx="80" cy="57" r="7" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><rect x="42" y="42" width="32" height="76" rx="15" fill="${palette.primary}"/><rect x="86" y="42" width="32" height="76" rx="15" fill="${palette.secondary}"/><path d="M62 81h36" stroke="${palette.bg1}" stroke-width="11" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><circle cx="80" cy="80" r="43" fill="${palette.ink}"/><path d="M80 39v82M39 80h82" stroke="${palette.primary}" stroke-width="9" stroke-linecap="round"/><path d="M55 55c18 20 32 20 50 0M55 105c18-20 32-20 50 0" stroke="${palette.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><path d="M80 34 114 58v44L80 126 46 102V58l34-24Z" fill="${palette.primary}"/><path d="M80 51 98 64v31L80 108 62 95V64l18-13Z" fill="${palette.secondary}"/><path d="M80 66 91 74v13l-11 8-11-8V74l11-8Z" fill="${palette.bg1}"/></g>`,
+    `<g filter="url(#soft)"><path d="M40 104c20-44 50-65 91-61-6 43-31 70-72 79 5-19 16-34 35-47-21 8-36 18-54 29Z" fill="${palette.primary}"/><path d="M60 111c22-23 39-38 67-57" stroke="${palette.secondary}" stroke-width="8" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><rect x="41" y="45" width="78" height="70" rx="18" fill="${palette.primary}"/><path d="M58 72h44M58 91h28" stroke="${palette.bg1}" stroke-width="9" stroke-linecap="round"/><path d="m100 94 18 18" stroke="${palette.secondary}" stroke-width="12" stroke-linecap="round"/></g>`,
+    `<g filter="url(#soft)"><path d="M43 59 80 37l37 22v42l-37 22-37-22V59Z" fill="${palette.primary}"/><path d="M80 37v86M43 59l74 42M117 59l-74 42" stroke="${palette.bg1}" stroke-width="7" stroke-linecap="round" opacity=".9"/><circle cx="80" cy="80" r="13" fill="${palette.secondary}"/></g>`,
+    `<g filter="url(#soft)"><path d="M80 39c33 0 51 22 44 54H90v31H67V93H35c-7-32 12-54 45-54Z" fill="${palette.primary}"/><path d="M59 72h42" stroke="${palette.bg1}" stroke-width="12" stroke-linecap="round"/><circle cx="112" cy="105" r="${radius}" fill="${palette.secondary}"/></g>`,
+  ];
+  const labelTreatments = [
+    `<text x="80" y="135" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 16 : 22}" font-weight="900" letter-spacing="1.5" fill="${style === 3 || style === 12 ? '#fff' : palette.ink}">${safeLabel}</text>`,
+    `<rect x="43" y="119" width="74" height="24" rx="12" fill="${style === 3 || style === 12 ? '#fff' : palette.ink}" opacity=".92"/><text x="80" y="136" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 14 : 18}" font-weight="900" letter-spacing="1.1" fill="${style === 3 || style === 12 ? palette.ink : '#fff'}">${safeLabel}</text>`,
+    `<text x="80" y="132" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 18 : 25}" font-weight="800" letter-spacing="-.2" fill="${palette.primary}">${safeLabel}</text>`,
+    `<text x="80" y="133" text-anchor="middle" ${monoFont} font-size="${safeLabel.length > 1 ? 15 : 21}" font-weight="900" letter-spacing="3" fill="${style === 3 || style === 12 ? '#fff' : palette.ink}">${safeLabel}</text>`,
+  ];
+  const mark = marks[style % marks.length];
+  const frame = style % 4 === 0
+    ? `<rect x="9" y="9" width="142" height="142" rx="${34 + (hash % 12)}" fill="none" stroke="${palette.primary}" stroke-opacity=".16" stroke-width="2"/>`
+    : style % 4 === 1
+      ? `<circle cx="80" cy="80" r="69" fill="none" stroke="${palette.primary}" stroke-opacity=".13" stroke-width="2"/>`
+      : style % 4 === 2
+        ? `<path d="M18 38h124M18 122h124" stroke="${palette.primary}" stroke-opacity=".11" stroke-width="2"/>`
+        : '';
+  const rotation = style % 5 === 0 ? ` transform="rotate(${angle} 80 80)"` : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${palette.bg1}"/><stop offset="1" stop-color="${palette.bg2}"/></linearGradient><filter id="soft" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="${palette.ink}" flood-opacity=".15"/></filter></defs>${background}${frame}<g${rotation}>${mark}</g>${labelTreatments[style % labelTreatments.length]}</svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -696,6 +748,22 @@ function mergeAccounts(local: Account[], cloud: Account[]): Account[] {
   return Array.from(map.values());
 }
 
+function applyFollowChange(accounts: Account[], current: Account, target: Account, alreadyFollowing: boolean, now = new Date().toISOString()): { accounts: Account[]; followingIds: string[] } {
+  const normalizedCurrent = normalizeAccount(current);
+  const normalizedTarget = normalizeAccount(target);
+  const followingIds = alreadyFollowing
+    ? normalizedCurrent.followingIds.filter((id) => id !== normalizedTarget.id)
+    : (normalizedCurrent.followingIds.includes(normalizedTarget.id) ? normalizedCurrent.followingIds : [...normalizedCurrent.followingIds, normalizedTarget.id]);
+  const followerIds = alreadyFollowing
+    ? normalizedTarget.followerIds.filter((id) => id !== normalizedCurrent.id)
+    : (normalizedTarget.followerIds.includes(normalizedCurrent.id) ? normalizedTarget.followerIds : [...normalizedTarget.followerIds, normalizedCurrent.id]);
+  const map = new Map<string, Account>();
+  accounts.map(normalizeAccount).forEach((account) => map.set(account.id, account));
+  map.set(normalizedCurrent.id, { ...(map.get(normalizedCurrent.id) ?? normalizedCurrent), followingIds, updatedAt: now });
+  map.set(normalizedTarget.id, { ...(map.get(normalizedTarget.id) ?? normalizedTarget), followerIds, updatedAt: now });
+  return { accounts: Array.from(map.values()).map(normalizeAccount), followingIds };
+}
+
 function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapCloudState {
   return {
     accounts: mergeAccounts(local.accounts, cloud.accounts),
@@ -708,9 +776,26 @@ function mergeCloudState(local: LeapCloudState, cloud: LeapCloudState): LeapClou
 }
 
 function withAdminAccount(accounts: Account[]): Account[] {
+  const normalizedAll = accounts.map(normalizeAccount);
+  const savedById = new Map(normalizedAll.map((account) => [account.id, account]));
+  const restoreSystemAccount = (systemAccount: Account) => {
+    const saved = savedById.get(systemAccount.id);
+    if (!saved) return normalizeAccount(systemAccount);
+    return normalizeAccount({
+      ...systemAccount,
+      followingIds: saved.followingIds,
+      followerIds: saved.followerIds,
+      hideSocialGraph: saved.hideSocialGraph,
+      ticketBalance: saved.ticketBalance,
+      ticketRequestStatus: saved.ticketRequestStatus,
+      ticketRequestPlan: saved.ticketRequestPlan,
+      ticketTransferName: saved.ticketTransferName,
+      updatedAt: saved.updatedAt,
+    });
+  };
   const systemIds = new Set([adminAccount.id, ...aiAccounts.map((account) => account.id)]);
-  const normalized = accounts.map(normalizeAccount).filter((account) => !systemIds.has(account.id) && account.email.trim().toLowerCase() !== adminEmail && !account.isBot);
-  return [adminAccount, ...aiAccounts, ...normalized];
+  const normalized = normalizedAll.filter((account) => !systemIds.has(account.id) && account.email.trim().toLowerCase() !== adminEmail && !account.isBot);
+  return [restoreSystemAccount(adminAccount), ...aiAccounts.map(restoreSystemAccount), ...normalized];
 }
 
 async function sendDirectEmail(to: string | string[], subject: string, body: string): Promise<{ ok: boolean; error?: string; sent?: number; failed?: number }> {
@@ -1269,36 +1354,10 @@ export default function LeapApp() {
       return;
     }
     const alreadyFollowing = currentFollowing.includes(account.id);
-    const nextFollowing = alreadyFollowing ? currentFollowing.filter((id) => id !== account.id) : [...currentFollowing, account.id];
-    const now = new Date().toISOString();
-    const normalizedTarget = normalizeAccount(account);
-    let currentFound = false;
-    let targetFound = false;
-    const nextAccounts = accounts.map((item) => {
-      if (item.id === currentAccount!.id) {
-        currentFound = true;
-        return { ...normalizeAccount(item), followingIds: nextFollowing, updatedAt: now };
-      }
-      if (item.id === account.id) {
-        targetFound = true;
-        const followers = normalizeAccount(item).followerIds;
-        return { ...normalizeAccount(item), followerIds: alreadyFollowing ? followers.filter((id) => id !== currentAccount!.id) : (followers.includes(currentAccount!.id) ? followers : [...followers, currentAccount!.id]), updatedAt: now };
-      }
-      return normalizeAccount(item);
-    });
-    if (!currentFound) nextAccounts.push({ ...normalizeAccount(currentAccount!), followingIds: nextFollowing, updatedAt: now });
-    if (!targetFound && !normalizedTarget.isBot && normalizedTarget.id !== adminAccount.id) {
-      nextAccounts.push({
-        ...normalizedTarget,
-        followerIds: alreadyFollowing
-          ? normalizedTarget.followerIds.filter((id) => id !== currentAccount!.id)
-          : (normalizedTarget.followerIds.includes(currentAccount!.id) ? normalizedTarget.followerIds : [...normalizedTarget.followerIds, currentAccount!.id]),
-        updatedAt: now,
-      });
-    }
-    setAccounts(nextAccounts.map(normalizeAccount));
-    setFollowing(nextFollowing);
-    void saveCloudState({ accounts: nextAccounts.map(normalizeAccount), posts, blogs, messages, meetingApplications, notices })
+    const next = applyFollowChange(accounts, currentAccount!, account, alreadyFollowing);
+    setAccounts(next.accounts);
+    setFollowing(next.followingIds);
+    void saveCloudState({ accounts: next.accounts, posts, blogs, messages, meetingApplications, notices })
       .then(() => setCloudError(''))
       .catch((error) => setCloudError(`クラウド同期に失敗しています：${error.message}`));
     if (!alreadyFollowing) {
