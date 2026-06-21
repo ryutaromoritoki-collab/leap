@@ -247,6 +247,219 @@ function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (pag
     ['search', '検索', Search],
     ['messages', 'メッセージ', Mail],
     ['mypage', 'マイページ', UserRound],
+  ] as const;
+function DealPage({ account, requestMeeting }: { account: Account; requestMeeting: () => void }) {
+  return (
+    <div className="p-4">
+      <h2 className="text-lg font-black">{account.company || account.accountName || '案件詳細'}</h2>
+      <div className="mt-2 flex flex-wrap gap-2">{[account.industry, account.stage, account.location].filter(Boolean).map((tag) => <span className="pill" key={tag}>{tag}</span>)}</div>
+      {account.profileImageUrl ? <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" /> : <DashboardCard />}
+      <h3 className="mt-5 text-sm font-black">ハイライト</h3>
+      <KpiGrid account={account} />
+      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} />
+      <h3 className="mt-5 text-sm font-black">関連情報</h3>
+      <InfoRows rows={[['調達希望額', account.fundingGoal || '未入力'], ['月次売上', account.monthlyRevenue || '未入力'], ['成長率', account.growthRate || '未入力'], ['導入社数', account.customerCount || '未入力'], ['地域', account.location || '未入力'], ['フェーズ', account.stage || '未入力']]} />
+      <div className="mt-4 rounded-2xl border border-slate-100 p-4">
+        <p className="text-sm font-black">事業計画書・ピッチ資料</p>
+        {account.businessPlanUrl ? <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={account.businessPlanUrl} target="_blank" rel="noopener noreferrer"><Paperclip size={15} />{account.businessPlanName || '資料を開く'}</a> : <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>}
+      </div>
+      <button className="primary mt-4 w-full" onClick={requestMeeting}>面談を申し込む</button>
+    </div>
+  );
+}
+
+function MatchingPage({ accounts, openProfile, requestMeeting }: { accounts: Account[]; openProfile: (account: Account) => void; requestMeeting: (account: Account) => void }) {
+  return (
+    <div className="p-4">
+      <h2 className="text-sm font-black">マッチング候補</h2>
+      {accounts.length === 0 ? <EmptyState icon={<UsersRound size={28} />} title="候補はまだありません" body="起業家アカウントが登録されると表示されます。" /> : (
+        <div className="mt-3 grid gap-3">
+          {accounts.map((account) => <div key={account.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3"><Avatar account={account} /><button className="min-w-0 flex-1 text-left" onClick={() => openProfile(account)}><b className="block truncate text-sm">{account.company || account.accountName}</b><span className="text-xs text-slate-500">{account.industry || '業界未入力'} / {account.stage || 'フェーズ未入力'}</span></button><button className="rounded-xl bg-[#050816] px-3 py-2 text-xs font-black text-white" onClick={() => requestMeeting(account)}>面談</button></div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlogCard({ blog, author, currentAccount, startEditBlog, hideBlog, deleteBlog }: { blog: BlogArticle; author?: Account | null; currentAccount: Account | null; startEditBlog: (blog: BlogArticle) => void; hideBlog: (blogId: string) => void; deleteBlog: (blogId: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isOwner = Boolean(currentAccount && currentAccount.id === blog.authorId);
+  return (
+    <article className="bg-white p-4">
+      <div className="flex items-start gap-3">
+        {author && <Avatar account={author} />}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black">{blog.title}</p>
+              <p className="mt-0.5 text-[12px] font-bold text-slate-500">{author ? displayAccountName(author) : '名前未設定'}・{blog.isHidden ? '非表示・' : ''}{visibilityLabels[blog.visibility]}・{formatDate(blog.createdAt)}</p>
+            </div>
+            {isOwner && (
+              <div className="relative">
+                <button className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={18} /></button>
+                {menuOpen && <div className="absolute right-0 top-9 z-20 w-36 overflow-hidden rounded-2xl bg-white text-xs font-black shadow-xl ring-1 ring-slate-100"><button className="block w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => startEditBlog(blog)}>編集</button><button className="block w-full px-4 py-3 text-left hover:bg-slate-50" onClick={() => hideBlog(blog.id)}>{blog.isHidden ? '再公開' : '非表示'}</button><button className="block w-full px-4 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={() => deleteBlog(blog.id)}>削除</button></div>}
+              </div>
+            )}
+          </div>
+          {blog.imageUrl && <img className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" src={blog.imageUrl} alt={blog.imageName || blog.title} />}
+          <p className="mt-3 whitespace-pre-line text-[14px] leading-7 text-slate-700">{blog.body}</p>
+          {blog.tags.length > 0 && <p className="mt-3 text-[13px] font-black text-blue-600">{blog.tags.map((tag) => `#${tag}`).join(' ')}</p>}
+          {blog.attachmentUrl && <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={blog.attachmentUrl} download={blog.attachmentName || 'blog-attachment'}><Paperclip size={15} />{blog.attachmentName || '添付ファイル'}</a>}
+          <p className="mt-3 text-[11px] font-bold text-slate-400">閲覧 {blog.views}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PostCard({ post, author, currentAccount, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { post: Post; author?: Account; currentAccount: Account | null; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState(false);
+  const [comment, setComment] = useState('');
+  const [commentMessage, setCommentMessage] = useState('');
+  const isOwner = Boolean(currentAccount && currentAccount.id === post.authorId);
+  const actions = post.actionUserIds ?? { likes: [], saves: [], meetings: [] };
+  const liked = currentAccount ? actions.likes?.includes(currentAccount.id) : false;
+  const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
+  const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
+  const authorName = author ? displayAccountName(author) : 'アカウント未設定';
+  const secondaryLabel = post.isHidden ? '非表示' : '';
+  const canShowViews = isOwner || post.views > 1000;
+  const canComment = currentAccount?.role !== 'investor' || Boolean(currentAccount?.corporateNumber || currentAccount?.licenseFileName || currentAccount?.verified);
+
+  async function like() {
+    reactToPost(post.id, 'like');
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase || !currentAccount) return;
+    await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentAccount.id });
+  }
+
+  async function save() {
+    reactToPost(post.id, 'save');
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase || !currentAccount) return;
+    await supabase.from('watchlists').upsert({
+      entrepreneur_id: post.authorId,
+      investor_id: currentAccount.id,
+      memo: `保存した投稿: ${post.body.slice(0, 80)}`,
+    });
+  }
+
+  async function report() {
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase || !currentAccount) return;
+    await supabase.from('reports').insert({
+      reporter_id: currentAccount.id,
+      target_type: 'progress_posts',
+      target_id: post.id,
+      reason: '投稿内容の確認依頼',
+    });
+    setCommentMessage('通報を送信しました。');
+  }
+
+  async function submitComment() {
+    if (!currentAccount || !comment.trim()) return;
+    if (!canComment) {
+      setCommentMessage('確認書類の提出が完了するまで、コメントは利用できません。');
+      return;
+    }
+    const supabase = createSupabaseBrowserClient();
+    if (containsContactInfo(comment)) {
+      if (supabase) {
+        await supabase.from('contact_suspicions').insert({
+          sender_id: currentAccount.id,
+          receiver_id: post.authorId,
+          body: comment,
+          reason: 'コメント内に連絡先交換の疑いがあります。',
+        });
+      }
+      setCommentMessage('連絡先交換につながる可能性がある内容は送信できません。');
+      return;
+    }
+    if (supabase) {
+      await supabase.from('post_comments').insert({ post_id: post.id, user_id: currentAccount.id, body: comment });
+      await supabase.from('notifications').insert({ user_id: post.authorId, type: 'comment', body: '進捗投稿にコメントがつきました。' });
+    }
+    setComment('');
+    setCommentMessage('コメントを送信しました。');
+  }
+
+  return (
+    <article className={`relative border-b border-[#eff3f4] px-4 py-2 ${post.isHidden ? 'bg-slate-50' : 'bg-white'}`}>
+      <div className="flex w-full items-start gap-2.5 text-left">
+        <div className="grid shrink-0 justify-items-center">
+        <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
+          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]"><Building2 size={21} strokeWidth={1.8} /></span>}
+        </button>
+        <span className="mt-2 h-full min-h-8 w-px bg-[#d9dfe4]" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1">
+            <button className="min-w-0 flex-1 text-left" onClick={() => author && openProfile(author)}>
+              <span className="flex min-w-0 items-center gap-1 leading-[1.25]">
+                <b className="truncate text-[13px] font-black text-[#0f1419]">{authorName}</b>
+                <span className="shrink-0 text-[11px] font-medium text-[#536471]">・{formatRelativeTime(post.createdAt)}</span>
+              </span>
+              {secondaryLabel && <span className="mt-0.5 inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[9.5px] font-bold leading-none text-[#536471]">{secondaryLabel}</span>}
+            </button>
+            <button className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} className="text-[#536471]" /></button>
+          </div>
+
+          <p className="mt-0.5 whitespace-pre-wrap text-[13px] font-medium leading-[1.48] text-[#0f1419]">{renderPostBody(post.body)}</p>
+          {post.tags.length > 0 && <div className="mt-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5">{post.tags.map((tag) => <span className="text-[11px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+          {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
+          {post.attachmentName && <div className="mt-1.5 flex items-center gap-1.5 rounded-2xl bg-slate-50 p-2 text-[11px]"><Paperclip size={13} />{post.attachmentName}</div>}
+          <div className="mt-1.5 flex items-center gap-5 text-[10.5px] font-semibold text-[#536471]">
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={like} aria-label="応援" aria-pressed={liked}><Heart size={18} strokeWidth={1.8} fill={liked ? 'currentColor' : 'none'} /><span>{post.likes}</span></button>
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={save} aria-label="保存" aria-pressed={saved}><Bookmark size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} /><span>{post.saves}</span></button>
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'meeting')} aria-label="面談" aria-pressed={meetingRequested}><UsersRound size={18} strokeWidth={1.8} /><span>{post.meetings}</span></button>
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={report} aria-label="通報"><Flag size={17} strokeWidth={1.8} /></button>
+            {canShowViews && <span className="ml-auto text-[10px] font-semibold text-[#536471]">{post.views}</span>}
+          </div>
+          {currentAccount?.role === 'investor' && (
+            <div className="mt-2">
+              {!canComment && <p className="mb-1 text-[10px] font-bold text-amber-600">確認書類の提出が完了するまで、コメントは利用できません。</p>}
+              <div className="flex items-center gap-1.5">
+                <input className="field min-h-8 flex-1 rounded-full py-1.5 text-[11px]" value={comment} onChange={(event) => { setComment(event.target.value); setCommentMessage(''); }} placeholder="質問やコメントを書く" />
+                <button className="primary min-h-8 rounded-full px-3 text-[10px] disabled:opacity-40" disabled={!canComment || !comment.trim()} onClick={submitComment}><MessageCircle size={14} />送信</button>
+              </div>
+              {commentMessage && <p className="mt-1 text-[10px] font-bold text-[#536471]">{commentMessage}</p>}
+            </div>
+          )}
+        </div>
+      </div>
+      {menuOpen && isOwner && (
+        <div className="absolute right-4 top-12 z-20 w-40 rounded-2xl border border-slate-100 bg-white p-2 text-xs font-black shadow-xl">
+          <button className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { startEditPost(post); setMenuOpen(false); }}><Edit3 size={14} />編集</button>
+          <button className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left hover:bg-slate-50" onClick={() => { hidePost(post.id); setMenuOpen(false); }}><EyeOff size={14} />{post.isHidden ? '再公開' : '非表示'}</button>
+          <button className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-rose-600 hover:bg-rose-50" onClick={() => { deletePost(post.id); setMenuOpen(false); }}><Trash2 size={14} />削除</button>
+        </div>
+      )}
+      {menuOpen && !isOwner && <div className="absolute right-4 top-12 z-20 rounded-2xl border border-slate-100 bg-white p-3 text-xs font-bold text-slate-500 shadow-xl">投稿者のみ操作できます</div>}
+      {previewImage && (
+        <Modal title={post.imageName || '投稿画像'} onClose={() => setPreviewImage(false)}>
+          <img className="max-h-[70vh] w-full rounded-2xl object-contain" src={post.imageUrl} alt={post.imageName || '投稿画像'} />
+        </Modal>
+      )}
+    </article>
+  );
+}
+
+function renderPostBody(body: string) {
+  return body.split('\n').map((line, index) => (
+    line.trim()
+      ? <span key={`${index}-${line}`} className="block whitespace-pre-wrap">{line}</span>
+      : <span key={`blank-${index}`} className="block h-[0.55em]" aria-hidden />
+  ));
+}
+
+function BottomTabs({ page, setPage, openComposer }: { page: Page; setPage: (page: Page) => void; openComposer: () => void }) {
+  const tabs = [
+    ['feed', 'フィード', Home],
+    ['search', '検索', Search],
+    ['messages', 'メッセージ', Mail],
+    ['mypage', 'マイページ', UserRound],
   ] as const;  RefreshCcw,
   Rocket,
   Search,
