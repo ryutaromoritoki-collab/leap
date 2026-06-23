@@ -13,6 +13,7 @@ import {
   Edit3,
   EyeOff,
   FileText,
+  Flag,
   Heart,
   Home,
   Image as ImageIcon,
@@ -620,6 +621,16 @@ function createSupabaseBrowserClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   return createClient(url, key);
+}
+
+function containsContactInfo(value: string) {
+  const text = value.toLowerCase();
+  return [
+    /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i,
+    /(?:0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{3,4})/,
+    /line\s*(id|:|：)/i,
+    /https?:\/\/(?:line\.me|lin\.ee|zoom\.us|meet\.google\.com)/i,
+  ].some((pattern) => pattern.test(text));
 }
 
 function loadLocal<T>(key: string, fallback: T): T {
@@ -1712,10 +1723,15 @@ function FeedPage({ posts, accounts, currentAccount, feedTab, setFeedTab, openCo
           </div>
         </div>
       )}
+      <button className="flex w-full items-center gap-2.5 border-b border-[#eff3f4] px-4 py-2 text-left hover:bg-[#f7f9f9]" onClick={openComposer}>
+        {currentAccount ? <Avatar account={currentAccount} size="feed" /> : <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]"><Building2 size={21} strokeWidth={1.8} /></span>}
+        <span className="min-w-0 flex-1 text-[12px] font-semibold text-[#536471]">いま何を共有しますか？</span>
+        <span className="rounded-full bg-[#050816] px-4 py-2 text-[11px] font-black text-white">投稿</span>
+      </button>
       {posts.length === 0 ? (
         <EmptyState compact={feedTab === 'following'} icon={<MessageCircle size={28} />} title="まだ投稿がありません" body="投稿すると、指定した公開範囲に合わせてフィードとマイページへ反映されます。" action="投稿する" onAction={openComposer} />
       ) : (
-        <div className="divide-y divide-[#eff3f4]">
+        <div>
           {posts.map((post) => {
             const author = accounts.find((account) => account.id === post.authorId);
             return <PostCard key={post.id} post={post} author={author} currentAccount={currentAccount} openProfile={openProfile} reactToPost={reactToPost} startEditPost={startEditPost} hidePost={hidePost} deletePost={deletePost} />;
@@ -2115,9 +2131,9 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
                   )}
                 </section>
               </div>
-              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
-              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
-              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} muted={!currentAccount.bio} /></div>
+              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} muted={!currentAccount.mission} /></div>
+              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} muted={!currentAccount.culture} /></div>
               <div>
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between gap-3">
@@ -2768,11 +2784,11 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
               {account.profileImageUrl && (
                 <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-[28px] object-cover shadow-sm ring-1 ring-slate-100" />
               )}
-              <CompanyStorySection eyebrow="WHAT WE DO" title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。プロフィール編集から、解決している課題、提供サービス、顧客に届けている価値を記載してください。'} />
+              <CompanyStorySection eyebrow="WHAT WE DO" title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。プロフィール編集から、解決している課題、提供サービス、顧客に届けている価値を記載してください。'} muted={!account.bio} />
               {account.role === 'entrepreneur' && (
                 <>
-                  <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={account.mission || '創業の背景や、実現したい未来はまだ登録されていません。なぜこの事業を続けるのか、誰のどんな課題を変えたいのかを書いてください。'} />
-                  <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={account.culture || '事業の進め方、大切にしている価値観、顧客との向き合い方はまだ登録されていません。チームらしさが伝わる内容を書くと、投資家が判断しやすくなります。'} />
+                  <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={account.mission || '創業の背景や、実現したい未来はまだ登録されていません。なぜこの事業を続けるのか、誰のどんな課題を変えたいのかを書いてください。'} muted={!account.mission} />
+                  <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={account.culture || '事業の進め方、大切にしている価値観、顧客との向き合い方はまだ登録されていません。チームらしさが伝わる内容を書くと、投資家が判断しやすくなります。'} muted={!account.culture} />
                   <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
                     <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">MEMBERS</p>
                     <h3 className="mt-1 text-lg font-black">メンバー</h3>
@@ -2781,7 +2797,7 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
                       <div className="min-w-0 flex-1">
                         <b className="block truncate text-sm">{account.name || '代表者名未設定'}</b>
                         <span className="text-xs font-bold text-slate-500">{account.title || '肩書き未設定'}</span>
-                        <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">{account.teamIntro || 'チーム紹介はまだ登録されていません。創業メンバーの経験、役割、これから仲間にしたい人を書いてください。'}</p>
+                        <p className={`mt-3 whitespace-pre-line text-sm leading-7 ${account.teamIntro ? 'text-slate-600' : 'text-slate-400'}`}>{account.teamIntro || 'チーム紹介はまだ登録されていません。創業メンバーの経験、役割、これから仲間にしたい人を書いてください。'}</p>
                       </div>
                     </div>
                   </section>
@@ -2828,7 +2844,7 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
       )}
       {tab === 'achievements' && (
         <div className="px-3 py-2">
-          <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} />
+          <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} muted={!account.achievements} />
         </div>
       )}
       {tab === 'posts' && (
@@ -2845,12 +2861,12 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
   );
 }
 
-function CompanyStorySection({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+function CompanyStorySection({ eyebrow, title, body, muted = false }: { eyebrow: string; title: string; body: string; muted?: boolean }) {
   return (
     <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
       <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">{eyebrow}</p>
       <h3 className="mt-1 text-xl font-black tracking-tight">{title}</h3>
-      <p className="mt-4 whitespace-pre-line text-[15px] font-bold leading-8 text-slate-700">{body}</p>
+      <p className={`mt-4 whitespace-pre-line text-[15px] font-bold leading-8 ${muted ? 'text-slate-400' : 'text-slate-700'}`}>{body}</p>
     </section>
   );
 }
@@ -2875,7 +2891,7 @@ function CultureMap({ account }: { account: Account }) {
           </div>
         ))}
       </div>
-      <p className="mt-4 whitespace-pre-line text-sm font-bold leading-7 text-slate-600">{account.personalityProfile || '意思決定やチームの特徴はまだ登録されていません。プロフィール編集で、投資家が一緒に動く時に知っておくとよい特徴を書けます。'}</p>
+      <p className={`mt-4 whitespace-pre-line text-sm font-bold leading-7 ${account.personalityProfile ? 'text-slate-600' : 'text-slate-400'}`}>{account.personalityProfile || '意思決定やチームの特徴はまだ登録されていません。プロフィール編集で、投資家が一緒に動く時に知っておくとよい特徴を書けます。'}</p>
     </section>
   );
 }
@@ -2927,12 +2943,12 @@ function DealPage({ account, requestMeeting }: { account: Account; requestMeetin
       {account.profileImageUrl ? <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" /> : <DashboardCard />}
       <h3 className="mt-5 text-sm font-black">ハイライト</h3>
       <KpiGrid account={account} />
-      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} />
+      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} muted={!account.dealDetails} />
       <h3 className="mt-5 text-sm font-black">関連情報</h3>
       <InfoRows rows={[['調達希望額', account.fundingGoal || '未入力'], ['月次売上', account.monthlyRevenue || '未入力'], ['成長率', account.growthRate || '未入力'], ['導入社数', account.customerCount || '未入力'], ['地域', account.location || '未入力'], ['フェーズ', account.stage || '未入力']]} />
       <div className="mt-4 rounded-2xl border border-slate-100 p-4">
         <p className="text-sm font-black">事業計画書・ピッチ資料</p>
-        {account.businessPlanUrl ? <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={account.businessPlanUrl} download={account.businessPlanName || 'business-plan'}><Paperclip size={15} />{account.businessPlanName || '資料をダウンロード'}</a> : <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>}
+        {account.businessPlanUrl ? <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={account.businessPlanUrl} target="_blank" rel="noopener noreferrer"><Paperclip size={15} />{account.businessPlanName || '資料を開く'}</a> : <p className="mt-2 text-xs text-slate-500">資料が登録されるとここに表示されます。</p>}
       </div>
       <button className="primary mt-4 w-full" onClick={requestMeeting}>面談を申し込む</button>
     </div>
@@ -2986,44 +3002,118 @@ function BlogCard({ blog, author, currentAccount, startEditBlog, hideBlog, delet
 function PostCard({ post, author, currentAccount, openProfile, reactToPost, startEditPost, hidePost, deletePost }: { post: Post; author?: Account; currentAccount: Account | null; openProfile: (account: Account) => void; reactToPost: (postId: string, type: 'like' | 'save' | 'meeting') => void; startEditPost: (post: Post) => void; hidePost: (postId: string) => void; deletePost: (postId: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(false);
+  const [comment, setComment] = useState('');
+  const [commentMessage, setCommentMessage] = useState('');
   const isOwner = Boolean(currentAccount && currentAccount.id === post.authorId);
   const actions = post.actionUserIds ?? { likes: [], saves: [], meetings: [] };
   const liked = currentAccount ? actions.likes?.includes(currentAccount.id) : false;
   const saved = currentAccount ? actions.saves?.includes(currentAccount.id) : false;
   const meetingRequested = currentAccount ? actions.meetings?.includes(currentAccount.id) : false;
   const authorName = author ? displayAccountName(author) : 'アカウント未設定';
-  const visibilityText = post.visibility === 'public' ? '' : visibilityLabels[post.visibility];
-  const secondaryLabel = [post.isHidden ? '非表示' : '', visibilityText].filter(Boolean).join('・');
+  const secondaryLabel = post.isHidden ? '非表示' : '';
   const canShowViews = isOwner || post.views > 1000;
+  const canComment = currentAccount?.role !== 'investor' || Boolean(currentAccount?.corporateNumber || currentAccount?.licenseFileName || currentAccount?.verified);
+
+  async function like() {
+    reactToPost(post.id, 'like');
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase || !currentAccount) return;
+    await supabase.from('post_likes').upsert({ post_id: post.id, user_id: currentAccount.id });
+  }
+
+  async function save() {
+    reactToPost(post.id, 'save');
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase || !currentAccount) return;
+    await supabase.from('watchlists').upsert({
+      entrepreneur_id: post.authorId,
+      investor_id: currentAccount.id,
+      memo: `保存した投稿: ${post.body.slice(0, 80)}`,
+    });
+  }
+
+  async function report() {
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase || !currentAccount) return;
+    await supabase.from('reports').insert({
+      reporter_id: currentAccount.id,
+      target_type: 'progress_posts',
+      target_id: post.id,
+      reason: '投稿内容の確認依頼',
+    });
+    setCommentMessage('通報を送信しました。');
+  }
+
+  async function submitComment() {
+    if (!currentAccount || !comment.trim()) return;
+    if (!canComment) {
+      setCommentMessage('確認書類の提出が完了するまで、コメントは利用できません。');
+      return;
+    }
+    const supabase = createSupabaseBrowserClient();
+    if (containsContactInfo(comment)) {
+      if (supabase) {
+        await supabase.from('contact_suspicions').insert({
+          sender_id: currentAccount.id,
+          receiver_id: post.authorId,
+          body: comment,
+          reason: 'コメント内に連絡先交換の疑いがあります。',
+        });
+      }
+      setCommentMessage('連絡先交換につながる可能性がある内容は送信できません。');
+      return;
+    }
+    if (supabase) {
+      await supabase.from('post_comments').insert({ post_id: post.id, user_id: currentAccount.id, body: comment });
+      await supabase.from('notifications').insert({ user_id: post.authorId, type: 'comment', body: '進捗投稿にコメントがつきました。' });
+    }
+    setComment('');
+    setCommentMessage('コメントを送信しました。');
+  }
+
   return (
-    <article className={`relative px-3.5 py-2 ${post.isHidden ? 'bg-slate-50' : ''}`}>
-      <div className="flex w-full items-start gap-2 text-left">
+    <article className={`relative border-b border-[#eff3f4] px-4 py-3 ${post.isHidden ? 'bg-slate-50' : 'bg-white'}`}>
+      <div className="flex w-full items-start gap-2.5 text-left">
+        <div className="grid shrink-0 justify-items-center">
         <button className="shrink-0" onClick={() => author && openProfile(author)} aria-label={`${authorName}のプロフィールを見る`}>
-          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]"><Building2 size={18} strokeWidth={1.8} /></span>}
+          {author ? <Avatar account={author} size="feed" /> : <span className="grid h-12 w-12 place-items-center rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]"><Building2 size={21} strokeWidth={1.8} /></span>}
         </button>
+        <span className="mt-2 h-full min-h-8 w-px bg-[#d9dfe4]" />
+        </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1.5">
+          <div className="flex items-start gap-1">
             <button className="min-w-0 flex-1 text-left" onClick={() => author && openProfile(author)}>
               <span className="flex min-w-0 items-center gap-1 leading-[1.25]">
-                <b className="truncate text-[13px] font-black text-[#0f1419]">{authorName}</b>
-                <span className="shrink-0 text-[11px] font-semibold text-[#536471]">・{formatRelativeTime(post.createdAt)}</span>
+                <b className="truncate text-[14px] font-black text-[#0f1419]">{authorName}</b>
+                <span className="shrink-0 text-[11px] font-medium text-[#536471]">・{formatRelativeTime(post.createdAt)}</span>
               </span>
-              <span className="block text-[10px] font-semibold leading-[1.25] text-[#536471]">{secondaryLabel}</span>
+              {secondaryLabel && <span className="mt-0.5 inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[9.5px] font-bold leading-none text-[#536471]">{secondaryLabel}</span>}
             </button>
             <button className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-slate-50" onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={17} className="text-[#536471]" /></button>
           </div>
 
-          <p className="mt-0.5 text-[13px] leading-[1.24] text-[#0f1419]">{renderPostBody(post.body)}</p>
-          {post.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{post.tags.map((tag) => <span className="text-[12px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
+          <p className="mt-0.5 whitespace-pre-wrap text-[15px] font-normal leading-[1.55] text-[#0f1419]">{renderPostBody(post.body)}</p>
+          {post.tags.length > 0 && <div className="mt-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5">{post.tags.map((tag) => <span className="text-[11px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
           {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
           {post.attachmentName && <div className="mt-1.5 flex items-center gap-1.5 rounded-2xl bg-slate-50 p-2 text-[11px]"><Paperclip size={13} />{post.attachmentName}</div>}
-          <div className="mt-1.5 flex items-center gap-5 text-[11px] font-semibold text-[#536471]">
-            <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'like')} aria-label="応援" aria-pressed={liked}><Heart size={16} fill={liked ? 'currentColor' : 'none'} />{post.likes}</button>
-            <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'save')} aria-label="保存" aria-pressed={saved}><Bookmark size={16} fill={saved ? 'currentColor' : 'none'} />{post.saves}</button>
-            <button className="inline-flex min-w-7 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'meeting')} aria-label="面談" aria-pressed={meetingRequested}><UsersRound size={16} />{post.meetings}</button>
-            {canShowViews && <span className="ml-auto text-[10px]">閲覧 {post.views}</span>}
+          <div className="mt-1.5 flex items-center gap-5 text-[12px] font-semibold text-[#536471]">
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={like} aria-label="応援" aria-pressed={liked}><Heart size={18} strokeWidth={1.8} fill={liked ? 'currentColor' : 'none'} /><span>{post.likes}</span></button>
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={save} aria-label="保存" aria-pressed={saved}><Bookmark size={18} strokeWidth={1.8} fill={saved ? 'currentColor' : 'none'} /><span>{post.saves}</span></button>
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={() => reactToPost(post.id, 'meeting')} aria-label="面談" aria-pressed={meetingRequested}><UsersRound size={18} strokeWidth={1.8} /><span>{post.meetings}</span></button>
+            <button className="inline-flex min-w-6 items-center gap-1 text-[#0f1419]" onClick={report} aria-label="通報"><Flag size={17} strokeWidth={1.8} /></button>
+            {canShowViews && <span className="ml-auto text-[10px] font-semibold text-[#536471]">{post.views}</span>}
           </div>
+          {currentAccount?.role === 'investor' && (
+            <div className="mt-2">
+              {!canComment && <p className="mb-1 text-[10px] font-bold text-amber-600">確認書類の提出が完了するまで、コメントは利用できません。</p>}
+              <div className="flex items-center gap-1.5">
+                <input className="field min-h-8 flex-1 rounded-full py-1.5 text-[11px]" value={comment} onChange={(event) => { setComment(event.target.value); setCommentMessage(''); }} placeholder="質問やコメントを書く" />
+                <button className="primary min-h-8 rounded-full px-3 text-[10px] disabled:opacity-40" disabled={!canComment || !comment.trim()} onClick={submitComment}><MessageCircle size={14} />送信</button>
+              </div>
+              {commentMessage && <p className="mt-1 text-[10px] font-bold text-[#536471]">{commentMessage}</p>}
+            </div>
+          )}
         </div>
       </div>
       {menuOpen && isOwner && (
@@ -3204,8 +3294,8 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
 }
 
 function Avatar({ account, size = 'md', active }: { account: Account; size?: 'md' | 'feed' | 'lg'; active?: boolean }) {
-  const dimension = size === 'lg' ? 'h-20 w-20' : size === 'feed' ? 'h-10 w-10' : 'h-11 w-11';
-  const iconSize = size === 'lg' ? 30 : size === 'feed' ? 18 : 17;
+  const dimension = size === 'lg' ? 'h-20 w-20' : size === 'feed' ? 'h-12 w-12' : 'h-11 w-11';
+  const iconSize = size === 'lg' ? 30 : size === 'feed' ? 21 : 17;
   return (
     <span className={`relative grid ${dimension} shrink-0 place-items-center overflow-hidden rounded-full bg-[#f2f4f7] text-slate-400 ring-1 ring-[#e5e7eb]`}>
       {account.avatarUrl ? <img src={account.avatarUrl} alt={displayAccountName(account)} className="h-full w-full object-cover" /> : <Building2 size={iconSize} strokeWidth={1.8} />}
@@ -3252,8 +3342,8 @@ function Select({ label, value, options, onChange, displayMap }: { label: string
   return <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">{label}<select className="field" value={value} onChange={(event) => onChange(event.target.value)}><option value="">選択してください</option>{options.map((option) => <option key={option} value={option}>{displayMap?.[option] ?? option}</option>)}</select></label>;
 }
 
-function TextBlock({ title, body }: { title: string; body: string }) {
-  return <section className="mt-5"><h3 className="text-sm font-black">{title}</h3><p className="mt-2 whitespace-pre-line text-sm leading-7 text-slate-600">{body}</p></section>;
+function TextBlock({ title, body, muted = false }: { title: string; body: string; muted?: boolean }) {
+  return <section className="mt-5"><h3 className="text-sm font-black">{title}</h3><p className={`mt-2 whitespace-pre-line text-[15px] font-bold leading-8 ${muted ? 'text-slate-400' : 'text-slate-700'}`}>{body}</p></section>;
 }
 
 function DashboardCard() {

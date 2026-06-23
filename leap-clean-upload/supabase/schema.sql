@@ -505,8 +505,8 @@ create policy "automated reminders admin read" on public.automated_reminders for
 create policy "pitch materials owner upload" on storage.objects for insert with check (
   bucket_id = 'pitch-materials' and auth.uid()::text = (storage.foldername(name))[1]
 );
-create policy "pitch materials owner read" on storage.objects for select using (
-  bucket_id = 'pitch-materials' and (auth.uid()::text = (storage.foldername(name))[1] or public.is_admin())
+create policy "pitch materials public read" on storage.objects for select using (
+  bucket_id = 'pitch-materials'
 );
 create policy "pitch materials owner update" on storage.objects for update using (
   bucket_id = 'pitch-materials' and (auth.uid()::text = (storage.foldername(name))[1] or public.is_admin())
