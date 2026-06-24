@@ -1498,7 +1498,7 @@ export default function LeapApp() {
               readFileAsDataUrl(file, setBlogImageUrl);
             }} />
           </label>
-          {blogImageUrl && <img src={blogImageUrl} alt={blogImageName} className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" />}
+          {blogImageUrl && <img src={blogImageUrl} alt={blogImageName} className="mt-3 aspect-[12/5] w-full rounded-2xl object-cover" />}
           <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
             <Paperclip size={17} />添付ファイルを選択
             <input className="hidden" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,image/*" onChange={(event) => {
@@ -2131,9 +2131,9 @@ function MyPage({ currentAccount, accounts, posts, blogs, setPage, openComposer,
                   )}
                 </section>
               </div>
-              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} /></div>
-              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} /></div>
-              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} /></div>
+              <div><CompanyStorySection eyebrow="WHAT WE DO" title="なにをやっているのか" body={currentAccount.bio || '事業内容はまだ登録されていません。プロフィール編集で、誰のどんな課題をどう解決しているのかを書きましょう。'} muted={!currentAccount.bio} /></div>
+              <div><CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={currentAccount.mission || 'ミッションはまだ登録されていません。事業を始めた背景、実現したい未来、社会に届けたい価値を書きましょう。'} muted={!currentAccount.mission} /></div>
+              <div><CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={currentAccount.culture || '事業の進め方やチームの価値観はまだ登録されていません。顧客への向き合い方、開発姿勢、組織文化を書きましょう。'} muted={!currentAccount.culture} /></div>
               <div>
                 <section className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between gap-3">
@@ -2373,7 +2373,7 @@ function ProfileEditPage({ accounts, currentAccount, setAccounts, setCurrentAcco
             <p className="mt-1 text-xs font-bold text-slate-500">あなたの会社の想いと事業内容が伝わる文章にしてください。</p>
             <label className="mt-4 grid gap-2 text-[11px] font-bold text-slate-600">
               会社紹介画像
-              {form.profileImageUrl && <img src={form.profileImageUrl} alt={form.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" />}
+              {form.profileImageUrl && <img src={form.profileImageUrl} alt={form.profileImageName || '会社紹介画像'} className="aspect-[12/5] w-full rounded-2xl object-cover ring-1 ring-slate-100" />}
               <span className="secondary relative min-h-11 overflow-hidden">
                 画像を選択
                 <input className="absolute inset-0 opacity-0" type="file" accept="image/*" onChange={(event) => {
@@ -2782,25 +2782,13 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
           <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="grid gap-5">
               {account.profileImageUrl && (
-                <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="aspect-[16/9] w-full rounded-[28px] object-cover shadow-sm ring-1 ring-slate-100" />
+                <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="aspect-[12/5] w-full rounded-[28px] object-cover shadow-sm ring-1 ring-slate-100" />
               )}
-              <CompanyStorySection eyebrow="WHAT WE DO" title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。プロフィール編集から、解決している課題、提供サービス、顧客に届けている価値を記載してください。'} />
+              <CompanyStorySection eyebrow="WHAT WE DO" title={account.role === 'entrepreneur' ? 'なにをやっているのか' : 'どんな投資をしているのか'} body={account.bio || '事業内容はまだ登録されていません。プロフィール編集から、解決している課題、提供サービス、顧客に届けている価値を記載してください。'} muted={!account.bio} />
               {account.role === 'entrepreneur' && (
                 <>
-                  <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={account.mission || '創業の背景や、実現したい未来はまだ登録されていません。なぜこの事業を続けるのか、誰のどんな課題を変えたいのかを書いてください。'} />
-                  <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={account.culture || '事業の進め方、大切にしている価値観、顧客との向き合い方はまだ登録されていません。チームらしさが伝わる内容を書くと、投資家が判断しやすくなります。'} />
-                  <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
-                    <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">MEMBERS</p>
-                    <h3 className="mt-1 text-lg font-black">メンバー</h3>
-                    <div className="mt-4 flex gap-4">
-                      <Avatar account={account} size="lg" />
-                      <div className="min-w-0 flex-1">
-                        <b className="block truncate text-sm">{account.name || '代表者名未設定'}</b>
-                        <span className="text-xs font-bold text-slate-500">{account.title || '肩書き未設定'}</span>
-                        <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">{account.teamIntro || 'チーム紹介はまだ登録されていません。創業メンバーの経験、役割、これから仲間にしたい人を書いてください。'}</p>
-                      </div>
-                    </div>
-                  </section>
+                  <CompanyStorySection eyebrow="WHY" title="なぜやるのか" body={account.mission || '創業の背景や、実現したい未来はまだ登録されていません。なぜこの事業を続けるのか、誰のどんな課題を変えたいのかを書いてください。'} muted={!account.mission} />
+                  <CompanyStorySection eyebrow="HOW" title="どうやっているのか" body={account.culture || '事業の進め方、大切にしている価値観、顧客との向き合い方はまだ登録されていません。チームらしさが伝わる内容を書くと、投資家が判断しやすくなります。'} muted={!account.culture} />
                   <CultureMap account={account} />
                 </>
               )}
@@ -2844,7 +2832,7 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
       )}
       {tab === 'achievements' && (
         <div className="px-3 py-2">
-          <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} />
+          <TextBlock title="実績" body={account.achievements || '実績はまだ登録されていません。'} muted={!account.achievements} />
         </div>
       )}
       {tab === 'posts' && (
@@ -2861,12 +2849,12 @@ function ProfilePage({ account, accounts, currentAccount, posts, blogs, isFollow
   );
 }
 
-function CompanyStorySection({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+function CompanyStorySection({ eyebrow, title, body, muted = false }: { eyebrow: string; title: string; body: string; muted?: boolean }) {
   return (
     <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
       <p className="text-[10px] font-black tracking-[0.18em] text-blue-600">{eyebrow}</p>
-      <h3 className="mt-1 text-xl font-black tracking-tight">{title}</h3>
-      <p className="mt-4 whitespace-pre-line text-[15px] font-bold leading-8 text-slate-700">{body}</p>
+      <h3 className="mt-2 text-[26px] font-black leading-tight tracking-tight">{title}</h3>
+      <p className={`mt-4 whitespace-pre-line text-[15px] font-bold leading-8 ${muted ? 'text-slate-400' : 'text-slate-700'}`}>{body}</p>
     </section>
   );
 }
@@ -2891,7 +2879,7 @@ function CultureMap({ account }: { account: Account }) {
           </div>
         ))}
       </div>
-      <p className="mt-4 whitespace-pre-line text-sm font-bold leading-7 text-slate-600">{account.personalityProfile || '意思決定やチームの特徴はまだ登録されていません。プロフィール編集で、投資家が一緒に動く時に知っておくとよい特徴を書けます。'}</p>
+      <p className={`mt-4 whitespace-pre-line text-sm font-bold leading-7 ${account.personalityProfile ? 'text-slate-600' : 'text-slate-400'}`}>{account.personalityProfile || '意思決定やチームの特徴はまだ登録されていません。プロフィール編集で、投資家が一緒に動く時に知っておくとよい特徴を書けます。'}</p>
     </section>
   );
 }
@@ -2926,7 +2914,7 @@ function CompanyInfoPanel({ account }: { account: Account }) {
 function MiniBlogCard({ blog }: { blog: BlogArticle }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-      {blog.imageUrl ? <img src={blog.imageUrl} alt={blog.imageName || blog.title} className="aspect-[16/9] w-full object-cover" /> : <div className="aspect-[16/9] bg-gradient-to-br from-blue-50 to-emerald-50" />}
+      {blog.imageUrl ? <img src={blog.imageUrl} alt={blog.imageName || blog.title} className="aspect-[12/5] w-full object-cover" /> : <div className="aspect-[12/5] bg-gradient-to-br from-blue-50 to-emerald-50" />}
       <div className="p-3">
         <b className="line-clamp-2 text-sm">{blog.title || 'タイトル未設定'}</b>
         <p className="mt-2 line-clamp-2 text-xs font-bold leading-5 text-slate-500">{blog.body}</p>
@@ -2940,10 +2928,10 @@ function DealPage({ account, requestMeeting }: { account: Account; requestMeetin
     <div className="p-4">
       <h2 className="text-lg font-black">{account.company || account.accountName || '案件詳細'}</h2>
       <div className="mt-2 flex flex-wrap gap-2">{[account.industry, account.stage, account.location].filter(Boolean).map((tag) => <span className="pill" key={tag}>{tag}</span>)}</div>
-      {account.profileImageUrl ? <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover ring-1 ring-slate-100" /> : <DashboardCard />}
+      {account.profileImageUrl ? <img src={account.profileImageUrl} alt={account.profileImageName || '会社紹介画像'} className="mt-4 aspect-[12/5] w-full rounded-2xl object-cover ring-1 ring-slate-100" /> : <DashboardCard />}
       <h3 className="mt-5 text-sm font-black">ハイライト</h3>
       <KpiGrid account={account} />
-      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} />
+      <TextBlock title="案件詳細" body={account.dealDetails || '案件詳細はまだ登録されていません。'} muted={!account.dealDetails} />
       <h3 className="mt-5 text-sm font-black">関連情報</h3>
       <InfoRows rows={[['調達希望額', account.fundingGoal || '未入力'], ['月次売上', account.monthlyRevenue || '未入力'], ['成長率', account.growthRate || '未入力'], ['導入社数', account.customerCount || '未入力'], ['地域', account.location || '未入力'], ['フェーズ', account.stage || '未入力']]} />
       <div className="mt-4 rounded-2xl border border-slate-100 p-4">
@@ -2988,7 +2976,7 @@ function BlogCard({ blog, author, currentAccount, startEditBlog, hideBlog, delet
               </div>
             )}
           </div>
-          {blog.imageUrl && <img className="mt-3 aspect-[16/9] w-full rounded-2xl object-cover" src={blog.imageUrl} alt={blog.imageName || blog.title} />}
+          {blog.imageUrl && <img className="mt-3 aspect-[12/5] w-full rounded-2xl object-cover" src={blog.imageUrl} alt={blog.imageName || blog.title} />}
           <p className="mt-3 whitespace-pre-line text-[14px] leading-7 text-slate-700">{blog.body}</p>
           {blog.tags.length > 0 && <p className="mt-3 text-[13px] font-black text-blue-600">{blog.tags.map((tag) => `#${tag}`).join(' ')}</p>}
           {blog.attachmentUrl && <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={blog.attachmentUrl} download={blog.attachmentName || 'blog-attachment'}><Paperclip size={15} />{blog.attachmentName || '添付ファイル'}</a>}
@@ -3342,8 +3330,8 @@ function Select({ label, value, options, onChange, displayMap }: { label: string
   return <label className="mt-3 grid gap-1 text-[11px] font-bold text-slate-600">{label}<select className="field" value={value} onChange={(event) => onChange(event.target.value)}><option value="">選択してください</option>{options.map((option) => <option key={option} value={option}>{displayMap?.[option] ?? option}</option>)}</select></label>;
 }
 
-function TextBlock({ title, body }: { title: string; body: string }) {
-  return <section className="mt-5"><h3 className="text-sm font-black">{title}</h3><p className="mt-2 whitespace-pre-line text-sm leading-7 text-slate-600">{body}</p></section>;
+function TextBlock({ title, body, muted = false }: { title: string; body: string; muted?: boolean }) {
+  return <section className="mt-5"><h3 className="text-sm font-black">{title}</h3><p className={`mt-2 whitespace-pre-line text-[15px] font-bold leading-8 ${muted ? 'text-slate-400' : 'text-slate-700'}`}>{body}</p></section>;
 }
 
 function DashboardCard() {
