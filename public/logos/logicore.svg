@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">LogiCore icon mark</title>
+  <desc id="desc">A creative logistics icon combining a dimensional core, route lines, and forward motion.</desc>
+  <defs>
+    <linearGradient id="bg" x1="176" y1="120" x2="862" y2="886" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#061B2E"/>
+      <stop offset="0.46" stop-color="#0A4B68"/>
+      <stop offset="1" stop-color="#062033"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="243" y1="214" x2="741" y2="752" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#29F2D1"/>
+      <stop offset="0.55" stop-color="#00A9C6"/>
+      <stop offset="1" stop-color="#1677FF"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="232" y1="674" x2="760" y2="284" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE45C"/>
+      <stop offset="0.5" stop-color="#FF9F1C"/>
+      <stop offset="1" stop-color="#FF5C35"/>
+    </linearGradient>
+    <linearGradient id="faceTop" x1="318" y1="237" x2="706" y2="486" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ECFFFB"/>
+      <stop offset="1" stop-color="#81EAE1"/>
+    </linearGradient>
+    <linearGradient id="faceLeft" x1="286" y1="426" x2="519" y2="779" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1CB5C9"/>
+      <stop offset="1" stop-color="#0B5E9A"/>
+    </linearGradient>
+    <linearGradient id="faceRight" x1="513" y1="425" x2="752" y2="777" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#126BFF"/>
+      <stop offset="1" stop-color="#123A5B"/>
+    </linearGradient>
+    <filter id="lift" x="-16%" y="-16%" width="132%" height="132%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#02111E" flood-opacity="0.32"/>
+    </filter>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+  <path d="M202 690c154 98 326 109 508 33 64-27 117-63 159-110" fill="none" stroke="#123A5B" stroke-width="74" stroke-linecap="round" opacity="0.34"/>
+  <path d="M191 651c143 112 324 133 512 60 72-28 129-70 170-126" fill="none" stroke="url(#amber)" stroke-width="52" stroke-linecap="round"/>
+  <path d="M792 490l119 64-98 86" fill="none" stroke="#FF7A2F" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#lift)">
+    <path d="M512 188 736 318 512 448 288 318 512 188Z" fill="url(#faceTop)"/>
+    <path d="M288 318 512 448v260L288 578V318Z" fill="url(#faceLeft)"/>
+    <path d="M736 318 512 448v260l224-130V318Z" fill="url(#faceRight)"/>
+    <path d="M512 188 736 318 512 448 288 318 512 188Z" fill="none" stroke="#FFFFFF" stroke-width="10" opacity="0.45"/>
+    <path d="M288 318 512 448 736 318" fill="none" stroke="#FFFFFF" stroke-width="10" opacity="0.34"/>
+    <path d="M512 448v260" fill="none" stroke="#FFFFFF" stroke-width="10" opacity="0.22"/>
+  </g>
+  <path d="M376 408v128c0 55 45 100 100 100h170" fill="none" stroke="#FFFFFF" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M648 388H526c-66 0-119 53-119 119 0 38 18 72 45 94" fill="none" stroke="#061B2E" stroke-width="46" stroke-linecap="round" opacity="0.56"/>
+  <path d="M642 388H526c-66 0-119 53-119 119 0 38 18 72 45 94" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="512" cy="512" r="62" fill="#061B2E"/>
+  <circle cx="512" cy="512" r="36" fill="#FFFFFF"/>
+  <circle cx="512" cy="512" r="18" fill="url(#amber)" filter="url(#glow)"/>
+  <circle cx="202" cy="651" r="30" fill="#FFE45C"/>
+  <circle cx="202" cy="651" r="13" fill="#061B2E" opacity="0.42"/>
+  <circle cx="824" cy="573" r="24" fill="#FF5C35"/>
+  <path d="M222 342c52-88 141-148 244-164" fill="none" stroke="url(#teal)" stroke-width="22" stroke-linecap="round" opacity="0.88"/>
+  <path d="M305 814c63 42 134 63 207 63 80 0 156-25 219-72" fill="none" stroke="#29F2D1" stroke-width="22" stroke-linecap="round" opacity="0.72"/>
+</svg>

@@ -352,6 +352,12 @@ const aiInvestorPostThemes = [
   '市場規模だけではなく、最初の顧客がなぜ使い続けるのかを見ています。投稿から仮説検証の過程が見えると判断しやすいです。',
 ];
 
+const logicoreIconUrl = '/logos/logicore.svg';
+
+function isLogicoreAccount(account: Pick<Account, 'company' | 'accountName'>) {
+  return [account.company, account.accountName].some((value) => value === 'LogiCore株式会社' || value === 'LogiCore');
+}
+
 function hashText(text: string) {
   return Array.from(text).reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
 }
@@ -471,7 +477,9 @@ function createAiAccounts(): Account[] {
     bio: `${aiFounderStories[index % aiFounderStories.length]}\n\n現在は「${aiBusinessDomains[index % aiBusinessDomains.length]}」を提供し、現場の声をもとにプロダクトと導入体験を改善しています。`,
     achievements: `${accountAchievementTitle(index)}\n・週次のKPIレビューを継続\n・顧客ヒアリングを累計${35 + index * 4}件実施\n・導入後オンボーディング改善を毎月実施`,
     avatarLabel: '',
-    avatarUrl: companyLogoDataUri(`${aiCompanyWords[index % aiCompanyWords.length]}株式会社`, index),
+    avatarUrl: aiCompanyWords[index % aiCompanyWords.length] === 'LogiCore'
+      ? logicoreIconUrl
+      : companyLogoDataUri(`${aiCompanyWords[index % aiCompanyWords.length]}株式会社`, index),
     isBot: true,
     botKind: 'entrepreneur',
     age: `${28 + (index % 18)}歳`,
@@ -651,7 +659,9 @@ function normalizeAccount(account: Account): Account {
   const hasIdentityMaterial = Boolean(account.corporateNumber || account.licenseFileName);
   const identityStatus = account.identityStatus || (account.verified ? 'verified' : hasIdentityMaterial ? 'submitted' : 'none');
   const isManagedAccount = Boolean(account.isBot || account.botKind);
-  const avatarUrl = account.avatarUrl || (isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, Math.abs(hashText(account.id || account.email || account.company))) : '');
+  const avatarUrl = isLogicoreAccount(account)
+    ? logicoreIconUrl
+    : account.avatarUrl || (isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, Math.abs(hashText(account.id || account.email || account.company))) : '');
   return {
     ...emptyAccount,
     ...account,
