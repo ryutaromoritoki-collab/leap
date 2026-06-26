@@ -600,7 +600,7 @@ function createAiPosts(accounts: Account[]): Post[] {
       body: account.role === 'entrepreneur'
         ? createEntrepreneurPostBody(account, accountIndex, postIndex)
         : createInvestorPostBody(account, accountIndex, postIndex),
-      tags: account.role === 'entrepreneur' ? ['進捗', account.industry] : ['投資観点', account.industry],
+      tags: [],
       visibility: 'public' as const,
       attachmentName: '',
       imageName: '',
@@ -855,7 +855,6 @@ export default function LeapApp() {
   const [toast, setToast] = useState('');
   const [showComposer, setShowComposer] = useState(false);
   const [postDraft, setPostDraft] = useState('');
-  const [postTags, setPostTags] = useState('');
   const [postVisibility, setPostVisibility] = useState<Visibility>('public');
   const [postAttachment, setPostAttachment] = useState('');
   const [postImageName, setPostImageName] = useState('');
@@ -865,7 +864,6 @@ export default function LeapApp() {
   const [editingBlogId, setEditingBlogId] = useState('');
   const [blogTitle, setBlogTitle] = useState('');
   const [blogBody, setBlogBody] = useState('');
-  const [blogTags, setBlogTags] = useState('');
   const [blogVisibility, setBlogVisibility] = useState<Visibility>('public');
   const [blogImageName, setBlogImageName] = useState('');
   const [blogImageUrl, setBlogImageUrl] = useState('');
@@ -1072,7 +1070,7 @@ export default function LeapApp() {
       setPosts((list) => list.map((post) => post.id === editingPostId ? {
         ...post,
         body: postDraft.trim(),
-        tags: postTags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        tags: [],
         visibility: postVisibility,
         attachmentName: postAttachment.trim(),
         imageName: postImageName,
@@ -1087,7 +1085,7 @@ export default function LeapApp() {
         id: crypto.randomUUID(),
         authorId: currentAccount!.id,
         body: postDraft.trim(),
-        tags: postTags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        tags: [],
         visibility: postVisibility,
         attachmentName: postAttachment.trim(),
         imageName: postImageName,
@@ -1109,7 +1107,6 @@ export default function LeapApp() {
   function resetComposer() {
     setEditingPostId('');
     setPostDraft('');
-    setPostTags('');
     setPostVisibility('public');
     setPostAttachment('');
     setPostImageName('');
@@ -1155,7 +1152,6 @@ export default function LeapApp() {
   function startEditPost(post: Post) {
     setEditingPostId(post.id);
     setPostDraft(post.body);
-    setPostTags(post.tags.join(', '));
     setPostVisibility(post.visibility);
     setPostAttachment(post.attachmentName);
     setPostImageName(post.imageName);
@@ -1185,9 +1181,8 @@ export default function LeapApp() {
       return;
     }
     const now = new Date().toISOString();
-    const tags = blogTags.split(',').map((tag) => tag.trim()).filter(Boolean);
     if (editingBlogId) {
-      setBlogs((list) => list.map((blog) => blog.id === editingBlogId ? { ...blog, title: blogTitle.trim(), body: blogBody.trim(), tags, visibility: blogVisibility, imageName: blogImageName, imageUrl: blogImageUrl, attachmentName: blogAttachmentName, attachmentUrl: blogAttachmentUrl, updatedAt: now } : blog));
+      setBlogs((list) => list.map((blog) => blog.id === editingBlogId ? { ...blog, title: blogTitle.trim(), body: blogBody.trim(), tags: [], visibility: blogVisibility, imageName: blogImageName, imageUrl: blogImageUrl, attachmentName: blogAttachmentName, attachmentUrl: blogAttachmentUrl, updatedAt: now } : blog));
       resetBlogComposer();
       flash('ブログを更新しました');
       return;
@@ -1197,7 +1192,7 @@ export default function LeapApp() {
       authorId: currentAccount!.id,
       title: blogTitle.trim(),
       body: blogBody.trim(),
-      tags,
+      tags: [],
       visibility: blogVisibility,
       imageName: blogImageName,
       imageUrl: blogImageUrl,
@@ -1216,7 +1211,6 @@ export default function LeapApp() {
     setEditingBlogId('');
     setBlogTitle('');
     setBlogBody('');
-    setBlogTags('');
     setBlogVisibility('public');
     setBlogImageName('');
     setBlogImageUrl('');
@@ -1229,7 +1223,6 @@ export default function LeapApp() {
     setEditingBlogId(blog.id);
     setBlogTitle(blog.title);
     setBlogBody(blog.body);
-    setBlogTags(blog.tags.join(', '));
     setBlogVisibility(blog.visibility);
     setBlogImageName(blog.imageName);
     setBlogImageUrl(blog.imageUrl);
@@ -1467,7 +1460,6 @@ export default function LeapApp() {
         <Modal onClose={resetComposer} title={editingPostId ? '投稿を編集' : '投稿する'}>
           <textarea className="field min-h-40 resize-none" placeholder="近況、学び、相談したいことを気軽に書いてください" value={postDraft} onChange={(event) => setPostDraft(event.target.value)} />
           <Select label="投稿範囲" value={postVisibility} options={Object.values(visibilityLabels)} onChange={(value) => setPostVisibility((Object.keys(visibilityLabels).find((key) => visibilityLabels[key as Visibility] === value) as Visibility) || 'public')} />
-          <input className="field mt-3" placeholder="タグ。例：SaaS, AI, 資金調達" value={postTags} onChange={(event) => setPostTags(event.target.value)} />
           <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
             <ImageIcon size={17} />画像を選択
             <input className="hidden" type="file" accept="image/*" onChange={(event) => {
@@ -1488,7 +1480,6 @@ export default function LeapApp() {
           <input className="field" placeholder="ブログタイトル" value={blogTitle} onChange={(event) => setBlogTitle(event.target.value)} />
           <textarea className="field mt-3 min-h-56 resize-none leading-7" placeholder="会社のストーリー、事業の考え方、顧客事例、学び、採用・資本提携につながる長文を書いてください" value={blogBody} onChange={(event) => setBlogBody(event.target.value)} />
           <Select label="公開範囲" value={blogVisibility} options={Object.values(visibilityLabels)} onChange={(value) => setBlogVisibility((Object.keys(visibilityLabels).find((key) => visibilityLabels[key as Visibility] === value) as Visibility) || 'public')} />
-          <input className="field mt-3" placeholder="タグ。例：会社紹介, SaaS, 資金調達" value={blogTags} onChange={(event) => setBlogTags(event.target.value)} />
           <label className="mt-3 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-xs font-black text-slate-500">
             <ImageIcon size={17} />カバー画像を選択
             <input className="hidden" type="file" accept="image/*" onChange={(event) => {
@@ -2984,7 +2975,6 @@ function BlogCard({ blog, author, currentAccount, startEditBlog, hideBlog, delet
           </div>
           {blog.imageUrl && <img className="mt-3 aspect-[12/5] w-full rounded-2xl object-cover" src={blog.imageUrl} alt={blog.imageName || blog.title} />}
           <p className="mt-3 whitespace-pre-line text-[14px] leading-7 text-slate-700">{blog.body}</p>
-          {blog.tags.length > 0 && <p className="mt-3 text-[13px] font-black text-blue-600">{blog.tags.map((tag) => `#${tag}`).join(' ')}</p>}
           {blog.attachmentUrl && <a className="mt-3 flex items-center gap-2 rounded-2xl bg-slate-50 p-3 text-xs font-black text-blue-600" href={blog.attachmentUrl} download={blog.attachmentName || 'blog-attachment'}><Paperclip size={15} />{blog.attachmentName || '添付ファイル'}</a>}
           <p className="mt-3 text-[11px] font-bold text-slate-400">閲覧 {blog.views}</p>
         </div>
@@ -3088,7 +3078,6 @@ function PostCard({ post, author, currentAccount, openProfile, reactToPost, star
           </div>
 
           <p className="mt-0.5 whitespace-pre-wrap text-[15px] font-normal leading-[1.55] text-[#0f1419]">{renderPostBody(post.body)}</p>
-          {post.tags.length > 0 && <div className="mt-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5">{post.tags.map((tag) => <span className="text-[11px] font-semibold text-blue-600" key={tag}>#{tag}</span>)}</div>}
           {post.imageUrl && <button className="mt-1.5 block w-full" onClick={() => setPreviewImage(true)}><img className="aspect-square w-full rounded-2xl object-cover" src={post.imageUrl} alt={post.imageName || '投稿画像'} /></button>}
           {post.attachmentName && <div className="mt-1.5 flex items-center gap-1.5 rounded-2xl bg-slate-50 p-2 text-[11px]"><Paperclip size={13} />{post.attachmentName}</div>}
           <div className="mt-1.5 flex items-center gap-5 text-[12px] font-semibold text-[#536471]">
