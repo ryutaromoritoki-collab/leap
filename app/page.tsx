@@ -2016,9 +2016,13 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
       return;
     }
     const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-    let result = (resend || Boolean(existing) || force)
-      ? await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } })
-      : await supabase.auth.signUp({
+    // 明示的な再送(resend/force)以外は、まず必ず signUp を実行する。
+    // 「既存ユーザー」判定は accounts(アプリ側) ではなく Supabase の応答で行う。
+    let result;
+    if (resend || force) {
+      result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+    } else {
+      result = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -2026,8 +2030,10 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
           data: { phone, role },
         },
       });
-    if (result.error && !resend && !force) {
-      result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+      const alreadyRegistered = result.error && /already|registered|exist/i.test(result.error.message);
+      if (alreadyRegistered) {
+        result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+      }
     }
     if (result.error) {
       setAuthMessage(`確認メール送信に失敗しました：${result.error.message}`);
