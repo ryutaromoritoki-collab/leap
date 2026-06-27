@@ -38,6 +38,9 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase/functions",
+    "_not-found",
+    "leap-clean-upload",
+    "leap-update 2"
   ]
 }
