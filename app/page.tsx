@@ -2002,13 +2002,22 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
     flash('ログインしました');
   }
   async function sendConfirmation(resend = false, force = false) {
+    const existing = accounts.find((account) => account.email.trim().toLowerCase() === normalizedEmail);
+    if (existing?.emailVerified && !force) {
+      setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
+      setMode('login');
+      setSent(false);
+      flash('すでに登録済みです');
+      return;
+    }
     const supabase = createSupabaseBrowserClient();
     if (!supabase) {
       setAuthMessage('Supabase接続がないため、確認メールを送信できません。環境変数を確認してください。');
       return;
     }
     const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-    // 初回は必ず signUp を実行し、Supabase が既存ユーザー系エラーを返した場合のみ resend する。
+    // 明示的な再送(resend/force)以外は、まず必ず signUp を実行する。
+    // 「既存ユーザー」判定は accounts(アプリ側) ではなく Supabase の応答で行う。
     let result;
     if (resend || force) {
       result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
@@ -2023,12 +2032,6 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
       });
       const alreadyRegistered = result.error && /already|registered|exist/i.test(result.error.message);
       if (alreadyRegistered) {
-        result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
-      }
-      const user = result.data?.user;
-      const identities = user?.identities ?? [];
-      const needsExplicitResend = !result.error && (!user || identities.length === 0 || !user.confirmation_sent_at);
-      if (needsExplicitResend) {
         result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
       }
     }
