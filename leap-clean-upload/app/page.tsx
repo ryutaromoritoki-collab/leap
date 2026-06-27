@@ -959,25 +959,47 @@ export default function LeapApp() {
       setAuthBootstrapped(true);
       return;
     }
-    supabase.auth.getUser().then(({ data }) => {
-      const user = data.user;
-      if (!user?.email || !isSupabaseEmailConfirmed(user)) {
+    const authClient = supabase;
+    let cancelled = false;
+    async function bootstrapAuthSession() {
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const hasAuthHash = hashParams.has('access_token') || hashParams.has('refresh_token');
+        if (code) {
+          await authClient.auth.exchangeCodeForSession(code);
+        } else if (hasAuthHash) {
+          await authClient.auth.getSession();
+        }
+        const { data } = await authClient.auth.getUser();
+        if (cancelled) return;
+        const user = data.user;
+        if (!user?.email || !isSupabaseEmailConfirmed(user)) {
+          setAuthBootstrapped(true);
+          return;
+        }
+        const email = user.email.trim().toLowerCase();
+        const existing = accounts.find((account) => account.email.trim().toLowerCase() === email);
+        const synced = syncAuthenticatedAccount(user, existing?.role || 'entrepreneur', existing?.phone || '');
+        setPage(synced.profileComplete ? 'feed' : 'profileEdit');
+        flash(synced.profileComplete ? 'メール認証が完了し、ログインしました' : 'メール認証が完了しました。プロフィールを作成してください');
+        if (code || hasAuthHash) {
+          url.searchParams.delete('code');
+          window.history.replaceState({}, document.title, `${url.pathname}${url.searchParams.size ? `?${url.searchParams.toString()}` : ''}`);
+        }
         setAuthBootstrapped(true);
-        return;
+      } catch (error) {
+        if (!cancelled) {
+          setCloudError(`メール認証後のログイン処理に失敗しました：${error instanceof Error ? error.message : '不明なエラー'}`);
+          setAuthBootstrapped(true);
+        }
       }
-      const email = user.email.trim().toLowerCase();
-      setAuthenticatedEmail(email);
-      const existing = accounts.find((account) => account.email.trim().toLowerCase() === email);
-      if (existing) {
-        setCurrentAccountId(existing.id);
-        setAuthBootstrapped(true);
-        return;
-      }
-      const synced = syncAuthenticatedAccount(user, 'entrepreneur', '');
-      setPage(synced.profileComplete ? 'feed' : 'profileEdit');
-      flash('メール認証が完了しました。プロフィールを作成してください');
-      setAuthBootstrapped(true);
-    });
+    }
+    bootstrapAuthSession();
+    return () => {
+      cancelled = true;
+    };
   }, [accounts, authBootstrapped, cloudReady]);
 
   const accountsWithAdmin = useMemo(() => withAdminAccount(accounts).filter((account) => !account.isDeleted), [accounts]);
@@ -2010,30 +2032,41 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
       flash('すでに登録済みです');
       return;
     }
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) {
-      setAuthMessage('Supabase接続がないため、確認メールを送信できません。環境変数を確認してください。');
+    if (!normalizedEmail) {
+      setAuthMessage('メールアドレスを入力してください。');
       return;
     }
-    const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-    let result = (resend || Boolean(existing) || force)
-      ? await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } })
-      : await supabase.auth.signUp({
+    if (password.length < 6) {
+      setAuthMessage('パスワードは6文字以上で入力してください。');
+      return;
+    }
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
+    const response = await fetch('/api/send-signup-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         email,
         password,
-        options: {
-          emailRedirectTo,
-          data: { phone, role },
-        },
-      });
-    if (result.error && !resend && !force) {
-      result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+        phone,
+        role,
+        redirectTo,
+        resend,
+        force,
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (result.alreadyRegistered) {
+        setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
+        setMode('login');
+        setSent(false);
+        flash('すでに登録済みです');
+        return;
+      }
+      setAuthMessage(result.error || '確認メール送信に失敗しました。時間をおいて再度お試しください。');
+      return;
     }
-    if (result.error) {
-      setAuthMessage(`確認メール送信に失敗しました：${result.error.message}`);
-    } else {
-      setAuthMessage(resend ? '確認メールを再送しました。メール内のURLを押すと認証が完了します。' : '確認メールを送信しました。メール内のURLを押すと認証が完了します。');
-    }
+    setAuthMessage(resend ? '確認メールを再送しました。メール内のURLを押すと認証が完了します。' : '確認メールを送信しました。メール内のURLを押すと認証が完了します。');
     setSent(true);
     flash(resend ? '確認メールを再送しました' : '確認メールを送信しました');
   }
