@@ -2010,46 +2010,38 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
       flash('すでに登録済みです');
       return;
     }
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) {
-      setAuthMessage('Supabase接続がないため、確認メールを送信できません。環境変数を確認してください。');
+    if (!email || !password) {
+      setAuthMessage('メールアドレスとパスワードを入力してください。');
       return;
     }
-    const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined;
-    // 明示的な再送(resend/force)以外は、まず必ず signUp を実行する。
-    // 「既存ユーザー」判定は accounts(アプリ側) ではなく Supabase の応答で行う。
-    let result;
-    if (resend || force) {
-      result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
-    } else {
-      result = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo,
-          data: { phone, role },
-        },
+    try {
+      const response = await fetch('/api/send-signup-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          phone,
+          role,
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+        }),
       });
-      const alreadyRegistered = result.error && /already|registered|exist/i.test(result.error.message);
-      if (alreadyRegistered) {
-        result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (result.alreadyRegistered) {
+          setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
+          setMode('login');
+          setSent(false);
+        } else {
+          setAuthMessage(result.error || `確認メール送信に失敗しました。status=${response.status}`);
+        }
+        return;
       }
-    }
-    if (result.error) {
-      const message = result.error.message;
-      if (/security purposes|only request|rate/i.test(message)) {
-        setAuthMessage('短時間に確認メールを複数回送信しています。1分ほど時間をおいてから、確認メールを再送してください。');
-      } else if (/already confirmed|already registered|already exists|user already/i.test(message)) {
-        setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
-        setMode('login');
-        setSent(false);
-      } else {
-        setAuthMessage(`確認メール送信に失敗しました：${message}`);
-      }
-    } else {
       setAuthMessage(resend ? '確認メールを再送しました。メール内のURLを押すと認証が完了します。' : '確認メールを送信しました。メール内のURLを押すと認証が完了します。');
       setSent(true);
       flash(resend ? '確認メールを再送しました' : '確認メールを送信しました');
+    } catch {
+      setAuthMessage('確認メール送信APIに接続できませんでした。時間をおいて再度お試しください。');
     }
   }
   async function complete() {
