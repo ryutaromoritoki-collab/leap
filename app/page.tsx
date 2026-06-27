@@ -2013,14 +2013,6 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
     flash('ログインしました');
   }
   async function sendConfirmation(resend = false, force = false) {
-    const existing = accounts.find((account) => account.email.trim().toLowerCase() === normalizedEmail);
-    if (existing?.emailVerified && !force) {
-      setAuthMessage('すでに登録済みです。ログイン画面に戻ってログインしてください。');
-      setMode('login');
-      setSent(false);
-      flash('すでに登録済みです');
-      return;
-    }
     const supabase = createSupabaseBrowserClient();
     if (!supabase) {
       setAuthMessage('Supabase接続がないため、確認メールを送信できません。環境変数を確認してください。');
