@@ -475,11 +475,16 @@ function createAiAccounts(): Account[] {
     employeeSize: employeeSizes[index % employeeSizes.length],
     revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
     bio: `${aiFounderStories[index % aiFounderStories.length]}\n\n現在は「${aiBusinessDomains[index % aiBusinessDomains.length]}」を提供し、現場の声をもとにプロダクトと導入体験を改善しています。`,
+    mission: `私たちは、${aiIndustries[index % aiIndustries.length]}領域に残る非効率を、現場で毎日使われるプロダクトで解決します。大きな理想だけでなく、顧客の業務が今日少し楽になることを積み上げ、継続的に価値が届く会社を目指しています。`,
+    culture: `顧客へのヒアリング、仮説検証、KPIレビューを毎週行い、学んだことをすぐにプロダクトへ反映しています。チームでは透明性とスピードを大切にし、意思決定の背景まで共有する文化をつくっています。`,
+    teamIntro: `代表の${name}を中心に、プロダクト開発、顧客支援、事業開発のメンバーが連携しています。少人数だからこそ顧客の声に近く、導入後の定着まで責任を持って向き合っています。`,
+    personalityProfile: `実行速度を重視しながら、数字の背景にある顧客の変化を丁寧に見るタイプです。短期の反応だけで判断せず、継続率や紹介につながる体験を磨き込むことを大切にしています。`,
+    dealDetails: `調達・提携では、顧客紹介、営業戦略、採用、プロダクト改善の壁打ちを支援いただける方とお話ししたいです。事業の進捗、KPI、課題はLeap上で継続的に共有しています。`,
     achievements: `${accountAchievementTitle(index)}\n・週次のKPIレビューを継続\n・顧客ヒアリングを累計${35 + index * 4}件実施\n・導入後オンボーディング改善を毎月実施`,
     avatarLabel: '',
     avatarUrl: aiCompanyWords[index % aiCompanyWords.length] === 'LogiCore'
       ? logicoreIconUrl
-      : companyLogoDataUri(`${aiCompanyWords[index % aiCompanyWords.length]}株式会社`, index),
+      : '',
     isBot: true,
     botKind: 'entrepreneur',
     age: `${28 + (index % 18)}歳`,
@@ -506,9 +511,14 @@ function createAiAccounts(): Account[] {
     employeeSize: employeeSizes[(index + 2) % employeeSizes.length],
     revenueScale: revenueScales[(index % (revenueScales.length - 1)) + 1],
     bio: aiInvestorStories[index % aiInvestorStories.length],
+    mission: `${aiIndustries[index % aiIndustries.length]}を中心に、創業者の学習速度と顧客理解が見える事業を継続的に支援しています。短期の話題性ではなく、顧客に使われ続ける理由を大切にしています。`,
+    culture: `面談前から公開投稿やKPIを確認し、投資判断だけでなく、営業、採用、資金調達の壁打ちにつながる関係づくりを重視しています。起業家の挑戦に敬意を持ち、建設的なフィードバックを行います。`,
+    teamIntro: `${aiInvestorFirms[index]}では、シードからシリーズA前後の企業を中心に、事業開発・採用・資本政策の観点から支援しています。必要に応じて専門家や事業会社との接点づくりも行います。`,
+    personalityProfile: `数字だけではなく、なぜその数字になったのかを丁寧に確認します。創業者の意思決定、顧客の反応、次の打ち手が見える投稿を重視しています。`,
+    dealDetails: `投資検討では、月次売上、継続率、顧客単価、導入社数の変化を確認します。面談では、事業の仮説、顧客課題、資金用途、支援ニーズを中心にお聞きします。`,
     achievements: `投資検討領域：${aiIndustries[index % aiIndustries.length]}\n支援可能領域：${['事業戦略', '採用支援', '営業支援', '資金調達', 'ネットワーク提供'][index % 5]}\n公開プロフィールと投稿内容をもとに継続的に案件を確認しています。`,
     avatarLabel: '',
-    avatarUrl: companyLogoDataUri(aiInvestorFirms[index], index + 100),
+    avatarUrl: '',
     isBot: true,
     botKind: 'investor',
     age: `${32 + (index % 22)}歳`,
@@ -661,7 +671,7 @@ function normalizeAccount(account: Account): Account {
   const isManagedAccount = Boolean(account.isBot || account.botKind);
   const avatarUrl = isLogicoreAccount(account)
     ? logicoreIconUrl
-    : account.avatarUrl || (isManagedAccount ? companyLogoDataUri(account.company || account.accountName || account.name || account.id, Math.abs(hashText(account.id || account.email || account.company))) : '');
+    : isManagedAccount ? '' : account.avatarUrl || '';
   return {
     ...emptyAccount,
     ...account,
