@@ -2025,6 +2025,12 @@ function AuthPage({ accounts, setAccounts, setCurrentAccountId, setPage, flash, 
       if (alreadyRegistered) {
         result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
       }
+      const user = result.data?.user;
+      const identities = user?.identities ?? [];
+      const needsExplicitResend = !result.error && (!user || identities.length === 0 || !user.confirmation_sent_at);
+      if (needsExplicitResend) {
+        result = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } });
+      }
     }
     if (result.error) {
       setAuthMessage(`確認メール送信に失敗しました：${result.error.message}`);
